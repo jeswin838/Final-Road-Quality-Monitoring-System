@@ -1,0 +1,234 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   PREMIUM GLASSMORPHISM DESIGN SYSTEM — Smart Road Monitoring
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Global Variable Overrides ─────────────────────────────────────────────── */
+:root {
+  /* Background Palette */
+  --bg-dark:       #05070a;
+  --bg-panel:      #0d1117;
+  --bg-surface:    #0f172a;
+  
+  /* Core Variables */
+  --bg:            var(--bg-dark);
+  --surface:       rgba(15, 23, 42, 0.6);
+  --card-bg:       rgba(30, 41, 59, 0.4);
+  --border:        rgba(255, 255, 255, 0.05);
+  --text:          #f8fafc;
+  --muted:         #94a3b8;
+  
+  /* Accents - Cyan/Blue */
+  --accent:        #0ea5e9;      /* Sky Blue */
+  --accent-2:      #06b6d4;      /* Cyan */
+  --accent-gradient: linear-gradient(135deg, #0ea5e9, #06b6d4);
+  
+  /* Status Colors */
+  --warning:       #f59e0b;      /* Amber */
+  --danger:        #ef4444;      /* Red */
+  --success:       #10b981;      /* Emerald */
+  --info:          #3b82f6;      /* Blue */
+
+  /* Glass Effects */
+  --glass-blur:    10px;
+  --glass-border:  1px solid rgba(255, 255, 255, 0.05);
+  --glass-shadow:  0 4px 24px -1px rgba(0, 0, 0, 0.3);
+  
+  /* Transitions */
+  --transition:    0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --radius:        16px;
+}
+
+/* ── Global Reset & Animations ─────────────────────────────────────────────── */
+body {
+  background-color: var(--bg-dark) !important;
+  color: var(--text) !important;
+  font-family: 'Inter', sans-serif !important;
+  overflow-x: hidden;
+}
+
+/* Animated Ambient Background */
+.ambient-bg {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  z-index: -2;
+  background: var(--bg-dark);
+  overflow: hidden;
+}
+
+.ambient-orb {
+  position: absolute;
+  filter: blur(120px);
+  border-radius: 50%;
+  opacity: 0.12;
+  animation: orbMovement 25s infinite alternate ease-in-out;
+}
+
+.orb-1 { width: 600px; height: 600px; background: var(--accent); top: -200px; left: -200px; }
+.orb-2 { width: 500px; height: 500px; background: var(--accent-2); bottom: -150px; right: -150px; animation-delay: -5s; }
+.orb-3 { width: 400px; height: 400px; background: var(--info); top: 30%; left: 60%; animation-delay: -10s; }
+
+@keyframes orbMovement {
+  0%   { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(120px, 80px) scale(1.1); }
+}
+
+/* ── Sidebar Redesign ────────────────────────────────────────────────────── */
+.sidebar {
+  background: rgba(13, 17, 23, 0.7) !important;
+  backdrop-filter: blur(var(--glass-blur)) !important;
+  border-right: var(--glass-border) !important;
+  box-shadow: 4px 0 32px rgba(0,0,0,0.4) !important;
+}
+
+.sidebar-brand { border-bottom: var(--glass-border) !important; }
+.brand-icon { 
+  background: var(--accent-gradient) !important;
+  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3) !important;
+}
+.brand-text {
+  background: var(--accent-gradient) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+.nav-item { transition: all 0.3s ease !important; border-radius: 12px !important; margin: 2px 8px !important; }
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  transform: translateX(4px);
+}
+.nav-item.active {
+  background: rgba(14, 165, 233, 0.1) !important;
+  color: var(--accent) !important;
+}
+.nav-item.active i { color: var(--accent) !important; }
+.nav-item.active::before { background: var(--accent) !important; box-shadow: 0 0 15px var(--accent) !important; }
+
+/* ── Topbar Redesign ─────────────────────────────────────────────────────── */
+.topbar {
+  background: rgba(5, 7, 10, 0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  border-bottom: var(--glass-border) !important;
+}
+.topbar-title { color: var(--text) !important; letter-spacing: 0.5px; font-weight: 600 !important; }
+
+/* ── Glass Cards ─────────────────────────────────────────────────────────── */
+.glass-card, .stat-card, .modal-box, .alert-item, .user-profile-card, .mini-stat, .table-container {
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) !important;
+  border: var(--glass-border) !important;
+  box-shadow: var(--glass-shadow) !important;
+  border-radius: var(--radius) !important;
+  transition: all var(--transition) !important;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5) !important;
+  background: rgba(30, 41, 59, 0.5) !important;
+}
+
+.stat-icon {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 12px !important;
+}
+
+/* Stat Icon Colors */
+.stat-card:nth-child(1) .stat-icon { color: var(--accent) !important; }
+.stat-card:nth-child(2) .stat-icon { color: var(--accent-2) !important; }
+.stat-card:nth-child(3) .stat-icon { color: var(--success) !important; }
+.stat-card:nth-child(4) .stat-icon { color: var(--info) !important; }
+
+/* ── Buttons & Inputs ─────────────────────────────────────────────────────── */
+.btn {
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+}
+
+.btn-primary {
+  background: var(--accent-gradient) !important;
+  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.2) !important;
+  border: none !important;
+  color: white !important;
+}
+.btn-primary:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4) !important;
+  filter: brightness(1.1);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: var(--glass-border) !important;
+}
+
+.form-input {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(4px) !important;
+  border-radius: 10px !important;
+}
+.form-input:focus {
+  border-color: var(--accent) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1) !important;
+}
+
+select.form-input {
+  cursor: pointer !important;
+  appearance: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 12px center !important;
+  background-size: 16px !important;
+  padding-right: 40px !important;
+}
+
+select.form-input option {
+  background: var(--bg-surface) !important;
+  color: var(--text) !important;
+}
+
+/* ── Map Panels ──────────────────────────────────────────────────────────── */
+.leaflet-container {
+  filter: saturate(0.8) brightness(0.8) contrast(1.1);
+  border-radius: var(--radius) !important;
+}
+
+.map-overlay-card {
+  background: rgba(13, 17, 23, 0.7) !important;
+  backdrop-filter: blur(10px) !important;
+  border: var(--glass-border) !important;
+}
+
+/* ── Tables & Badges ─────────────────────────────────────────────────────── */
+table { border-collapse: separate !important; border-spacing: 0 4px !important; }
+tr { transition: transform 0.2s ease !important; }
+tr:hover { background: rgba(255, 255, 255, 0.02) !important; }
+td { border-top: 1px solid rgba(255, 255, 255, 0.02) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.02) !important; padding: 12px 16px !important; }
+td:first-child { border-left: 1px solid rgba(255, 255, 255, 0.02) !important; border-radius: 12px 0 0 12px !important; }
+td:last-child { border-right: 1px solid rgba(255, 255, 255, 0.02) !important; border-radius: 0 12px 12px 0 !important; }
+
+.badge { border-radius: 30px !important; padding: 4px 12px !important; font-weight: 600 !important; border: 1px solid rgba(255,255,255,0.05) !important; }
+.badge-danger { background: rgba(239, 68, 68, 0.15) !important; color: var(--danger) !important; }
+.badge-warning { background: rgba(245, 158, 11, 0.15) !important; color: var(--warning) !important; }
+.badge-success { background: rgba(16, 185, 129, 0.15) !important; color: var(--success) !important; }
+
+/* ── Status Dot ──────────────────────────────────────────────────────────── */
+.status-dot {
+  background: var(--accent) !important;
+  box-shadow: 0 0 12px var(--accent) !important;
+  animation: shimmerPulse 2s infinite ease-in-out !important;
+}
+
+@keyframes shimmerPulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent !important; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1) !important; border-radius: 10px !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent) !important; }
+

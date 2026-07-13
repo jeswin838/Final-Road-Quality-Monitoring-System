@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+{% block title %}Safe Navigation — PotholePro{% endblock %}
+{% block page_title %}Safe Route Navigation{% endblock %}
+
+{% block head %}
+<style>
+/* ── Reports Gallery Modal (shared) ─────────────────────────────────────── */
+.reports-modal-inner {
+  width: 100%; max-width: 860px; max-height: 80vh;
+  display: flex; flex-direction: column;
+  background: rgba(22,27,34,0.92);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 20px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
+  overflow: hidden;
+  animation: slideUpModal .25s cubic-bezier(.4,0,.2,1);
+}
+@keyframes slideUpModal {
+  from { opacity:0; transform:translateY(24px) scale(0.98); }
+  to   { opacity:1; transform:translateY(0)    scale(1);    }
+}
+.reports-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+.reports-modal-header h3 {
+  font-size: 1.1rem; font-weight: 700; letter-spacing: .01em;
+  display: flex; align-items: center; gap: 10px; color: var(--text);
+}
+.reports-modal-header h3 i { color: var(--accent); font-size: 1rem; }
+.reports-modal-close {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  color: var(--muted); width: 34px; height: 34px; border-radius: 8px;
+  font-size: 1.2rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s, color .15s;
+}
+.reports-modal-close:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+.reports-gallery {
+  flex: 1; overflow-y: auto;
+  padding: 20px 24px 24px;
+  display: flex; flex-direction: column; gap: 16px;
+  scroll-behavior: smooth;
+}
+.reports-gallery::-webkit-scrollbar { width: 5px; }
+.reports-gallery::-webkit-scrollbar-track { background: transparent; }
+.reports-gallery::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.45); border-radius: 10px; }
+.reports-gallery::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+.report-gallery-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px; overflow: hidden;
+  display: flex; flex-direction: column;
+  transition: border-color .2s, box-shadow .2s, transform .2s;
+}
+.report-gallery-card:hover {
+  border-color: rgba(99,102,241,0.4);
+  box-shadow: 0 8px 32px rgba(99,102,241,0.15);
+  transform: translateY(-2px);
+}
+.report-gallery-img-wrap {
+  position: relative; background: rgba(0,0,0,0.35);
+  width: 100%; height: 260px;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.report-gallery-img-wrap img,
+.report-gallery-img-wrap video {
+  width: 100%; height: 100%; object-fit: contain;
+  cursor: zoom-in; transition: transform .3s ease;
+}
+.report-gallery-img-wrap:hover img { transform: scale(1.03); }
+.report-gallery-img-wrap video { cursor: default; }
+.reports-gallery-empty {
+  text-align: center; padding: 60px 20px; color: var(--muted);
+  font-size: 0.9rem; display: flex; flex-direction: column;
+  align-items: center; gap: 12px;
+}
+.reports-gallery-empty i { font-size: 2.5rem; opacity: .4; }
+.reports-count-badge {
+  background: rgba(99,102,241,0.18); color: var(--accent);
+  border: 1px solid rgba(99,102,241,0.3); border-radius: 20px;
+  font-size: 11px; font-weight: 700; padding: 2px 10px; margin-left: 4px;
+}
+@media (max-width: 560px) {
+  .reports-modal-inner { border-radius: 14px; }
+  .report-gallery-img-wrap { height: 200px; }
+}
+
+/* ── Navigation Page Layout ─────────────────────────────────────────────── */
+.nav-layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 16px;
+  height: calc(100vh - var(--topbar-h) - 36px);
+}
+
+/* ── Control Panel ──────────────────────────────────────────────────────── */
+.nav-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.panel-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px 20px;
+}
+
+.panel-card h3 {
+  font-size: .9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* ── Location inputs ────────────────────────────────────────────────────── */
+.location-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.location-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-start { background: var(--success); box-shadow: 0 0 10px var(--success); }
+.dot-end   { background: var(--danger);  box-shadow: 0 0 10px var(--danger); }
+
+.location-input-wrap .form-input {
+  flex: 1;
+  padding-right: 36px;
+}
+
+.clear-input-btn {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: .8rem;
+  cursor: pointer;
+  transition: color var(--transition);
+}
+.clear-input-btn:hover { color: var(--danger); }
+
+.divider-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: .7rem;
+}
+.divider-line::before, .divider-line::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── Route Status Card ──────────────────────────────────────────────────── */
+#routeStatus { display: none; }
+
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: .82rem;
+}
+.status-row:last-child { border-bottom: none; }
+.status-label { color: var(--muted); }
+.status-value { font-weight: 600; }
+
+.safe-badge     { color: var(--success); }
+.moderate-badge { color: var(--warning); }
+.unsafe-badge   { color: var(--danger); }
+
+/* ── Legend ─────────────────────────────────────────────────────────────── */
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: .8rem;
+  color: var(--muted);
+  padding: 5px 0;
+}
+.legend-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  opacity: .85;
+}
+.legend-line {
+  width: 24px; height: 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── Map container ──────────────────────────────────────────────────────── */
+#navMap {
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  background: var(--surface);
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Route info banner ─────────────────────────────────────────────────── */
+#routeBanner {
+  display: none;
+  position: absolute;
+  bottom: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 800;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 20px;
+  font-size: .85rem;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  white-space: nowrap;
+}
+
+/* ── Spinner ────────────────────────────────────────────────────────────── */
+.spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .nav-layout { grid-template-columns: 1fr; height: auto; }
+  #navMap { height: 450px; }
+}
+
+/* Leaflet dark map tiles helper */
+.leaflet-container { background: #1a1f27; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="nav-layout">
+
+  <!-- ── LEFT PANEL ─────────────────────────────────────────────────────── -->
+  <div class="nav-panel">
+
+    <!-- Location Picker -->
+    <div class="panel-card">
+      <h3><i class="fa-solid fa-location-dot" style="color:var(--accent)"></i> Set Locations</h3>
+
+      <!-- Hint -->
+      <p style="font-size:.75rem;color:var(--muted);margin-bottom:12px">
+        Click the map to place markers, or use the fields below.
+      </p>
+
+      <!-- Start -->
+      <label style="font-size:.75rem;color:var(--muted);font-weight:500">📍 Start Point</label>
+      <div class="location-input-wrap" style="margin-top:5px">
+        <div class="location-dot dot-start"></div>
+        <input id="startInput" class="form-input" placeholder="Click map or enter lat,lon"/>
+        <button class="clear-input-btn" onclick="clearPoint('start')" title="Clear">✕</button>
+      </div>
+
+      <div class="divider-line">via safest road</div>
+
+      <!-- End -->
+      <label style="font-size:.75rem;color:var(--muted);font-weight:500">🏁 Destination</label>
+      <div class="location-input-wrap" style="margin-top:5px">
+        <div class="location-dot dot-end"></div>
+        <input id="endInput" class="form-input" placeholder="Click map or enter lat,lon"/>
+        <button class="clear-input-btn" onclick="clearPoint('end')" title="Clear">✕</button>
+      </div>
+
+      <!-- Map click mode toggle -->
+      <div style="display:flex;gap:8px;margin:14px 0 0">
+        <button id="modeStart" class="btn btn-success btn-xs" onclick="setClickMode('start')">
+          <i class="fa-solid fa-crosshairs"></i> Set Start
+        </button>
+        <button id="modeEnd" class="btn btn-danger btn-xs" onclick="setClickMode('end')">
+          <i class="fa-solid fa-crosshairs"></i> Set End
+        </button>
+        <button class="btn btn-secondary btn-xs" onclick="useMyLocation()" title="Use GPS">
+          <i class="fa-solid fa-location-arrow"></i> My Location
+        </button>
+      </div>
+    </div>
+
+    <!-- Find Route Button -->
+    <button id="findRouteBtn" class="btn btn-primary btn-full" onclick="findSafeRoute()" style="padding:12px">
+      <i class="fa-solid fa-shield-halved"></i> Find Safe Route
+    </button>
+
+    <!-- Route Status (hidden until route calculated) -->
+    <div class="panel-card" id="routeStatus">
+      <h3><i class="fa-solid fa-chart-simple" style="color:var(--accent)"></i> Route Summary</h3>
+      <div class="status-row">
+        <span class="status-label">Safety Status</span>
+        <span class="status-value" id="safetyBadge">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Potholes on Route</span>
+        <span class="status-value" id="potholesOnPath">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Risk Score</span>
+        <span class="status-value" id="riskValue">0%</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Danger Zones Avoided</span>
+        <span class="status-value" id="avoidedCount">—</span>
+      </div>
+      <div id="routeWarningBox" style="display:none;margin-top:12px;padding:10px 12px;border-radius:8px;font-size:.8rem"></div>
+    </div>
+
+    <!-- Legend -->
+    <div class="panel-card">
+      <h3><i class="fa-solid fa-circle-info" style="color:var(--muted)"></i> Map Legend</h3>
+      <div class="legend-row"><div class="legend-dot" style="background:var(--danger)"></div> High Severity Pothole</div>
+      <div class="legend-row"><div class="legend-dot" style="background:var(--warning)"></div> Medium Severity Pothole</div>
+      <div class="legend-row"><div class="legend-dot" style="background:var(--success)"></div> Low Severity Pothole</div>
+      
+      <div class="legend-row" style="margin-top:10px"><div class="legend-line" style="background:var(--success)"></div> Safe Route (No potholes)</div>
+      <div class="legend-row"><div class="legend-line" style="background:var(--warning)"></div> Moderate Route (Small risks)</div>
+      <div class="legend-row"><div class="legend-line" style="background:var(--danger)"></div> Unsafe Route (High risks)</div>
+      
+      <div class="legend-row" style="margin-top:12px;color:var(--muted);font-size:.72rem">
+        <i class="fa-solid fa-rotate" style="margin-right:4px"></i>
+        Pothole data refreshes every 12 seconds
+      </div>
+    </div>
+
+  </div><!-- /left panel -->
+
+  <!-- ── MAP ──────────────────────────────────────────────────────────────── -->
+  <div style="position:relative">
+    <div id="navMap"></div>
+    <div id="routeBanner"></div>
+  </div>
+
+</div>
+
+<!-- Reports Viewer Modal -->
+<div id="reportsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:10000; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(6px)" onclick="if(event.target===this)closeReportsModal()">
+  <div class="reports-modal-inner">
+    <div class="reports-modal-header">
+      <h3>
+        <i class="fa-solid fa-images"></i>
+        Location Reports
+        <span class="reports-count-badge" id="reportsCountBadge" style="display:none">0</span>
+      </h3>
+      <button class="reports-modal-close" onclick="closeReportsModal()" title="Close">&times;</button>
+    </div>
+    <div class="reports-gallery" id="reportsContainer">
+      <div class="reports-gallery-empty">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        Loading reports...
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #070B14;
+  --color-secondary: rgba(15, 23, 42, 0.92);
+  --color-accent: #38BDF8;
+  --color-glass-border: rgba(255, 255, 255, 0.08);
+  --color-danger: #F43F5E;
+  --color-warning: #F59E0B;
+  --color-success: #10B981;
+  
+  /* Text Colors */
+  --color-title: #F8FAFC;
+  --color-body: #CBD5E1;
+  --color-muted-text: #94A3B8;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-body font-sans antialiased selection:bg-accent/30 selection:text-white;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-title font-black tracking-tight;
+  }
+
+  select {
+    @apply bg-secondary/80 backdrop-blur-[12px] border border-glass-border rounded-xl px-4 py-2.5 text-sm font-bold text-title outline-none shadow-xl transition-all hover:bg-secondary/90 focus:border-accent/50 appearance-none cursor-pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1.25em;
+  }
+
+  option {
+    @apply bg-[#0F172A] text-title;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-secondary backdrop-blur-[18px] border border-glass-border rounded-[24px] shadow-[0_10px_40px_rgba(0,0,0,0.45)];
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-black text-sm transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:pointer-events-none uppercase tracking-wider;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-br from-accent to-blue-600 text-slate-900 shadow-[0_0_20px_rgba(56,189,248,0.3)] hover:shadow-[0_0_30px_rgba(56,189,248,0.5)] hover:-translate-y-0.5 border border-white/20;
+  }
+
+  .btn-secondary {
+    @apply bg-white/5 border border-white/10 text-title hover:bg-white/10 hover:border-white/20;
+  }
+
+  .btn-danger {
+    @apply bg-danger/10 border border-danger/30 text-danger hover:bg-danger hover:text-white;
+  }
+
+  .btn-circle {
+    @apply p-3 rounded-full aspect-square;
+  }
+
+  /* Custom Scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-white/10 rounded-full hover:bg-white/20;
+  }
+
+  /* Leaflet Popup Styling Override */
+  .leaflet-popup-content-wrapper {
+    @apply !bg-secondary !backdrop-blur-[18px] !border !border-glass-border !rounded-[24px] !shadow-[0_20px_50px_rgba(0,0,0,0.6)] !p-0 !overflow-hidden;
+  }
+  .leaflet-popup-tip {
+    @apply !bg-secondary !border !border-glass-border;
+  }
+  .leaflet-popup-content {
+    @apply !m-0 !w-[320px];
+  }
+  .leaflet-container {
+    @apply !bg-background;
+  }
+}
+
+/* Map Animations */
+.nav-icon {
+  @apply transition-transform duration-300 hover:scale-110 cursor-pointer;
+}
+
+.custom-pothole-icon {
+  @apply animate-pulse;
+}

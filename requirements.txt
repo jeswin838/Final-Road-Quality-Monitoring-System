@@ -1,0 +1,14 @@
+Flask
+supabase
+Werkzeug
+python-dotenv
+flask-bcrypt
+requests
+gunicorn
+flask-cors
+opencv-python-headless
+numpy
+torch
+torchvision
+ultralytics==8.3.0
+gdown
