@@ -44,13 +44,10 @@ def load_model(dlog: "DetectionLogger | None" = None):
     if model is None:
         if dlog:
             dlog.model_loading()
-        print("🚀 Loading YOLO model...")
+        print("Loading YOLO model...")
         print("📂 Current directory:", os.getcwd())
         print("📂 Files:", os.listdir())
         model_path = os.path.join("models", "best.pt")
-        
-        from download_model import download_model
-        download_model()
         
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"❌ MODEL NOT FOUND at {model_path}. Please ensure it exists.")
@@ -58,7 +55,6 @@ def load_model(dlog: "DetectionLogger | None" = None):
         try:
             print("Loading model from:", os.path.abspath(model_path))
             model = YOLO(model_path)
-            model.to("cuda")
             
             # PyTorch Optimizations for Live Detection FPS
             if torch.cuda.is_available():
@@ -66,7 +62,7 @@ def load_model(dlog: "DetectionLogger | None" = None):
                 
             if dlog:
                 dlog.model_loaded()
-            print("✅ YOLO Model loaded successfully (CUDA)")
+            print("YOLO model loaded successfully.")
             print("MODEL CLASSES:", model.names)
         except Exception as e:
             print(f"❌ Error loading YOLO: {e}")
@@ -347,13 +343,14 @@ def run_inference(m, img: np.ndarray) -> tuple:
         # captured at an angle, while the backend 'strong_detections' logic
         # still filters out pure noise later.
         with torch.no_grad():
+            device = "cuda:0" if torch.cuda.is_available() else "cpu"
             results = m.predict(
                 source=img,
                 conf=0.08,
                 iou=0.30,
                 imgsz=640,
-                device=0,
-                half=True,
+                device=device,
+                half=torch.cuda.is_available(),
                 verbose=False
             )
         elapsed = (time.time() - start) * 1000
@@ -948,13 +945,14 @@ def user_report():
             print("✅ Starting AI inference...")
             print("MODEL CLASSES:", m.names)
             # Lightweight inference configuration for Render deployment.
+            device = "cuda:0" if torch.cuda.is_available() else "cpu"
             results = m.predict(
                 source=img,
                 conf=0.10,
                 iou=0.20,
                 imgsz=320,
-                device=0,
-                half=True,
+                device=device,
+                half=torch.cuda.is_available(),
                 verbose=False
             )
             _yolo_ms = (time.time() - _t_yolo_start) * 1000

@@ -20,6 +20,11 @@ from supabase import create_client, Client
 from supabase.client import ClientOptions
 from config import Config
 
+# Ensure the model is downloaded before the Flask app starts
+from download_model import download_model
+download_model()
+logger.info("✅ AI model is ready.")
+
 Config.check_env()
 
 # 2. Initialize Supabase Client safely with increased network timeouts
