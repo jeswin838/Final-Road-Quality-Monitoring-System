@@ -1580,32 +1580,33 @@ def get_user_reports():
         r["source"] = "user"
         normalized.append(r)
         
-    # 2. Fetch AI detections from potholes if status is pending (or all)
-    if not status or status == "pending" or status == "all":
-        p_query = supabase.table("potholes").select("*")
-        if status and status != 'all':
-            p_query = p_query.eq("status", status).eq("review_required", True)
+    # 2. Fetch AI detections from potholes
+    p_query = supabase.table("potholes").select("*").is_("source_report_id", "null")
+    if status and status != 'all':
+        p_query = p_query.eq("status", status)
+        if status == "pending":
+            p_query = p_query.eq("review_required", True)
+    
+    ph_res = p_query.order("created_at", desc=True).execute()
         
-        ph_res = p_query.order("created_at", desc=True).execute()
+    for p in ph_res.data:
+        conf_pct = int((p.get("confidence") or 0) * 100)
+        det_type = p.get("type") or "pothole"
         
-        for p in ph_res.data:
-            conf_pct = int((p.get("confidence") or 0) * 100)
-            det_type = p.get("type") or "pothole"
-            
-            ai_record = {
-                "id": p.get("id"),
-                "created_at": p.get("created_at"),
-                "status": p.get("status"),
-                "media_url": p.get("image_url"),
-                "latitude": p.get("latitude"),
-                "longitude": p.get("longitude"),
-                "confidence": p.get("confidence"),
-                "severity": p.get("severity"),
-                "type": det_type,
-                "source": "ai",
-                "description": f"AI detected {det_type} ({conf_pct}%)"
-            }
-            normalized.append(ai_record)
+        ai_record = {
+            "id": p.get("id"),
+            "created_at": p.get("created_at"),
+            "status": p.get("status"),
+            "media_url": p.get("image_url"),
+            "latitude": p.get("latitude"),
+            "longitude": p.get("longitude"),
+            "confidence": p.get("confidence"),
+            "severity": p.get("severity"),
+            "type": det_type,
+            "source": "ai",
+            "description": f"AI detected {det_type} ({conf_pct}%)"
+        }
+        normalized.append(ai_record)
             
     # Sort merged list newest first
     normalized.sort(key=lambda x: x.get("created_at", ""), reverse=True)

@@ -886,7 +886,7 @@ def user_report():
         if img is None:
             raise ValueError("Decode failed")
         _decode_ms = (time.time() - _t_decode_start) * 1000
-        print(f"[PERF] Image Decode Time: {_decode_ms:.2f} ms")
+        print(f"Decode: {_decode_ms/1000:.2f}s")
     except Exception:
         return jsonify({"error": "Invalid image data"}), 400
 
@@ -963,7 +963,7 @@ def user_report():
                 verbose=False
             )
             _yolo_ms = (time.time() - _t_yolo_start) * 1000
-            print(f"[PERF] YOLO Inference Time: {_yolo_ms:.2f} ms")
+            print(f"YOLO: {_yolo_ms/1000:.2f}s")
             for r in (results or []):
                 if r.boxes is None:
                     continue
@@ -1137,7 +1137,7 @@ def user_report():
             _t_bbox_start = time.time()
             annotated_or_raw = ai_results[0].plot() if (ai_results and len(ai_results) > 0) else img_to_process
             _bbox_ms = (time.time() - _t_bbox_start) * 1000
-            print(f"[PERF] Bounding Box Drawing Time: {_bbox_ms:.2f} ms")
+            print(f"Draw: {_bbox_ms/1000:.2f}s")
 
             _t_resize_start = time.time()
             h, w = annotated_or_raw.shape[:2]
@@ -1150,7 +1150,7 @@ def user_report():
                     interpolation=cv2.INTER_AREA
                 )
             _resize_ms = (time.time() - _t_resize_start) * 1000
-            print(f"[PERF] Resize Time: {_resize_ms:.2f} ms")
+            print(f"Resize: {_resize_ms/1000:.2f}s")
 
             _t_jpeg_start = time.time()
             ok_annotated, annotated_buffer = cv2.imencode(
@@ -1160,7 +1160,7 @@ def user_report():
             if not ok_annotated:
                 raise ValueError("cv2.imencode failed")
             _jpeg_ms = (time.time() - _t_jpeg_start) * 1000
-            print(f"[PERF] JPEG Compression Time: {_jpeg_ms:.2f} ms")
+            print(f"JPEG: {_jpeg_ms/1000:.2f}s")
             
             print(f"[PERF] Resized Resolution  : {annotated_or_raw.shape[1]}x{annotated_or_raw.shape[0]}")
             print(f"[PERF] Compressed Size     : {annotated_buffer.nbytes} bytes")
@@ -1170,7 +1170,7 @@ def user_report():
             _t_upload_req_start = time.time()
             uploaded = upload_with_retry(app_supabase, annotated_buffer.tobytes(), f"{b_name}_ann", exact_filename=a_filename)
             _upload_req_ms = (time.time() - _t_upload_req_start) * 1000
-            print(f"[PERF] Supabase Upload Time: {_upload_req_ms:.2f} ms")
+            print(f"Upload: {_upload_req_ms/1000:.2f}s")
             
             if uploaded:
                 dl.upload_done(url=f"{Config.SUPABASE_URL}/storage/v1/object/public/pothole-images/{uploaded}")
@@ -1192,7 +1192,7 @@ def user_report():
         print(f"[PERF] Sync Upload Time         : {_upload_ms:.1f} ms")
 
     _total_s = time.time() - _t_total_start
-    print(f"[PERF] Total Request Time: {_total_s * 1000:.2f} ms")
+    print(f"Total: {_total_s:.2f}s")
     dlog.timings(yolo_ms=_yolo_ms, upload_ms=_upload_ms, total_s=_total_s)
     dlog.request_end()
 
@@ -1378,7 +1378,7 @@ def submit_user_report():
             print(f"[DB] ❌ user_reports minimal insert failed: {e2}")
             return jsonify({"error": "user_report_insert_failed", "detail": str(e2)}), 500
     _db_ms = (time.time() - _t_db_start) * 1000
-    print(f"[PERF] Database Insert Time: {_db_ms:.2f} ms")
+    print(f"Database: {_db_ms/1000:.2f}s")
 
     # Only approved go into potholes
     if status == "approved":

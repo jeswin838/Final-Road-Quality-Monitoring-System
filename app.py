@@ -25,7 +25,9 @@ from download_model import download_model
 download_model()
 logger.info("📥 Model downloaded")
 
+logger.info(f"RAILWAY_ENVIRONMENT = {os.getenv('RAILWAY_ENVIRONMENT')}")
 IS_RAILWAY = os.getenv("RAILWAY_ENVIRONMENT", "").lower() in ("true", "1", "yes")
+logger.info(f"IS_RAILWAY = {IS_RAILWAY}")
 
 if IS_RAILWAY:
     logger.info("🚀 Railway detected")
