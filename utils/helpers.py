@@ -174,7 +174,7 @@ def human_time(dt_str: str) -> str:
         print(f"Time parse error: {e}")
         return dt_str
 
-def upload_with_retry(supabase, img_bytes: bytes, base_name: str, bucket_name: str = "pothole-images") -> str | None:
+def upload_with_retry(supabase, img_bytes: bytes, base_name: str, bucket_name: str = "pothole-images", exact_filename: str = None) -> str | None:
     """Upload image bytes to Supabase storage with exponential backoff.
 
     Args:
@@ -182,6 +182,7 @@ def upload_with_retry(supabase, img_bytes: bytes, base_name: str, bucket_name: s
         img_bytes: Raw image bytes.
         base_name: Base name for the file (without extension or retry suffix).
         bucket_name: Supabase storage bucket.
+        exact_filename: Optional exact filename to use for all attempts (upsert is enabled).
 
     Returns:
         The filename on success, or ``None`` on failure.
@@ -195,12 +196,17 @@ def upload_with_retry(supabase, img_bytes: bytes, base_name: str, bucket_name: s
     backoff_times = [1, 2, 4]
     for attempt, wait in enumerate(backoff_times, start=1):
         try:
-            filename = f"{base_name}_{attempt}.jpg"
+            filename = exact_filename if exact_filename else f"{base_name}_{attempt}.jpg"
             logger.info(f"[UPLOAD] Attempt {attempt}: uploading {filename} to bucket '{bucket_name}'")
+            
+            file_options = {"content-type": "image/jpeg"}
+            if exact_filename:
+                file_options["upsert"] = "true"
+                
             response = supabase.storage.from_(bucket_name).upload(
                 path=filename,
                 file=img_bytes,
-                file_options={"content-type": "image/jpeg"},
+                file_options=file_options,
             )
             # If the SDK returns a dict-like object with a 'Key' or similar, treat as success.
             logger.info(f"[UPLOAD] Successfully uploaded {filename}")
@@ -214,6 +220,9 @@ def upload_with_retry(supabase, img_bytes: bytes, base_name: str, bucket_name: s
         except httpx.TransportError as e:
             logger.warning(f"[UPLOAD] TransportError on attempt {attempt}: {e}")
         except Exception as e:
+            if "400" in str(e):
+                logger.error(f"[UPLOAD] HTTP 400 Bad Request on attempt {attempt}, aborting retries: {e}")
+                break
             logger.error(f"[UPLOAD] Unexpected error on attempt {attempt}: {e}", exc_info=True)
         logger.debug("[UPLOAD] Backing off for %s seconds before retry", wait)
         time.sleep(wait)
@@ -248,6 +257,12 @@ def db_insert_with_retry(supabase, record: dict, retries: int = 3) -> bool:
                     current.pop(col)
                     print(f"[DB] Column '{col}' not in schema cache — stripped, retrying")
                     continue   # retry immediately (don't count against attempts)
+            
+            # Abort retries for HTTP 400 errors (Bad Request)
+            if "400" in err:
+                print(f"[DB] ❌ HTTP 400 Bad Request, aborting retries: {err}")
+                return False
+
             print(f"[DB] Insert attempt {attempt}/{retries} failed: {err}")
             traceback.print_exc()
             if attempt < retries:

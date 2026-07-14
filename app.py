@@ -23,7 +23,32 @@ from config import Config
 # Ensure the model is downloaded before the Flask app starts
 from download_model import download_model
 download_model()
-logger.info("✅ AI model is ready.")
+logger.info("📥 Model downloaded")
+
+IS_RAILWAY = os.getenv("RAILWAY_ENVIRONMENT", "").lower() in ("true", "1", "yes")
+
+if IS_RAILWAY:
+    logger.info("🚀 Railway detected")
+    try:
+        from routes.ai import load_model
+        logger.info("🧠 Loading YOLO model...")
+        m = load_model()
+        if m:
+            logger.info("🔥 Running warm-up inference...")
+            import numpy as np
+            import torch
+            dummy = np.zeros((320, 320, 3), dtype=np.uint8)
+            device = "cuda:0" if torch.cuda.is_available() else "cpu"
+            m.predict(
+                source=dummy, 
+                imgsz=320, 
+                device=device,
+                half=torch.cuda.is_available(),
+                verbose=False
+            )
+            logger.info("✅ YOLO warm-up completed")
+    except Exception as e:
+        logger.error(f"❌ YOLO warm-up failed: {e}")
 
 Config.check_env()
 
@@ -78,6 +103,8 @@ def create_app():
 
 # Global app instance for Gunicorn
 app = create_app()
+
+logger.info("🚀 Server ready")
 
 if __name__ == "__main__":
     # Production run — debug=False prevents state loss from auto-reloader

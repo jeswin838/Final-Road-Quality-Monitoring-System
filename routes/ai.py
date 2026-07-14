@@ -20,6 +20,9 @@ executor = ThreadPoolExecutor(max_workers=4)
 from config import Config
 import logging
 logger = logging.getLogger(__name__)
+
+IS_RAILWAY = os.environ.get("RAILWAY_ENVIRONMENT", "").strip().lower() in ("true", "1", "yes")
+
 from utils.detection_logger import DetectionLogger
 from utils.helpers import (
     is_duplicate,
@@ -644,7 +647,8 @@ def analyze():
                 continue
 
             # ===== DEBUG =====
-            cv2.imwrite(f"received_{idx}.jpg", img)
+            if not IS_RAILWAY:
+                cv2.imwrite(f"received_{idx}.jpg", img)
 
             if m:
                 results, detections = run_inference(m, img)
@@ -876,10 +880,13 @@ def user_report():
     try:
         file_bytes = file.read()  # Preserve original bytes from upload
         byte_size = len(file_bytes or b"")
+        _t_decode_start = time.time()
         np_arr = np.frombuffer(file_bytes, np.uint8)
         img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         if img is None:
             raise ValueError("Decode failed")
+        _decode_ms = (time.time() - _t_decode_start) * 1000
+        print(f"[PERF] Image Decode Time: {_decode_ms:.2f} ms")
     except Exception:
         return jsonify({"error": "Invalid image data"}), 400
 
@@ -956,6 +963,7 @@ def user_report():
                 verbose=False
             )
             _yolo_ms = (time.time() - _t_yolo_start) * 1000
+            print(f"[PERF] YOLO Inference Time: {_yolo_ms:.2f} ms")
             for r in (results or []):
                 if r.boxes is None:
                     continue
@@ -1113,65 +1121,78 @@ def user_report():
     # Upload resized annotated image only (raw image is NOT stored)
     dlog.upload_start()
     _t_upload_start = time.time()
-    try:
-        # Log original resolution and size
-        _orig_h, _orig_w = img.shape[:2]
-        _, _orig_buf = cv2.imencode(".jpg", img)
-        print(f"[PERF] Original Resolution : {_orig_w}x{_orig_h}")
-        print(f"[PERF] Original File Size  : {_orig_buf.nbytes} bytes")
-
-        # Generate annotated frame with YOLO bounding boxes
-        annotated_or_raw = results[0].plot() if (results and len(results) > 0) else img
-
-        # Resize while keeping aspect ratio (max 1600px wide, no upscaling)
-        h, w = annotated_or_raw.shape[:2]
-        MAX_WIDTH = 1600
-        if w > MAX_WIDTH:
-            scale = MAX_WIDTH / float(w)
-            annotated_or_raw = cv2.resize(
-                annotated_or_raw,
-                (MAX_WIDTH, int(h * scale)),
-                interpolation=cv2.INTER_AREA
-            )
-
-        # Compress with JPEG quality 90
-        ok_annotated, annotated_buffer = cv2.imencode(
-            ".jpg", annotated_or_raw,
-            [int(cv2.IMWRITE_JPEG_QUALITY), 90]
-        )
-        if not ok_annotated:
-            raise ValueError("cv2.imencode failed")
-        print(f"[PERF] Resized Resolution  : {annotated_or_raw.shape[1]}x{annotated_or_raw.shape[0]}")
-        print(f"[PERF] Compressed Size     : {annotated_buffer.nbytes} bytes")
-
-        dlog.image_saved()
-        base_name = f"user_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
-        # Upload ONLY the resized annotated image
-        annotated_filename = upload_with_retry(supabase, annotated_buffer.tobytes(), f"{base_name}_ann")
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        dlog.error(e)
-        print(f"[USER REPORT] image processing/upload prep failed: {e}")
-        return jsonify({
-            "error": "upload_failed",
-            "details": str(e)
-        }), 500
-    _upload_ms = (time.time() - _t_upload_start) * 1000
-
-    print(f"[PERF] Upload Time         : {_upload_ms:.1f} ms")
-
-    if not annotated_filename:
-        return jsonify({
-            "error": "upload_failed",
-            "details": "Annotated image upload returned None"
-        }), 500
-
-    # image_url always holds the annotated (bounding-box) image
+    
+    base_name = f"user_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+    annotated_filename = f"{base_name}_ann.jpg"
     image_url = f"{Config.SUPABASE_URL}/storage/v1/object/public/pothole-images/{annotated_filename}"
-    dlog.upload_done(url=image_url)
+    _upload_ms = 0.0
+
+    def process_and_upload(app_supabase, img_to_process, ai_results, b_name, a_filename, dl):
+        try:
+            _orig_h, _orig_w = img_to_process.shape[:2]
+            _, _orig_buf = cv2.imencode(".jpg", img_to_process)
+            print(f"[PERF] Original Resolution : {_orig_w}x{_orig_h}")
+            print(f"[PERF] Original File Size  : {_orig_buf.nbytes} bytes")
+
+            _t_bbox_start = time.time()
+            annotated_or_raw = ai_results[0].plot() if (ai_results and len(ai_results) > 0) else img_to_process
+            _bbox_ms = (time.time() - _t_bbox_start) * 1000
+            print(f"[PERF] Bounding Box Drawing Time: {_bbox_ms:.2f} ms")
+
+            _t_resize_start = time.time()
+            h, w = annotated_or_raw.shape[:2]
+            MAX_WIDTH = 1280
+            if w > MAX_WIDTH:
+                scale = MAX_WIDTH / float(w)
+                annotated_or_raw = cv2.resize(
+                    annotated_or_raw,
+                    (MAX_WIDTH, int(h * scale)),
+                    interpolation=cv2.INTER_AREA
+                )
+            _resize_ms = (time.time() - _t_resize_start) * 1000
+            print(f"[PERF] Resize Time: {_resize_ms:.2f} ms")
+
+            _t_jpeg_start = time.time()
+            ok_annotated, annotated_buffer = cv2.imencode(
+                ".jpg", annotated_or_raw,
+                [int(cv2.IMWRITE_JPEG_QUALITY), 85]
+            )
+            if not ok_annotated:
+                raise ValueError("cv2.imencode failed")
+            _jpeg_ms = (time.time() - _t_jpeg_start) * 1000
+            print(f"[PERF] JPEG Compression Time: {_jpeg_ms:.2f} ms")
+            
+            print(f"[PERF] Resized Resolution  : {annotated_or_raw.shape[1]}x{annotated_or_raw.shape[0]}")
+            print(f"[PERF] Compressed Size     : {annotated_buffer.nbytes} bytes")
+
+            dl.image_saved()
+            
+            _t_upload_req_start = time.time()
+            uploaded = upload_with_retry(app_supabase, annotated_buffer.tobytes(), f"{b_name}_ann", exact_filename=a_filename)
+            _upload_req_ms = (time.time() - _t_upload_req_start) * 1000
+            print(f"[PERF] Supabase Upload Time: {_upload_req_ms:.2f} ms")
+            
+            if uploaded:
+                dl.upload_done(url=f"{Config.SUPABASE_URL}/storage/v1/object/public/pothole-images/{uploaded}")
+            else:
+                print("[BACKGROUND UPLOAD] Upload failed, returned None")
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            dl.error(e)
+            print(f"[BACKGROUND UPLOAD] image processing/upload prep failed: {e}")
+
+    if IS_RAILWAY:
+        print("[USER REPORT] Railway environment detected - offloading image processing and upload to background thread.")
+        executor.submit(process_and_upload, supabase, img, results, base_name, annotated_filename, dlog)
+    else:
+        print("[USER REPORT] Local environment detected - processing synchronously.")
+        process_and_upload(supabase, img, results, base_name, annotated_filename, dlog)
+        _upload_ms = (time.time() - _t_upload_start) * 1000
+        print(f"[PERF] Sync Upload Time         : {_upload_ms:.1f} ms")
 
     _total_s = time.time() - _t_total_start
+    print(f"[PERF] Total Request Time: {_total_s * 1000:.2f} ms")
     dlog.timings(yolo_ms=_yolo_ms, upload_ms=_upload_ms, total_s=_total_s)
     dlog.request_end()
 
@@ -1357,6 +1378,7 @@ def submit_user_report():
             print(f"[DB] ❌ user_reports minimal insert failed: {e2}")
             return jsonify({"error": "user_report_insert_failed", "detail": str(e2)}), 500
     _db_ms = (time.time() - _t_db_start) * 1000
+    print(f"[PERF] Database Insert Time: {_db_ms:.2f} ms")
 
     # Only approved go into potholes
     if status == "approved":
@@ -1396,6 +1418,7 @@ def submit_user_report():
             pass
 
     _total_s = time.time() - _t_total_start
+    print(f"[PERF] Total Request Time: {_total_s * 1000:.2f} ms")
     dlog.timings(db_ms=_db_ms, total_s=_total_s)
     dlog.request_end()
 
