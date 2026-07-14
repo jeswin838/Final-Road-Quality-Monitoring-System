@@ -788,6 +788,13 @@ def analyze():
 
         _db_ms = (time.time() - _t_db_start) * 1000
         dlog.db_done(report_id=inserted_id)
+        
+        if approval_status == "approved":
+            try:
+                from routes.api import global_alerts_cache
+                global_alerts_cache["data"] = None
+            except Exception:
+                pass
 
         # ----- 9. Background Image Upload -----
         base_name = f"fusion_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
@@ -1330,12 +1337,21 @@ def submit_user_report():
 
     print(f"\nReceived Latitude: {lat_f}\nReceived Longitude: {lon_f}\n")
 
+    user_id = None
+    try:
+        from flask import session as flask_session
+        user_id = flask_session.get("user_id")
+    except Exception:
+        pass
+    
+    if not user_id and data:
+        user_id = data.get("user_id")
+
     # Build payload using only existing columns in user_reports
     user_payload = {
         "latitude": lat_f,
         "longitude": lon_f,
         "media_url": data["image_url"],
-        "image_url": data["image_url"],
         "type": "image",
         "description": f"AI Decision: {ai_status}",
         "status": status,
@@ -1379,6 +1395,13 @@ def submit_user_report():
     print(f"[PERF] Total Request Time: {_total_s * 1000:.2f} ms")
     dlog.timings(db_ms=_db_ms, total_s=_total_s)
     dlog.request_end()
+
+    if status == "approved":
+        try:
+            from routes.api import global_alerts_cache
+            global_alerts_cache["data"] = None
+        except Exception:
+            pass
 
     print(f"[USER REPORT] status={status} conf={confidence:.4f}")
     return jsonify({

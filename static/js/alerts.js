@@ -60,14 +60,17 @@ function renderAlertPanel(alerts) {
     div.className = `alert-item severity-${sevDisplay.toLowerCase()}`;
     div.innerHTML = `
       <div class="alert-title" style="display:flex; justify-content:space-between; align-items:center">
-        <span><b style="color:${sevColor}">#${r.id}</b> pothole &bull; ${r.report_count} ${r.report_count === 1 ? 'Report' : 'Reports'}</span>
+        <span><b style="color:${sevColor}">#${r.id || r.marker_id}</b> pothole &bull; ${r.report_count} ${r.report_count === 1 ? 'Report' : 'Reports'}</span>
         <span class="badge" style="background:${sevColor}22; color:${sevColor}; font-size:0.6rem">${sevDisplay}</span>
       </div>
-      <div class="alert-meta" style="margin-top:4px">
-        <div style="color:var(--text); font-size:0.75rem"><i class="fa-solid fa-clock"></i> Last seen: ${r.last_seen}</div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px">
-           <span style="font-size:0.7rem; color:var(--muted)"><i class="fa-solid fa-map-pin"></i> ${r.latitude}, ${r.longitude}</span>
-           <span style="font-size:0.7rem; font-style:italic; color:var(--accent)">Source: ${(r.source && r.source.toLowerCase() === 'citizen') ? 'Citizen' : 'Sensor'}</span>
+      <div style="display:flex; gap:10px; margin-top:8px;">
+        <img src="${r.latest_image || r.image || '/static/img/placeholder.jpg'}" style="width:48px;height:48px;border-radius:6px;object-fit:cover;" onerror="this.style.display='none'">
+        <div class="alert-meta" style="flex:1;">
+          <div style="color:var(--text); font-size:0.75rem"><i class="fa-solid fa-clock"></i> Last seen: ${r.last_seen}</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px">
+             <span style="font-size:0.7rem; color:var(--muted)"><i class="fa-solid fa-map-pin"></i> ${parseFloat(r.latitude).toFixed(4)}, ${parseFloat(r.longitude).toFixed(4)}</span>
+             <span style="font-size:0.7rem; font-style:italic; color:var(--accent)">Source: ${(r.source && r.source.toLowerCase() === 'citizen') ? 'Citizen' : 'Sensor'}</span>
+          </div>
         </div>
       </div>`;
     panel.appendChild(div);

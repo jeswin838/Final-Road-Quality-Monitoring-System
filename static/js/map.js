@@ -24,6 +24,8 @@ let allData            = [];
 let userReports        = [];
 let showClusters       = true;
 let refreshTimer       = null;
+let autoRefreshInterval= null;
+let isLoadingMarkers   = false;
 let activeFilters      = { severity: '', status: '', confidence: 0 };
 let userMarker         = null;
 let firstLoad           = true;
@@ -266,7 +268,7 @@ function buildPremiumPopup(r, lat, lon, isUserReport) {
       </div>
 
       <div class="popup-actions">
-        <button class="popup-btn popup-btn-primary" onclick="showReports(${lat}, ${lon})">
+        <button class="popup-btn popup-btn-primary" onclick="showReports('${r.marker_id}')">
           <i class="fa-solid fa-images"></i> View Reports
         </button>
         ${markFixedBtn}
@@ -276,34 +278,41 @@ function buildPremiumPopup(r, lat, lon, isUserReport) {
 
 // ── Load & render markers ────────────────────────────────────────────────
 async function loadMarkers() {
-  const container = map.getContainer();
-  let spinner = document.getElementById('map-spinner');
-  if(!spinner && container) {
-    spinner = document.createElement('div');
-    spinner.id = 'map-spinner';
-    spinner.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:24px;color:#6366f1"></i>';
-    spinner.style.cssText = 'position:absolute;top:15px;right:15px;z-index:9999;background:var(--card-bg);padding:10px;border-radius:50%;box-shadow:0 4px 12px rgba(0,0,0,0.5);display:none;';
-    container.appendChild(spinner);
-  }
-  if (spinner) spinner.style.display = 'block';
+  if (isLoadingMarkers) return;
+  isLoadingMarkers = true;
 
   try {
-    const res = await fetch('/api/alerts');
-    allData = await res.json();
-    userReports = []; // No longer needed separately
-  } catch (e) {
-    console.error('Map fetch error', e);
+    const container = map.getContainer();
+    let spinner = document.getElementById('map-spinner');
+    if(!spinner && container) {
+      spinner = document.createElement('div');
+      spinner.id = 'map-spinner';
+      spinner.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:24px;color:#6366f1"></i>';
+      spinner.style.cssText = 'position:absolute;top:15px;right:15px;z-index:9999;background:var(--card-bg);padding:10px;border-radius:50%;box-shadow:0 4px 12px rgba(0,0,0,0.5);display:none;';
+      container.appendChild(spinner);
+    }
+    if (spinner) spinner.style.display = 'block';
+
+    try {
+      const res = await fetch('/api/alerts');
+      allData = await res.json();
+      userReports = []; // No longer needed separately
+    } catch (e) {
+      console.error('Map fetch error', e);
+      if (spinner) spinner.style.display = 'none';
+      return;
+    }
+    
     if (spinner) spinner.style.display = 'none';
-    return;
-  }
-  
-  if (spinner) spinner.style.display = 'none';
-  renderMarkers();
-  updateStats();
-  
-  // Update alerts panel using the same data to save API calls
-  if (typeof pollAlerts === 'function') {
-    pollAlerts(allData);
+    renderMarkers();
+    updateStats();
+    
+    // Update alerts panel using the same data to save API calls
+    if (typeof pollAlerts === 'function') {
+      pollAlerts(allData);
+    }
+  } finally {
+    isLoadingMarkers = false;
   }
 }
 
@@ -384,8 +393,9 @@ function scheduleRefresh() {
 }
 
 function startAutoRefresh() {
+  if (autoRefreshInterval) clearInterval(autoRefreshInterval);
   loadMarkers();
-  setInterval(loadMarkers, (defaultSettings.refresh || 5) * 1000);
+  autoRefreshInterval = setInterval(loadMarkers, (defaultSettings.refresh || 5) * 1000);
 }
 
 // ── Mark fixed from popup ────────────────────────────────────────────────────
@@ -401,7 +411,7 @@ window.markFixedFromMap = async function(id) {
 };
 
 // ── Reports Modal Logic ──────────────────────────────────────────────────────
-window.showReports = async function(lat, lon) {
+window.showReports = async function(marker_id) {
   const modal = document.getElementById('reportsModal');
   const container = document.getElementById('reportsContainer');
   const countBadge = document.getElementById('reportsCountBadge');
@@ -410,23 +420,10 @@ window.showReports = async function(lat, lon) {
   modal.style.display = 'flex';
   if (countBadge) countBadge.style.display = 'none';
 
-  container.innerHTML = `
-    <div class="reports-gallery-empty">
-      <i class="fa-solid fa-spinner fa-spin"></i>
-      Loading reports…
-    </div>`;
-
   try {
-    console.log(`[Reports] Fetching for lat=${lat}, lon=${lon}…`);
-    const res = await fetch(`/api/location-reports?lat=${lat}&lon=${lon}`);
-
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      console.error('[Reports] API Error:', errData);
-      throw new Error(errData.error || `Server error: ${res.status}`);
-    }
-
-    const reports = await res.json();
+    const group = allData.find(g => g.marker_id === marker_id);
+    if (!group) throw new Error("Marker not found in cache");
+    const reports = group.reports || [];
     console.log(`[Reports] Found ${reports?.length || 0} reports.`);
 
     if (!Array.isArray(reports) || reports.length === 0) {
@@ -479,24 +476,52 @@ window.showReports = async function(lat, lon) {
       const confPct = r.confidence ? Math.round(r.confidence * 100) : 0;
       const formattedTime = fmtDate(r.created_at);
 
+      const srcRaw = (r.source || 'Unknown').toLowerCase();
+      let srcIcon = '❓';
+      let srcText = 'Unknown Report';
+      if (srcRaw.includes('citizen')) { srcIcon = '👤'; srcText = 'Citizen Report'; }
+      else if (srcRaw.includes('sensor')) { srcIcon = '📡'; srcText = 'Sensor Report'; }
+      else if (srcRaw.includes('ai')) { srcIcon = '🤖'; srcText = 'AI Report'; }
+      else if (srcRaw.includes('live')) { srcIcon = '📹'; srcText = 'Live Report'; }
+      else { srcIcon = '📄'; srcText = 'System Report'; }
+
+      const statLower = (r.status || 'Pending').toLowerCase();
+      const statColor = statLower === 'approved' ? '#4ade80' : 
+                        statLower === 'rejected' ? '#f87171' : '#fbbf24';
+
       return `
         <div class="report-gallery-card">
           <div class="report-gallery-img-wrap">
             ${displayMedia ? mediaTag : `<div class="reports-gallery-empty" style="padding:40px"><i class="fa-solid fa-image" style="opacity:.3"></i></div>`}
           </div>
-          <div style="padding: 14px; display: flex; flex-direction: column; gap: 8px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span style="background:${chip.bg}; color:${chip.color}; border-radius:20px; font-size:11px; font-weight:700; padding:3px 10px; text-transform:uppercase">
-                ${r.severity || 'Unknown'}
-              </span>
-              <span style="font-size: 11px; font-weight: 700; color: var(--accent);">
-                ${confPct}% Conf.
-              </span>
+          <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:1.1rem; font-weight:800; color:#fff;">#${r.id || 'N/A'}</span>
+              <span style="font-size:0.9rem; font-weight:600; color:var(--muted);">${srcIcon} ${srcText}</span>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #cbd5e1;">
-              <span>Status: <strong style="color: #ffffff;">${r.status || 'Pending'}</strong></span>
-              <span style="color: #94a3b8; font-size: 11px;">${formattedTime}</span>
+            
+            <div style="font-size:0.85rem; color:var(--muted); border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:14px; margin-bottom:2px;">
+              📅 ${formattedTime}
             </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; align-items:center;">
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <span style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Confidence</span>
+                <span style="font-size:0.9rem; font-weight:700; color:#fff;">${confPct}%</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <span style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Severity</span>
+                <span style="background:${chip.bg}; color:${chip.color}; border-radius:12px; font-size:0.75rem; font-weight:800; padding:4px 8px; text-transform:uppercase; display:inline-flex; justify-content:center; align-items:center;">${r.severity || 'UNKNOWN'}</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <span style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Status</span>
+                <span style="background:${statColor}22; color:${statColor}; border-radius:12px; font-size:0.75rem; font-weight:800; padding:4px 8px; display:inline-flex; justify-content:center; align-items:center;">${r.status || 'Pending'}</span>
+              </div>
+            </div>
+
+            <button class="popup-btn popup-btn-primary" style="margin-top:8px; width:100%; justify-content:center;" onclick="window.open('${displayMedia}','_blank')">
+              View
+            </button>
           </div>
         </div>
       `;

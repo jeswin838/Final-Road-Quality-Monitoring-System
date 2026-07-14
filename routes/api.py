@@ -8,6 +8,8 @@ from utils.helpers import is_duplicate, filter_by_confidence, majority_severity,
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
+global_alerts_cache = {"data": None, "timestamp": 0}
+
 # Lazy load supabase from app to avoid circular import issues
 def get_supabase():
     from app import supabase
@@ -138,7 +140,7 @@ def get_location_reports():
                 
             # 2. Filter by confidence threshold (failed AI detections etc.) and missing severity
             conf = p.get("confidence")
-            is_citizen = "user_report" in url if url else False
+            is_citizen = p.get("source") == "Citizen" or ("user_report" in url if url else False)
             
             sev = p.get("severity")
             if sev is None or str(sev).lower() in ["none", "null", "n/a", ""]:
@@ -148,7 +150,10 @@ def get_location_reports():
                 continue
 
             # 3. Skip rejected or non-approved records (double-check beyond the DB filter)
-            p_status = assigns.get(p["id"], p.get("status", "approved"))
+            p_status = p.get("status", "approved")
+            if not is_citizen and p.get("id") in assigns:
+                p_status = assigns[p["id"]]
+
             if p_status.lower() in ('rejected', 'pending'):
                 continue
 
@@ -502,6 +507,9 @@ def update_pothole(pid):
     if not "severity" in data and not "status" in data:
         return jsonify({"error": "No fields to update"}), 400
 
+    global global_alerts_cache
+    global_alerts_cache["data"] = None
+    
     return jsonify({"message": "Pothole updated successfullly"})
 
 # -----------------------------------------------------------------------------
@@ -1382,9 +1390,10 @@ def get_nearby_potholes():
 @api_bp.route("/alerts", methods=["GET"])
 @api_bp.route("/all-potholes", methods=["GET"])
 def get_alerts_unified():
+    global global_alerts_cache
     supabase = get_supabase()
     from utils.helpers import human_time, haversine
-    from datetime import datetime
+    import time
 
     # Extract Filters
     f_severity  = request.args.get("severity", "").lower()
@@ -1393,260 +1402,154 @@ def get_alerts_unified():
     f_date_to   = request.args.get("date_to")
     ptype       = request.args.get("type")
 
-    # Enforce status filter for alerts:
-    # - Default to "approved" only (pending/rejected NEVER appear on map or alert panel)
-    # - Only show non-approved statuses when explicitly requested (e.g. admin views)
-    status_filter = f_status if f_status else "approved"
+    # If filters are applied, skip cache
+    has_filters = bool(f_severity or f_status or f_date_from or f_date_to or ptype)
     
-    # Build base query (potholes) — always restrict to approved unless explicitly filtered
-    p_query = supabase.table("potholes").select("*").eq("pothole", True)
-    p_query = p_query.eq("status", status_filter)
-    # Apply other filters if provided
-    if f_severity: p_query = p_query.ilike("severity", f_severity)
-    if f_date_from: p_query = p_query.gte("created_at", f"{f_date_from}T00:00:00")
-    if f_date_to: p_query = p_query.lte("created_at", f"{f_date_to}T23:59:59")
+    if not has_filters:
+        if global_alerts_cache["data"] is not None and time.time() - global_alerts_cache["timestamp"] < 300:
+            return jsonify(global_alerts_cache["data"])
+            
+    # Fetch approved AI/Sensor reports
+    p_query = supabase.table("potholes").select("*").eq("pothole", True).eq("status", "approved")
     if ptype: p_query = p_query.ilike("type", ptype)
+    p_res = p_query.execute()
+    p_data = p_res.data or []
 
-    conf_thresh = Config.DEFAULT_CONFIDENCE_THRESHOLD
-    try:
-        conn = get_sqlite()
-        cur = conn.cursor()
-        cur.execute("SELECT detection_sensitivity FROM app_settings WHERE id = 1")
-        row = cur.fetchone()
-        conn.close()
-        if row:
-            conf_thresh = float(row["detection_sensitivity"] or Config.DEFAULT_CONFIDENCE_THRESHOLD)
-    except:
-        pass
+    # Fetch approved Citizen reports
+    u_res = supabase.table("user_reports").select("*").eq("status", "approved").execute()
+    u_data = u_res.data or []
+    # Safety strip
+    u_data = [u for u in u_data if str(u.get("status", "")).lower() == "approved"]
 
-    # 1. Fetch AI Potholes (active/pothole=true) - Limit to most recent 500 for performance
-    p_res = p_query.order("created_at", desc=True).limit(500).execute()
-    potholes = p_res.data or []
-    potholes = filter_by_confidence(potholes, conf_thresh)
-    
-    # 2. Fetch ONLY approved user reports (pending/rejected must not appear on map/alerts)
-    u_res = supabase.table("user_reports").select("*").eq("status", "approved").order("created_at", desc=True).limit(400).execute()
-    user_reports = u_res.data or []
-    user_reports = filter_by_confidence(user_reports, conf_thresh)
-    # Extra safety: strip any that slipped through with wrong status
-    user_reports = [u for u in user_reports if str(u.get("status", "")).lower() == "approved"]
-    
-    # Map user reports perfectly
-    for c in user_reports:
-        c["image_url"] = c.get("media_url")
-        c["media_url"] = c.get("media_url")
-        c["latitude"] = c.get("latitude")
-        c["longitude"] = c.get("longitude")
-        c["created_at"] = c.get("created_at")
-        c["description"] = c.get("description")
-        c["status"] = c.get("status")
-        c["type"] = c.get("type")
-        c["source"] = "Citizen"
-        c["confidence"] = c.get("confidence")
-        c["severity"] = c.get("severity") or "Unknown"
-        c["pothole"] = True
-        
-    print(f"Dashboard potholes fetched: {len(potholes)}")
-    print(f"Dashboard approved user reports fetched: {len(user_reports)}")
-    print(f"Merged hazards: {len(potholes) + len(user_reports)}")
-    print(f"Dashboard response count: {len(potholes) + len(user_reports)}")
-    
-    # 3. Get Assignments for Status
-    try:
-        conn = get_sqlite()
-        cur = conn.cursor()
-        cur.execute("SELECT pothole_id, status FROM assignments")
-        assigns = {row[0]: row[1] for row in cur.fetchall()}
-        conn.close()
-    except:
-        assigns = {}
-    
-    final_groups = []
-    sev_rank = {"low": 1, "medium": 2, "high": 3, "critical": 4}
-    
-    # A. First, process all AI potholes as anchors
-    for p in potholes:
-        lat, lon = float(p["latitude"]), float(p["longitude"])
-        
-        # Check if it merges with an existing group in our list
-        found = False
-        for g in final_groups:
-            if g["type"] == "pothole" and haversine(lat, lon, g["latitude"], g["longitude"]) < 50.0:
-                # Merge: accumulate severity votes (majority wins)
-                p_sev = (p.get("severity") or "medium").lower()
-                g.setdefault("_severity_votes", [g.get("severity") or "medium"])
-                g["_severity_votes"].append(p_sev)
-                g["report_count"] = (g.get("report_count") or 1) + (p.get("report_count") or 1)
-                p_ts = p.get("last_reported_at") or p.get("created_at")
-                if p_ts and (not g["last_reported_at"] or p_ts > g["last_reported_at"]):
-                    g["last_reported_at"] = p_ts
-                found = True
-                break
-        
-        if not found:
-            p_ts = p.get("last_reported_at") or p.get("created_at")
-            p_status_raw = str(p.get("status") or "").lower()
-            p_url = p.get("image_url", "")
-            p_source = "Citizen" if (p_url and "user_report" in p_url) else "AI"
-            p_sev = (p.get("severity") or "").lower() or None
-            final_groups.append({
-                "id": p["id"],
-                "latitude": lat,
-                "longitude": lon,
-                "severity": p_sev,
-                "_severity_votes": [p_sev] if p_sev else [],
-                "report_count": p.get("report_count") or 1,
-                "last_reported_at": p_ts,
-                "status": assigns.get(p["id"], p.get("status") or "Pending"),
-                "image": p.get("image_url"),
-                "all_images": [p.get("image_url")] if p.get("image_url") else [],
-                "source": p_source,
-                "type": "pothole",
-                "description": p.get("type", "Pothole detected by AI"),
-                "confidence": p.get("confidence") or 0.0,
-                "approved_count": 1 if p_status_raw == "approved" else 0,
-                "pending_count": 1 if p_status_raw == "pending" else 0,
-                "rejected_count": 1 if p_status_raw == "rejected" else 0
-            })
-
-    # B. Process user reports and merge/append to final_groups
-    for u in user_reports:
+    # Normalize AI/Sensor reports
+    normalized_reports = []
+    for p in p_data:
         try:
-            lat, lon = float(u["latitude"]), float(u["longitude"])
-        except (TypeError, ValueError):
+            lat = float(p["latitude"])
+            lon = float(p["longitude"])
+        except:
             continue
+        url = p.get("image_url") or ""
+        if url and not url.startswith("http") and not url.startswith("/static"):
+            url = f"{Config.SUPABASE_URL.rstrip('/')}/storage/v1/object/public/pothole-images/{url}"
             
+        normalized_reports.append({
+            "id": p["id"],
+            "source": "Citizen" if ("user_report" in url if url else False) else "AI",
+            "table": "potholes",
+            "latitude": lat,
+            "longitude": lon,
+            "image_url": url,
+            "severity": (p.get("severity") or "medium").lower(),
+            "confidence": float(p.get("confidence") or 0.0),
+            "created_at": p.get("created_at") or ""
+        })
+
+    # Normalize Citizen reports
+    for u in u_data:
+        try:
+            lat = float(u["latitude"])
+            lon = float(u["longitude"])
+        except:
+            continue
+        url = u.get("media_url") or ""
+        if url and not url.startswith("http") and not url.startswith("/static"):
+            url = f"{Config.SUPABASE_URL.rstrip('/')}/storage/v1/object/public/user-reports/{url}"
+            
+        normalized_reports.append({
+            "id": u["id"],
+            "source": "Citizen",
+            "table": "user_reports",
+            "latitude": lat,
+            "longitude": lon,
+            "image_url": url,
+            "severity": (u.get("severity") or "medium").lower(),
+            "confidence": float(u.get("confidence") or 0.0),
+            "created_at": u.get("created_at") or ""
+        })
+
+    # Group by 10 meters
+    final_groups = []
+    for r in normalized_reports:
         found = False
         for g in final_groups:
-            if haversine(lat, lon, g["latitude"], g["longitude"]) < 50.0:
-                # Merge: accumulate severity votes for approved user reports only
-                u_status = str(u.get("status") or "pending").lower()
-                if u_status == "approved":
-                    u_sev = (u.get("severity") or "medium").lower()
-                    g.setdefault("_severity_votes", [g.get("severity") or "medium"])
-                    g["_severity_votes"].append(u_sev)
-                    g["approved_count"] = g.get("approved_count", 0) + 1
-                elif u_status == "rejected":
-                    g["rejected_count"] = g.get("rejected_count", 0) + 1
-                else:
-                    g["pending_count"] = g.get("pending_count", 0) + 1
-
-                g["report_count"] = (g.get("report_count") or 1) + 1
-                u_ts = u.get("created_at")
-                if u_ts and (not g["last_reported_at"] or u_ts > g["last_reported_at"]):
-                    g["last_reported_at"] = u_ts
-                
-                u_img = u.get("media_url")
-                if u_img and u_img not in g["all_images"]:
-                    g["all_images"].append(u_img)
-                    
+            if haversine(r["latitude"], r["longitude"], g["latitude"], g["longitude"]) <= 10.0:
+                g["reports"].append(r)
                 found = True
                 break
-                
+        
         if not found:
-            u_ts = u.get("created_at")
-            u_status = str(u.get("status") or "pending").lower()
-            u_sev = (u.get("severity") or "medium").lower()
-            
             final_groups.append({
-                "id": u["id"],
-                "latitude": lat,
-                "longitude": lon,
-                "severity": u_sev,
-                # Only count severity vote if this report is approved
-                "_severity_votes": [u_sev] if u_status == "approved" else [],
-                "report_count": 1,
-                "last_reported_at": u_ts,
-                "status": u.get("status") or "Pending",
-                "image": u.get("media_url"),
-                "all_images": [u.get("media_url")] if u.get("media_url") else [],
-                "source": "Citizen",
-                "type": u.get("type") or "image",
-                "description": u.get("description") or "Pothole reported by Citizen",
-                "approved_count": 1 if u_status == "approved" else 0,
-                "pending_count": 1 if u_status in ("pending", "reviewed") else 0,
-                "rejected_count": 1 if u_status == "rejected" else 0
+                "marker_id": f"group_{r['table']}_{r['id']}",
+                "latitude": r["latitude"],
+                "longitude": r["longitude"],
+                "reports": [r]
             })
 
-    processed_groups = final_groups
-
-    # 5. Final Formatting & Normalization
-    filtered_groups = []
-    for g in processed_groups:
-        # Exclude fixed/completed hazards from active alerts/map/navigation.
-        assignment_status = str(g.get("status", "")).lower()
-        if assignment_status in ("fixed", "completed"):
-            continue
-
-        approved_count = int(g.get("approved_count", 0) or 0)
-        pending_count = int(g.get("pending_count", 0) or 0)
-        rejected_count = int(g.get("rejected_count", 0) or 0)
-
-        # Final status by majority rule — always titlecase for frontend
-        if approved_count > pending_count:
-            final_status = "Approved"
-        elif pending_count >= approved_count and pending_count > 0:
-            final_status = "Pending"
-        elif rejected_count > 0 and approved_count == 0 and pending_count == 0:
-            final_status = "Rejected"
-        else:
-            final_status = "Pending"
-
-        # Final severity = majority vote among approved reports only
-        if approved_count > 0:
-            votes = g.get("_severity_votes") or []
-            maj = majority_severity(votes) if votes else (g.get("severity") or "medium")
-            g["severity"] = str(maj).capitalize() if maj and str(maj).lower() not in ["", "none", "null", "n/a"] else None
-        else:
-            # No approved evidence yet — severity is N/A
-            g["severity"] = None
-
-        g["status"] = final_status
-        g["approved_count"] = approved_count
-        g["pending_count"] = pending_count
-        g["rejected_count"] = rejected_count
-        g["last_seen"] = human_time(g["last_reported_at"])
-        # Normalize image URLs
-        def normalize(url):
-            if url and not url.startswith("http") and not url.startswith("/static"):
-                 return f"{Config.SUPABASE_URL}/storage/v1/object/public/pothole-images/{url}"
-            return url
+    # Format groups
+    output_groups = []
+    for g in final_groups:
+        # Sort reports newest first
+        g["reports"].sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+        
+        latest_report = g["reports"][0]
+        
+        # Calculate marker fields
+        sev_map = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+        total_sev = 0
+        for r in g["reports"]:
+            s = (r.get("severity") or "medium").lower()
+            total_sev += sev_map.get(s, 2)
             
-        g["image"] = normalize(g["image"])
-        g["all_images"] = [normalize(url) for url in g["all_images"] if url]
-        filtered_groups.append(g)
+        avg_sev = total_sev / len(g["reports"]) if g["reports"] else 2
+        
+        if avg_sev < 1.5:
+            calc_severity = "Low"
+        elif avg_sev < 2.5:
+            calc_severity = "Medium"
+        elif avg_sev < 3.5:
+            calc_severity = "High"
+        else:
+            calc_severity = "Critical"
+            
+        g["latest_severity"] = calc_severity
+        g["latest_status"] = "Approved"
+        g["latest_image"] = latest_report["image_url"]
+        g["latest_report_time"] = latest_report["created_at"]
+        g["report_count"] = len(g["reports"])
+        
+        # Additional fields to maintain some backward compatibility for frontend
+        g["image"] = g["latest_image"]
+        g["severity"] = g["latest_severity"]
+        g["status"] = g["latest_status"]
+        g["last_seen"] = human_time(g["latest_report_time"])
+        g["source"] = latest_report["source"]
+        
+        output_groups.append(g)
 
-    final_groups = filtered_groups
-
-    # 6. Apply Post-Grouping Filters
+    # Apply Post-Grouping Filters
     if f_severity or f_status or f_date_from or f_date_to:
         filtered = []
-        for g in final_groups:
-            # Severity check
+        for g in output_groups:
             if f_severity and g["severity"].lower() != f_severity:
                 continue
-            
-            # Status check
             if f_status and g["status"].lower() != f_status:
                 continue
-                
-            # Date check
-            g_ts = g.get("last_reported_at")
+            g_ts = g.get("latest_report_time")
             if g_ts:
-                # Assuming g_ts is ISO string, compare first 10 chars (YYYY-MM-DD)
                 g_date = g_ts[:10]
-                if f_date_from and g_date < f_date_from:
-                    continue
-                if f_date_to and g_date > f_date_to:
-                    continue
+                if f_date_from and g_date < f_date_from: continue
+                if f_date_to and g_date > f_date_to: continue
             elif f_date_from or f_date_to:
-                # If date filters are set but record has no date, skip it
                 continue
-                
             filtered.append(g)
-        final_groups = filtered
-            
-    return jsonify(final_groups)
+        output_groups = filtered
+        
+    if not has_filters:
+        global_alerts_cache["data"] = output_groups
+        global_alerts_cache["timestamp"] = time.time()
+        
+    return jsonify(output_groups)
 
 
 # -----------------------------------------------------------------------------
@@ -1789,12 +1692,14 @@ def report_action():
                     "review_required": False
                 }).eq("id", rid).execute()
                 print(f"[ADMIN APPROVE] AI detection {rid} approved.")
+                global_alerts_cache["data"] = None
             elif action == "reject":
                 supabase.table("potholes").update({
                     "status": "rejected",
                     "review_required": False
                 }).eq("id", rid).execute()
                 print(f"[ADMIN REJECT] AI detection {rid} rejected.")
+                global_alerts_cache["data"] = None
             return jsonify({"message": f"AI Detection {action}d successfully"})
 
         from utils.detection_logger import DetectionLogger
@@ -1808,6 +1713,7 @@ def report_action():
             }).eq("id", rid).execute()
             
             _stats_cache = {"data": None, "time": None}
+            global_alerts_cache["data"] = None
             
             dlog.log_admin_approved(rid)
             print(f"[ADMIN APPROVE] Citizen report {rid} approved.")
@@ -1819,6 +1725,7 @@ def report_action():
             }).eq("id", rid).execute()
             
             _stats_cache = {"data": None, "time": None}
+            global_alerts_cache["data"] = None
             
             dlog.log_admin_rejected(rid)          
         return jsonify({"message": f"Report {action}d successfully"})
