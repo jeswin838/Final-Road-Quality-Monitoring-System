@@ -114,6 +114,8 @@ function setCaptureMode(mode) {
 }
 
 /* ── GPS Logic ───────────────────────────────────────────────────────────── */
+let watchId = null;
+
 function initGPS() {
   if (!navigator.geolocation) {
     gpsStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> GPS not supported';
@@ -121,13 +123,16 @@ function initGPS() {
     return;
   }
 
-  navigator.geolocation.watchPosition(
+  console.log("GPS Tracking Started");
+  
+  watchId = navigator.geolocation.watchPosition(
     (pos) => {
       currentCoords = {
         lat: pos.coords.latitude,
         lon: pos.coords.longitude
       };
       gpsAccuracy = pos.coords.accuracy ?? null;
+      console.log(`Current Latitude: ${currentCoords.lat}\nCurrent Longitude: ${currentCoords.lon}\nAccuracy: ${gpsAccuracy}\nTimestamp: ${pos.timestamp}`);
       document.getElementById('latInput').value = currentCoords.lat.toFixed(6);
       document.getElementById('lonInput').value = currentCoords.lon.toFixed(6);
       
@@ -140,7 +145,7 @@ function initGPS() {
       gpsStatus.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> GPS Error: ' + err.message;
       gpsStatus.className = 'gps-status searching';
     },
-    { enableHighAccuracy: true }
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
   );
 }
 
@@ -152,6 +157,13 @@ function checkSubmitReady() {
 
 async function handleAnalyze() {
   if (!capturedBlob || !currentCoords) return;
+
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    console.log("GPS Tracking Stopped\nGPS Frozen");
+    console.log(`Frozen Latitude: ${currentCoords.lat}\nFrozen Longitude: ${currentCoords.lon}\nFrozen Accuracy: ${gpsAccuracy}\nFrozen Timestamp: ${Date.now()}`);
+  }
 
   analyzeBtn.disabled = true;
   analyzeBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing...';
@@ -262,6 +274,8 @@ function renderAnalyzeResult(data) {
 
 async function handleSubmit() {
   if (!analysisResult) return;
+  
+  console.log(`Submitting Frozen GPS\nLatitude: ${currentCoords.lat}\nLongitude: ${currentCoords.lon}`);
 
   submitBtn.disabled = true;
   submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';

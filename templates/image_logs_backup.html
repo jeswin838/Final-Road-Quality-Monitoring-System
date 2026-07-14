@@ -265,6 +265,17 @@ function renderGrid() {
     const fLon = isNaN(lon) ? '0.00000' : lon.toFixed(5);
     const timeStr = formatDt(r.created_at);
 
+    let displaySource = 'AI Detection';
+    if (r.source && r.source.toLowerCase() === 'citizen') {
+        displaySource = 'Citizen Report';
+    } else if (r.source && r.source.toLowerCase() === 'sensor') {
+        displaySource = 'Sensor';
+    } else if (r.type && r.type.toLowerCase() === 'sensor') {
+        displaySource = 'Sensor';
+    } else if (r.source) {
+        displaySource = r.source;
+    }
+
     return `
     <div class="img-tile" onclick="openLightbox('${mediaUrl}', ${r.id}, '${r.latitude}', '${r.longitude}', '${r.severity}', '${r.created_at}', 'image')">
       <div class="source-tag source-ai">
@@ -286,8 +297,11 @@ function renderGrid() {
         <div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 8px">${timeStr}</div>
          <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px">
            <div style="display:flex; justify-content:space-between; align-items:center">
-             <div style="text-transform: lowercase; font-size: 0.85rem; color: var(--accent); font-weight: 600">${r.severity || 'medium'}</div>
+             <div style="text-transform: capitalize; font-size: 0.85rem; color: var(--primary); font-weight: 600">${displaySource}</div>
              <div style="font-size: 0.75rem; color: var(--success); font-weight: 700">${Math.round((r.confidence || 0) * 100)}% Conf.</div>
+           </div>
+           <div style="display:flex; justify-content:flex-end">
+             <div style="text-transform: uppercase; font-size: 0.75rem; color: var(--accent); font-weight: 600">${r.severity || 'N/A'}</div>
            </div>
            <div style="font-size: 0.85rem; color: #fff; font-weight: 500">${r.status || 'Approved'}</div>
          </div>

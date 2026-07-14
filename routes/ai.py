@@ -1328,85 +1328,43 @@ def submit_user_report():
                 raise
         raise RuntimeError(f"{table_name} insert retries exhausted")
 
-    # Always insert into user_reports
+    print(f"\nReceived Latitude: {lat_f}\nReceived Longitude: {lon_f}\n")
+
+    # Build payload using only existing columns in user_reports
     user_payload = {
         "latitude": lat_f,
         "longitude": lon_f,
         "media_url": data["image_url"],
         "image_url": data["image_url"],
-        "upload_id": upload_id,
         "type": "image",
         "description": f"AI Decision: {ai_status}",
         "status": status,
-        "ai_status": ai_status,
-        "review_required": review_required,
-        "confidence": round(confidence, 4),
+        "confidence": round(confidence, 4) if confidence else None,
         "severity": severity,
-        "trust_score": trust_score,
-        "trust_level": trust_level,
-        "source_type": capture_type,
-        "capture_type": capture_type,
-        "image_hash": image_hash,
         "created_at": now_iso
     }
+    if user_id:
+        user_payload["user_id"] = user_id
 
     dlog.db_saving()
     _t_db_start = time.time()
     user_report_id = None
     try:
-        user_res, inserted_user_payload = insert_with_missing_column_retry("user_reports", user_payload)
+        # Perform a single direct insert without retry logic
+        user_res = supabase.table("user_reports").insert(user_payload).execute()
         user_rows = getattr(user_res, "data", []) or []
         user_report_id = user_rows[0].get("id") if user_rows else None
         dlog.db_done(report_id=user_report_id)
+        print(f"\nStored Latitude: {user_payload['latitude']}\nStored Longitude: {user_payload['longitude']}\n")
     except Exception as e:
-        print(f"[DB] user_reports rich insert failed, trying minimal fallback: {e}")
-        try:
-            minimal_payload = {
-                "latitude": lat_f,
-                "longitude": lon_f,
-                "media_url": data["image_url"],
-                "status": status,
-                "type": "image",
-                "description": f"AI Decision: {ai_status}"
-            }
-            user_res, _ = insert_with_missing_column_retry("user_reports", minimal_payload)
-            user_rows = getattr(user_res, "data", []) or []
-            user_report_id = user_rows[0].get("id") if user_rows else None
-            dlog.db_done(report_id=user_report_id)
-        except Exception as e2:
-            dlog.error(e2)
-            print(f"[DB] ❌ user_reports minimal insert failed: {e2}")
-            return jsonify({"error": "user_report_insert_failed", "detail": str(e2)}), 500
+        dlog.error(e)
+        print(f"[DB] ❌ user_reports insert failed: {e}")
+        return jsonify({"error": "user_report_insert_failed", "detail": str(e)}), 500
     _db_ms = (time.time() - _t_db_start) * 1000
     print(f"Database: {_db_ms/1000:.2f}s")
 
-    # Only approved go into potholes
-    if status == "approved":
-        try:
-            # Prevent duplicate pothole insert for same analyzed upload.
-            existing = supabase.table("potholes").select("id").eq("image_url", data["image_url"]).limit(1).execute()
-            if getattr(existing, "data", []):
-                print("[DB] Skipping pothole insert (already exists for this upload image)")
-            else:
-                pothole_payload = {
-                    "upload_id": upload_id,
-                    "report_id": user_report_id,
-                    "source_report_id": user_report_id,
-                    "latitude": lat_f,
-                    "longitude": lon_f,
-                    "severity": severity or "medium", # Fallback so frontend doesn't ignore it
-                    "image_url": data["image_url"],
-                    "confidence": round(confidence, 4),
-                    "type": detection_type if detection_type in ["pothole", "crack"] else "pothole",
-                    "pothole": True,
-                    "status": "approved",
-                    "report_count": 1,
-                    "created_at": now_iso,
-                    "last_reported_at": now_iso
-                }
-                insert_with_missing_column_retry("potholes", pothole_payload)
-        except Exception as e:
-            print(f"[DB] potholes insert failed: {e}")
+    # Only approved citizen reports remain in user_reports as source of truth.
+    # We no longer insert them into potholes table to avoid duplication.
 
     # Keep user report status synchronized for non-approved paths as source of truth.
     if status in ("pending", "rejected"):

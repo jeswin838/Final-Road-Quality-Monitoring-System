@@ -83,6 +83,34 @@ def get_location_reports():
         
         p_data = getattr(p_res, 'data', []) or []
         
+        # Fetch approved user reports near coordinates
+        u_res = supabase.table("user_reports") \
+            .select("*") \
+            .eq("status", "approved") \
+            .gte("latitude", lat - EPSILON) \
+            .lte("latitude", lat + EPSILON) \
+            .gte("longitude", lon - EPSILON) \
+            .lte("longitude", lon + EPSILON) \
+            .execute()
+            
+        u_data = getattr(u_res, 'data', []) or []
+        for c in u_data:
+            c["image_url"] = c.get("media_url")
+            c["media_url"] = c.get("media_url")
+            c["latitude"] = c.get("latitude")
+            c["longitude"] = c.get("longitude")
+            c["created_at"] = c.get("created_at")
+            c["description"] = c.get("description")
+            c["status"] = c.get("status")
+            c["type"] = c.get("type")
+            c["source"] = "Citizen"
+            c["confidence"] = c.get("confidence")
+            c["severity"] = c.get("severity") or "Citizen Report"
+            c["pothole"] = True
+            
+        p_data = p_data + u_data
+        p_data.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        
         # Merge with local assignments to get Status
         try:
             conn = get_sqlite()
@@ -201,10 +229,10 @@ def get_potholes():
             pass
 
         # 1. Fetch AI Potholes
-        ai_potholes = []
+        combined = []
         if not ptype or ptype.lower() in ["pothole", "crack"]:
-            p_query = supabase.table("potholes").select("*").eq("pothole", True)
-            # Apply status filter – default to approved if none supplied
+            # AI/Sensor/Live detections (filter by source_report_id is null to avoid duplicating citizen reports)
+            p_query = supabase.table("potholes").select("*").is_("source_report_id", "null").eq("pothole", True)
             if f_status:
                 p_query = p_query.eq("status", f_status)
             else:
@@ -215,22 +243,56 @@ def get_potholes():
             if ptype: p_query = p_query.ilike("type", ptype)
             
             p_res = p_query.order("created_at", desc=(sort_dir == "desc")).limit(500).execute()
-            ai_potholes = p_res.data or []
-            for p in ai_potholes:
-                url = p.get("image_url", "")
-                p["source"] = "Citizen" if (url and "user_report" in url) else "AI"
+            ai_data = p_res.data or []
+            for p in ai_data:
+                p["source"] = "AI"
+            
+            # Citizen reports approved by admin
+            c_query = supabase.table("user_reports").select("*")
+            if f_status:
+                c_query = c_query.eq("status", f_status)
+            else:
+                c_query = c_query.eq("status", "approved")
+            if severity: c_query = c_query.ilike("severity", severity)
+            if date_from: c_query = c_query.gte("created_at", f"{date_from}T00:00:00")
+            if date_to: c_query = c_query.lte("created_at", f"{date_to}T23:59:59")
+            # Note: user_reports uses 'type' differently (e.g. 'image'), but we allow it or skip if not matching
+            
+            c_res = c_query.order("created_at", desc=(sort_dir == "desc")).limit(500).execute()
+            citizen_data = c_res.data or []
+            for c in citizen_data:
+                c["source"] = "Citizen"
+                # Map user_reports schema to pothole schema exactly as requested
+                c["image_url"] = c.get("media_url")
+                c["media_url"] = c.get("media_url")
+                c["latitude"] = c.get("latitude")
+                c["longitude"] = c.get("longitude")
+                c["created_at"] = c.get("created_at")
+                c["description"] = c.get("description")
+                c["status"] = c.get("status")
+                c["type"] = c.get("type")
+                c["source"] = "Citizen"
+                c["confidence"] = c.get("confidence")
+                c["severity"] = c.get("severity") or "Citizen Report"
+                c["pothole"] = True
+            
+            # Merge both
+            combined = ai_data + citizen_data
+            
+            # Re-sort the combined list just in case
+            combined.sort(key=lambda x: x.get("created_at", ""), reverse=(sort_dir == "desc"))
 
         # Build lookup for enrichment of user-report logs.
         # Normalize keys to just the filename to ensure matching even if one is a full URL
         ai_by_image = {}
-        for p in ai_potholes:
+        for p in combined:
             raw_url = (p.get("image_url") or "").strip()
             if raw_url:
                 fname = raw_url.split("/")[-1]
                 ai_by_image[fname] = p
 
         # Combine
-        rows = ai_potholes
+        rows = combined
         print(f"[+] Unified fetch: {len(rows)} potholes from database.")
 
         # Confidence filter
@@ -502,7 +564,19 @@ def get_stats():
         p_res = supabase.table("potholes").select("id, created_at, status").eq("pothole", True).execute()
         p_data = p_res.data or []
 
+        u_res = supabase.table("user_reports").select("id, created_at, status").eq("status", "approved").execute()
+        u_data = u_res.data or []
+        for c in u_data:
+            c["pothole"] = True
+            c["type"] = "Citizen Report"
+            
+        p_data = p_data + u_data
+
         total = len(p_data)
+        print(f"Dashboard potholes fetched: {len(p_res.data or [])}")
+        print(f"Dashboard approved user reports fetched: {len(u_data)}")
+        print(f"Merged hazards: {total}")
+        print(f"Dashboard response count: {total}")
 
         # Count today's detections (UTC day matching creation date)
         today_str = datetime.utcnow().strftime("%Y-%m-%d")
@@ -572,15 +646,30 @@ def analytics():
         p_rows = p_res.data or []
 
         # 2. Fetch Approved User Reports
-        u_res = supabase.table("user_reports").select("id, latitude, longitude, created_at, description").eq("status", "approved").gte("created_at", start_date.strftime("%Y-%m-%dT%H:%M:%S")).execute()
+        u_res = supabase.table("user_reports").select("*").eq("status", "approved").gte("created_at", start_date.strftime("%Y-%m-%dT%H:%M:%S")).execute()
         u_rows = u_res.data or []
 
         # Map user reports
         for ur in u_rows:
-            ur["severity"] = "Medium"
-            ur["type"]     = "Citizen Report"
+            ur["image_url"] = ur.get("media_url")
+            ur["media_url"] = ur.get("media_url")
+            ur["latitude"] = ur.get("latitude")
+            ur["longitude"] = ur.get("longitude")
+            ur["created_at"] = ur.get("created_at")
+            ur["description"] = ur.get("description")
+            ur["status"] = ur.get("status")
+            ur["type"] = ur.get("type")
+            ur["source"] = "Citizen"
+            ur["confidence"] = ur.get("confidence")
+            ur["severity"] = ur.get("severity") or "Unknown"
+            ur["pothole"] = True
 
         rows = p_rows + u_rows
+
+        print(f"Dashboard potholes fetched: {len(p_rows)}")
+        print(f"Dashboard approved user reports fetched: {len(u_rows)}")
+        print(f"Merged hazards: {len(rows)}")
+        print(f"Dashboard response count: {len(rows)}")
 
         # Python-side processing for Supabase
         from collections import defaultdict
@@ -659,6 +748,15 @@ def list_assignments():
         supabase = get_supabase()
         potholes_res = supabase.table("potholes").select("id, latitude, longitude, severity").execute()
         p_dict = {p.get("id"): p for p in potholes_res.data} if potholes_res.data else {}
+
+        # ALSO fetch from user_reports since assignments could be linked to them now
+        u_res = supabase.table("user_reports").select("id, latitude, longitude, severity").eq("status", "approved").execute()
+        if u_res.data:
+            for u in u_res.data:
+                # Map to match pothole dict
+                u["severity"] = u.get("severity") or "Citizen Report"
+                u["confidence"] = u.get("confidence")
+                p_dict[u.get("id")] = u
 
         conn = get_sqlite()
         cur = conn.cursor()
@@ -1064,19 +1162,34 @@ def safe_route():
             .eq("pothole", True) \
             .execute()
         u_res = supabase.table("user_reports") \
-            .select("id, latitude, longitude, status") \
+            .select("*") \
             .eq("status", "approved") \
             .execute()
             
         ai_potholes = p_res.data or []
         user_potholes = u_res.data or []
         
-        # Map user reports to same format
-        for ur in user_potholes:
-            ur["severity"] = "medium"
-            ur["pothole"] = True
+        # Map user reports to same format exactly as requested
+        for c in user_potholes:
+            c["image_url"] = c.get("media_url")
+            c["media_url"] = c.get("media_url")
+            c["latitude"] = c.get("latitude")
+            c["longitude"] = c.get("longitude")
+            c["created_at"] = c.get("created_at")
+            c["description"] = c.get("description")
+            c["status"] = c.get("status")
+            c["type"] = c.get("type")
+            c["source"] = "Citizen"
+            c["confidence"] = c.get("confidence")
+            c["severity"] = c.get("severity") or "Citizen Report"
+            c["pothole"] = True
             
         all_potholes = ai_potholes + user_potholes
+        
+        print(f"Dashboard potholes fetched: {len(ai_potholes)}")
+        print(f"Dashboard approved user reports fetched: {len(user_potholes)}")
+        print(f"Merged hazards: {len(all_potholes)}")
+        print(f"Dashboard response count: {len(all_potholes)}")
     except Exception as e:
         return jsonify({"error": f"Database error: {e}"}), 500
 
@@ -1214,6 +1327,27 @@ def get_nearby_potholes():
     
     all_p = (p_res.data or []) + (u_res.data or [])
     
+    # Map user reports perfectly
+    for p in all_p:
+        if "media_url" in p and "pothole" not in p: # it's a citizen report
+            p["image_url"] = p.get("media_url")
+            p["media_url"] = p.get("media_url")
+            p["latitude"] = p.get("latitude")
+            p["longitude"] = p.get("longitude")
+            p["created_at"] = p.get("created_at")
+            p["description"] = p.get("description")
+            p["status"] = p.get("status")
+            p["type"] = p.get("type")
+            p["source"] = "Citizen"
+            p["confidence"] = p.get("confidence")
+            p["severity"] = p.get("severity") or "Unknown"
+            p["pothole"] = True
+            
+    print(f"Dashboard potholes fetched: {len(p_res.data or [])}")
+    print(f"Dashboard approved user reports fetched: {len(u_res.data or [])}")
+    print(f"Merged hazards: {len(all_p)}")
+    print(f"Dashboard response count: {len(all_p)}")
+    
     nearby = []
     for p in all_p:
         p_lat, p_lon = float(p["latitude"]), float(p["longitude"])
@@ -1296,6 +1430,26 @@ def get_alerts_unified():
     user_reports = filter_by_confidence(user_reports, conf_thresh)
     # Extra safety: strip any that slipped through with wrong status
     user_reports = [u for u in user_reports if str(u.get("status", "")).lower() == "approved"]
+    
+    # Map user reports perfectly
+    for c in user_reports:
+        c["image_url"] = c.get("media_url")
+        c["media_url"] = c.get("media_url")
+        c["latitude"] = c.get("latitude")
+        c["longitude"] = c.get("longitude")
+        c["created_at"] = c.get("created_at")
+        c["description"] = c.get("description")
+        c["status"] = c.get("status")
+        c["type"] = c.get("type")
+        c["source"] = "Citizen"
+        c["confidence"] = c.get("confidence")
+        c["severity"] = c.get("severity") or "Unknown"
+        c["pothole"] = True
+        
+    print(f"Dashboard potholes fetched: {len(potholes)}")
+    print(f"Dashboard approved user reports fetched: {len(user_reports)}")
+    print(f"Merged hazards: {len(potholes) + len(user_reports)}")
+    print(f"Dashboard response count: {len(potholes) + len(user_reports)}")
     
     # 3. Get Assignments for Status
     try:
@@ -1646,84 +1800,28 @@ def report_action():
         dlog = DetectionLogger()
         
         if action == "approve":
-            # 1. Get report data
-            res = supabase.table("user_reports").select("*").eq("id", rid).single().execute()
-            report = res.data
-            if not report: return jsonify({"error": "Report not found"}), 404
-            
-            lat, lon = report["latitude"], report["longitude"]
-            # Use 1.0 for citizen reports without AI confidence (admin-verified = 100% trusted)
-            raw_conf = report.get("confidence")
-            confidence = float(raw_conf) if (raw_conf is not None and float(raw_conf) > 0.0) else 1.0
-            severity = (report.get("severity") or "medium").lower()
-            detection_type = (report.get("type") or "pothole").lower()
-            image_url = report.get("annotated_image_url") or report.get("media_url")
-            upload_id = report.get("upload_id")
-            now_str = datetime.now().isoformat()
-            
-            # 2. Check for duplicates — first by image_url/upload_id, then by proximity
-            # This prevents double-insert when auto-approved reports already created a pothole record
-            existing_by_image = None
-            if image_url:
-                img_check = supabase.table("potholes").select("id, report_count").eq("image_url", image_url).limit(1).execute()
-                existing_by_image = img_check.data[0] if (img_check.data) else None
-            if not existing_by_image and upload_id:
-                uid_check = supabase.table("potholes").select("id, report_count").eq("upload_id", upload_id).limit(1).execute()
-                existing_by_image = uid_check.data[0] if (uid_check.data) else None
-
-            existing_pothole = existing_by_image or is_duplicate(supabase, lat, lon)
-            
-            if existing_pothole:
-                # Update existing — just mark approved and bump count
-                pid = existing_pothole["id"]
-                new_count = (existing_pothole.get("report_count") or 1) + 1
-                
-                supabase.table("potholes").update({
-                    "last_reported_at": now_str,
-                    "report_count": new_count,
-                    "status": "approved",
-                    "source_report_id": rid  # store the real user_report id (positive)
-                }).eq("id", pid).execute()
-                print(f"[ADMIN APPROVE] Updated existing pothole {pid} → approved")
-            else:
-                # Insert new pothole — this report has no prior pothole record
-                p_data = {
-                    "latitude": lat,
-                    "longitude": lon,
-                    "image_url": image_url,
-                    "severity": severity,
-                    "pothole": True,
-                    "type": detection_type if detection_type in ["pothole", "crack"] else "pothole",
-                    "confidence": confidence,
-                    "status": "approved",
-                    "report_count": 1,
-                    "last_reported_at": now_str,
-                    "created_at": now_str,
-                    "source_report_id": rid  # real user_report id, no FK constraint
-                }
-                if upload_id:
-                    p_data["upload_id"] = upload_id
-                new_p = supabase.table("potholes").insert(p_data).execute()
-                new_pid = new_p.data[0].get("id") if new_p.data else None
-                print(f"[ADMIN APPROVE] New pothole created (id={new_pid}) → approved, visible on map")
-            
-            # 3. Update report status
+            # Update report status
             supabase.table("user_reports").update({
                 "status": "approved",
                 "review_required": False
             }).eq("id", rid).execute()
             
+            global _stats_cache
+            _stats_cache = {"data": None, "time": None}
+            
             dlog.log_admin_approved(rid)
+            print(f"[ADMIN APPROVE] Citizen report {rid} approved.")
             
         elif action == "reject":
             supabase.table("user_reports").update({
                 "status": "rejected",
-                "ai_status": "rejected",
                 "review_required": False
             }).eq("id", rid).execute()
             
+            global _stats_cache
+            _stats_cache = {"data": None, "time": None}
+            
+            dlog.log_admin_rejected(rid)          
         return jsonify({"message": f"Report {action}d successfully"})
     except Exception as e:
         return jsonify({"error": f"Action failed: {str(e)}"}), 500
-
-

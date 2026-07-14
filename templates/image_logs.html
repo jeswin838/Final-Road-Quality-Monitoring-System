@@ -4,66 +4,83 @@
 
 {% block head %}
 <style>
-.img-toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
-.img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
-.img-tile { border-radius: 16px; overflow: hidden; cursor: pointer; transition: all 0.35s ease; position: relative; }
-.img-tile:hover { transform: translateY(-6px); }
-.img-tile img { width: 100%; height: 180px; object-fit: cover; display: block; transition: transform 0.35s ease; }
-.img-tile:hover img { transform: scale(1.05); }
-.img-tile .img-no-image { width: 100%; height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.03); color: var(--text-muted); font-size: 2rem; text-align: center; }
-.img-info { padding: 14px; }
-.img-info .img-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 6px; }
-.img-info .img-sub  { font-size: 0.78rem; display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.img-info .img-sub i { width: 14px; text-align: center; opacity: 0.8; }
+.img-toolbar { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-bottom: 24px; padding: 16px; border-radius: 16px; background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+.img-toolbar .form-group { margin: 0; flex: 1; min-width: 150px; }
 
-.source-tag { position: absolute; top: 12px; right: 12px; padding: 5px 10px; border-radius: 8px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; z-index: 10; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.15); letter-spacing: 0.5px; }
-.source-ai { background: rgba(14, 165, 233, 0.85); color: #fff; box-shadow: 0 2px 10px rgba(14, 165, 233, 0.3); }
-.source-citizen { background: rgba(6, 182, 212, 0.85); color: #fff; box-shadow: 0 2px 10px rgba(6, 182, 212, 0.3); }
+.stats-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+.stat-card { flex: 1; min-width: 120px; background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 16px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 0.2s; }
+.stat-card:hover { transform: translateY(-3px); background: rgba(30, 41, 59, 0.9); }
+.stat-val { font-size: 1.5rem; font-weight: 700; color: #fff; margin-top: 4px; }
+.stat-label { font-size: 0.8rem; color: var(--muted); font-weight: 500; display: flex; align-items: center; gap: 6px; }
+
+.img-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+@media (max-width: 1280px) { .img-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 1024px) { .img-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .img-grid { grid-template-columns: 1fr; } }
+
+.img-tile { 
+    background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px); 
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; 
+    overflow: hidden; transition: all 0.25s ease; position: relative; 
+    display: flex; flex-direction: column;
+}
+.img-tile:hover { 
+    transform: translateY(-5px); 
+    box-shadow: 0 12px 30px rgba(0,0,0,0.4); 
+    border-color: rgba(255,255,255,0.15); 
+}
+
+.img-media-container { width: 100%; height: 280px; background: #000; position: relative; overflow: hidden; }
+.img-tile img { width: 100%; height: 100%; object-fit: contain; display: block; transition: transform 0.25s ease; }
+.img-tile:hover img { transform: scale(1.02); }
+
+.source-tag { 
+    position: absolute; top: 12px; right: 12px; padding: 4px 12px; 
+    border-radius: 20px; font-size: 0.7rem; font-weight: 700; 
+    text-transform: uppercase; z-index: 10; backdrop-filter: blur(8px); 
+    border: 1px solid rgba(255,255,255,0.2); letter-spacing: 0.5px; 
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.9), rgba(56, 189, 248, 0.9)); 
+    color: #fff; box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+.img-tile:hover .source-tag { box-shadow: 0 4px 15px rgba(14, 165, 233, 0.5); }
+
+.img-info { padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 16px; }
+
+.img-header { margin-bottom: 4px; }
+.img-id { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 8px; line-height: 1.2; }
+.img-meta-line { font-size: 14px; color: #94a3b8; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+
+.meta-grid { display: flex; flex-direction: column; gap: 12px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.05); }
+.meta-row { display: flex; justify-content: space-between; align-items: center; }
+.meta-label { font-size: 13px; font-weight: 500; color: #94a3b8; }
+.meta-val { font-size: 14px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 6px; }
+
+.conf-track { width: 100px; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; display: inline-block; margin-right: 8px; vertical-align: middle; }
+.conf-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+
+.badge-pill { padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.badge-pill-low { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+.badge-pill-med { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); }
+.badge-pill-high { background: rgba(249, 115, 22, 0.15); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); }
+.badge-pill-crit { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+.badge-pill-app { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+.badge-pill-pen { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); }
+.badge-pill-rej { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+.badge-source { background: rgba(255,255,255,0.1); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.2); }
+
+.card-actions { display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.05); }
+.btn-card-action { flex: 1; padding: 8px 4px; border-radius: 8px; background: rgba(255,255,255,0.05); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.1); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.btn-card-action:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); color: #fff; }
 
 .status-indicator { display: inline-flex; align-items: center; gap: 8px; font-size: 0.75rem; margin-left: auto; }
 
-.pagination {
-  margin-top: 40px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-}
-
-.page-btn {
-  min-width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 0.9rem;
-  transition: all 0.25s ease;
-}
-
-.page-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-}
-
-.page-btn.active {
-  background: var(--accent-gradient);
-  color: white;
-  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
-}
-
-.page-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  filter: grayscale(1);
-}
-
-.page-info {
-  font-size: 0.85rem;
-  margin: 0 10px;
-  font-weight: 500;
-}
+.pagination { margin-top: 40px; display: flex; justify-content: center; align-items: center; gap: 12px; }
+.page-btn { min-width: 40px; height: 40px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.9rem; transition: all 0.25s ease; }
+.page-btn:hover:not(:disabled) { transform: translateY(-2px); }
+.page-btn.active { background: var(--accent-gradient); color: white; box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3); }
+.page-btn:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(1); }
 
 @media (max-width: 500px) {
   .hide-mobile { display: none; }
@@ -78,17 +95,24 @@
 .lightbox-close { position: absolute; top: 30px; right: 30px; color: #fff; font-size: 2.5rem; cursor: pointer; background: none; border: none; transition: transform .2s; padding: 10px; border-radius: var(--radius-md); }
 .lightbox-close:hover { transform: scale(1.1); color: var(--danger); background: rgba(239, 68, 68, 0.1); }
 
-@media (max-width: 768px) {
-  .img-toolbar { flex-direction: column; align-items: stretch; }
-  .img-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
-  .img-tile img, .img-tile .img-no-image { height: 130px; }
+/* Optimization CSS */
+.skeleton {
+    background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
 }
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+.img-lazy { opacity: 0; transition: opacity 0.4s ease-in; }
+.img-lazy.loaded { opacity: 1; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="img-toolbar glass-card" style="padding:16px; border-radius:16px;">
-  <div class="form-group" style="margin:0; min-width:140px">
+<div class="img-toolbar">
+  <div class="form-group">
     <label>Source</label>
     <select id="imgSource" class="form-input" onchange="renderGrid()">
       <option value="">All Sources</option>
@@ -96,7 +120,7 @@
       <option value="Citizen">User Report</option>
     </select>
   </div>
-  <div class="form-group" style="margin:0; min-width:140px">
+  <div class="form-group">
     <label>Type</label>
     <select id="imgType" class="form-input" onchange="loadImages()">
       <option value="">All Types</option>
@@ -104,25 +128,25 @@
       <option value="crack">Crack</option>
     </select>
   </div>
-  <div class="form-group" style="margin:0; min-width:140px">
+  <div class="form-group">
     <label>Severity</label>
     <select id="imgSeverity" class="form-input" onchange="loadImages()">
       <option value="">All Severities</option>
       <option>High</option><option>Medium</option><option>Low</option>
     </select>
   </div>
-  <div class="form-group" style="margin:0; min-width:140px">
+  <div class="form-group">
     <label>Date From</label>
     <input type="date" id="imgDateFrom" class="form-input" onchange="loadImages()"/>
   </div>
-  <div class="form-group" style="margin:0; flex:1">
+  <div class="form-group" style="flex:2">
     <label>Search Location</label>
     <div style="position:relative">
         <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:0.8rem"></i>
         <input type="text" id="imgSearch" class="form-input" placeholder="Filter by lat/lon or ID…" oninput="renderGrid()" style="padding-left:32px"/>
     </div>
   </div>
-  <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end">
+  <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end; justify-content:flex-end">
     <div class="status-indicator">
         <span id="refreshStatus">Auto-refresh Off</span>
         <div id="refreshDot" class="status-dot-idle"></div>
@@ -130,8 +154,11 @@
             <i class="fa-solid fa-sync"></i>
         </button>
     </div>
-    <span id="imgCount" class="badge badge-neutral">0 images</span>
   </div>
+</div>
+
+<div class="stats-row" id="statsRow">
+    <!-- Populated dynamically by JS -->
 </div>
 
 <div class="img-grid" id="imgGrid">
@@ -189,9 +216,10 @@ function mergeLogRecords(rows) {
   });
 }
 
+let apiCache = {}; // Cache responses in memory
+
 async function loadImages(isBackground = false) {
   if (!isBackground) {
-    // Show spinner if not background refresh
     if (imgRecords.length === 0) {
         document.getElementById('imgGrid').innerHTML = '<div class="no-images" style="grid-column:1/-1; padding:100px; text-align:center"><i class="fa-solid fa-circle-notch fa-spin fa-3x" style="color:var(--accent); margin-bottom:16px"></i><p style="color:var(--muted)">Fetching latest logs...</p></div>';
     }
@@ -202,19 +230,24 @@ async function loadImages(isBackground = false) {
     const severity = document.getElementById('imgSeverity').value;
     const date_from = document.getElementById('imgDateFrom').value;
     
-    // Fetch ONLY from potholes table
-    console.log("FETCHING FROM DATABASE ONLY");
     let url = `/api/potholes?dedupe=false&severity=${severity}&date_from=${date_from}&type=${type}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("API Error");
-    const data = await res.json();
     
-    // Sort + merge same incident (AI + user duplicate rows -> single log row)
-    data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    let data;
+    if (apiCache[url] && !isBackground) {
+        data = apiCache[url]; // Reuse cached data
+    } else {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("API Error");
+        data = await res.json();
+        
+        // Sort + merge same incident
+        data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        apiCache[url] = data; // Store in cache
+    }
+    
     imgRecords = mergeLogRecords(data);
     
     if (isBackground) {
-        // Flash refresh dot
         const dot = document.getElementById('refreshDot');
         dot.style.background = 'var(--accent)';
         setTimeout(() => { dot.style.background = 'var(--success)'; }, 500);
@@ -226,10 +259,156 @@ async function loadImages(isBackground = false) {
     }
     return;
   }
-  renderGrid();
+  
+  // Parallel independent loading
+  setTimeout(calculateStats, 0);
+  setTimeout(renderGrid, 0);
+}
+
+function calculateStats() {
+  const search  = document.getElementById('imgSearch').value.toLowerCase();
+  const sourceFilter = document.getElementById('imgSource').value;
+  
+  const filtered = imgRecords.filter(r => {
+    const matchesSearch = !search || `${r.latitude} ${r.longitude} ${r.id} ${r.type}`.toLowerCase().includes(search);
+    const matchesSource = !sourceFilter || r.source === sourceFilter;
+    return matchesSearch && matchesSource;
+  });
+
+  let aiCount = 0, citizenCount = 0, sensorCount = 0, liveCount = 0;
+  filtered.forEach(r => {
+      let src = r.source ? r.source.toLowerCase() : '';
+      let typ = r.type ? r.type.toLowerCase() : '';
+      
+      if (src === 'citizen') citizenCount++;
+      else if (src === 'sensor' || typ === 'sensor') sensorCount++;
+      else if (src === 'live' || typ === 'live') liveCount++;
+      else aiCount++;
+  });
+  
+  const statsRow = document.getElementById('statsRow');
+  if (statsRow) {
+      statsRow.innerHTML = `
+        <div class="stat-card">
+            <div class="stat-label"><i class="fa-solid fa-camera"></i> Total Images</div>
+            <div class="stat-val">${filtered.length}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label"><i class="fa-solid fa-robot"></i> AI</div>
+            <div class="stat-val">${aiCount}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label"><i class="fa-solid fa-user"></i> Citizen</div>
+            <div class="stat-val">${citizenCount}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label"><i class="fa-solid fa-satellite-dish"></i> Sensor</div>
+            <div class="stat-val">${sensorCount}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label"><i class="fa-solid fa-video"></i> Live</div>
+            <div class="stat-val">${liveCount}</div>
+        </div>
+      `;
+  }
+}
+
+function createCardHTML(r) {
+    const mediaUrl = r.image_url || r.media_url;
+    const isVideo = (r.type && r.type.toLowerCase() === 'video') || (mediaUrl && mediaUrl.toLowerCase().endsWith('.mp4'));
+    
+    // Thumbnail logic: If it's a Supabase storage URL, append width=400 for a small, fast-loading thumbnail
+    let thumbUrl = mediaUrl;
+    if (thumbUrl && thumbUrl.includes('.supabase.co/storage/v1/object/public/') && !isVideo) {
+        thumbUrl += (thumbUrl.includes('?') ? '&' : '?') + 'width=400&resize=contain';
+    }
+
+    const lat = parseFloat(r.latitude);
+    const lon = parseFloat(r.longitude);
+    const fLat = isNaN(lat) ? '0.00000' : lat.toFixed(5);
+    const fLon = isNaN(lon) ? '0.00000' : lon.toFixed(5);
+    const timeStr = formatDt(r.created_at);
+
+    let srcText = 'AI', srcIcon = 'fa-robot';
+    let sRaw = r.source ? r.source.toLowerCase() : '';
+    let tRaw = r.type ? r.type.toLowerCase() : '';
+    if (sRaw === 'citizen') { srcText = 'Citizen'; srcIcon = 'fa-user'; }
+    else if (sRaw === 'sensor' || tRaw === 'sensor') { srcText = 'Sensor'; srcIcon = 'fa-satellite-dish'; }
+    else if (sRaw === 'live' || tRaw === 'live') { srcText = 'Live'; srcIcon = 'fa-video'; }
+
+    let confRaw = r.confidence || 0;
+    let confPct = Math.round(confRaw * 100);
+    let confColorClass = confPct >= 80 ? 'bg-success' : (confPct >= 50 ? 'bg-warning' : 'bg-danger');
+    let confColorHex = confPct >= 80 ? '#4ade80' : (confPct >= 50 ? '#fb923c' : '#f87171');
+
+    let sev = (r.severity || 'UNKNOWN').toUpperCase();
+    let sevClass = 'badge-pill-med';
+    let sevIcon = 'fa-circle-dot';
+    if (sev === 'LOW') { sevClass = 'badge-pill-low'; sevIcon = 'fa-check-circle'; }
+    else if (sev === 'HIGH') { sevClass = 'badge-pill-high'; sevIcon = 'fa-triangle-exclamation'; }
+    else if (sev === 'CRITICAL') { sevClass = 'badge-pill-crit'; sevIcon = 'fa-skull-crossbones'; }
+    else if (sev === 'UNKNOWN' || sev === 'NONE' || sev === 'N/A' || sev === 'NULL') { sevClass = 'badge-source'; sev = 'N/A'; }
+
+    let statRaw = (r.status || 'pending').toLowerCase();
+    let statText = statRaw === 'approved' ? 'Approved' : (statRaw === 'rejected' ? 'Rejected' : 'Pending Review');
+    let statClass = statRaw === 'approved' ? 'badge-pill-app' : (statRaw === 'rejected' ? 'badge-pill-rej' : 'badge-pill-pen');
+    let statIcon = statRaw === 'approved' ? 'fa-check' : (statRaw === 'rejected' ? 'fa-xmark' : 'fa-clock');
+
+    return `
+      <div class="source-tag">DETECTION</div>
+      
+      <div class="img-media-container" onclick="openLightbox('${mediaUrl}', ${r.id}, '${r.latitude}', '${r.longitude}', '${r.severity}', '${r.created_at}', '${isVideo ? 'video' : 'image'}')">
+        <div class="skeleton" style="position:absolute; inset:0; z-index:1;"></div>
+        ${mediaUrl
+            ? `<img src="${thumbUrl}" alt="Detection #${r.id}" class="img-lazy" loading="lazy" onload="this.classList.add('loaded'); this.previousElementSibling.style.display='none';" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\\'img-no-image\\'><i class=\\'fa-solid fa-image-slash fa-xl\\'></i></div>';"/>`
+            : `<div class="img-no-image" style="z-index:2; position:relative;"><i class="fa-solid fa-image fa-xl" style="opacity:0.2"></i></div>`
+        }
+      </div>
+
+      <div class="img-info">
+        <div class="img-header">
+            <div class="img-id">#${r.id}</div>
+            <div class="img-meta-line"><i class="fa-solid fa-calendar"></i> ${timeStr}</div>
+            <div class="img-meta-line"><i class="fa-solid fa-location-dot"></i> ${fLat}, ${fLon}</div>
+        </div>
+        
+        <div class="meta-grid">
+            <div class="meta-row">
+                <div class="meta-label">Source</div>
+                <div class="meta-val"><div class="badge-pill badge-source"><i class="fa-solid ${srcIcon}"></i> ${srcText}</div></div>
+            </div>
+            
+            <div class="meta-row">
+                <div class="meta-label">Confidence</div>
+                <div class="meta-val">
+                    <div class="conf-track"><div class="conf-fill" style="width:${confPct}%; background:${confColorHex}"></div></div>
+                    ${confPct}%
+                </div>
+            </div>
+            
+            <div class="meta-row">
+                <div class="meta-label">Severity</div>
+                <div class="meta-val"><div class="badge-pill ${sevClass}"><i class="fa-solid ${sevIcon}"></i> ${sev}</div></div>
+            </div>
+            
+            <div class="meta-row">
+                <div class="meta-label">Status</div>
+                <div class="meta-val"><div class="badge-pill ${statClass}"><i class="fa-solid ${statIcon}"></i> ${statText}</div></div>
+            </div>
+        </div>
+        
+        <div class="card-actions">
+            <button class="btn-card-action" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${fLat},${fLon}', '_blank')"><i class="fa-solid fa-map-location-dot"></i> Map</button>
+            <button class="btn-card-action" onclick="openLightbox('${mediaUrl}', ${r.id}, '${r.latitude}', '${r.longitude}', '${r.severity}', '${r.created_at}', '${isVideo ? 'video' : 'image'}')"><i class="fa-solid fa-magnifying-glass"></i> View</button>
+            <button class="btn-card-action" onclick="window.open('${mediaUrl}', '_blank')"><i class="fa-solid fa-download"></i> Save</button>
+        </div>
+      </div>
+    `;
 }
 
 function renderGrid() {
+  setTimeout(calculateStats, 0); // Update stats asynchronously
+
   const search  = document.getElementById('imgSearch').value.toLowerCase();
   const sourceFilter = document.getElementById('imgSource').value;
   
@@ -239,7 +418,6 @@ function renderGrid() {
     return matchesSearch && matchesSource;
   });
   
-  document.getElementById('imgCount').textContent = `${filtered.length} images`;
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   if (curPage > totalPages && totalPages > 0) curPage = totalPages;
@@ -254,45 +432,43 @@ function renderGrid() {
     return;
   }
 
-  grid.innerHTML = records.map(r => {
-    const mediaUrl = r.image_url || r.media_url;
-    const isVideo = (r.type && r.type.toLowerCase() === 'video') || (mediaUrl && mediaUrl.toLowerCase().endsWith('.mp4'));
-    const source = r.source || 'AI';
-    const lat = parseFloat(r.latitude);
-    const lon = parseFloat(r.longitude);
-    const fLat = isNaN(lat) ? '0.00000' : lat.toFixed(5);
-    const fLon = isNaN(lon) ? '0.00000' : lon.toFixed(5);
-    const timeStr = formatDt(r.created_at);
+  // DOM node recycling to reduce reflows
+  const currentNodes = Array.from(grid.children);
+  const frag = document.createDocumentFragment();
 
-    return `
-    <div class="img-tile" onclick="openLightbox('${mediaUrl}', ${r.id}, '${r.latitude}', '${r.longitude}', '${r.severity}', '${r.created_at}', 'image')">
-      <div class="source-tag source-ai">
-        DETECTION
-      </div>
+  // If we had the no-images placeholder, clear the grid first
+  if (currentNodes.length > 0 && currentNodes[0].classList.contains('no-images')) {
+      grid.innerHTML = '';
+      currentNodes.length = 0;
+  }
+
+  for (let i = 0; i < records.length; i++) {
+      let card = currentNodes[i];
+      if (!card) {
+          card = document.createElement('div');
+          card.className = 'img-tile';
+          frag.appendChild(card);
+      }
       
-      <div class="img-media-container" style="width:100%; height:170px; background:var(--surface); position:relative; overflow:hidden">
-        ${mediaUrl
-            ? `<img src="${mediaUrl}" alt="Detection #${r.id}" style="width:100%; height:100%; object-fit:cover" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\\'img-no-image\\' style=\\'height:100%; background:var(--surface); color:var(--muted)\\'><i class=\\'fa-solid fa-image-slash fa-xl\\'></i></div>';"/>`
-            : `<div class="img-no-image" style="height:100%; background:var(--surface)">
-                 <i class="fa-solid fa-image fa-xl" style="opacity:0.2"></i>
-               </div>`
-        }
-      </div>
+      // Update the dataset ID to quickly determine if it actually changed
+      const rId = String(records[i].id);
+      if (card.dataset.id !== rId) {
+          card.dataset.id = rId;
+          card.innerHTML = createCardHTML(records[i]);
+      }
+      
+      // If we are reusing an existing node that's already in the grid, we don't need to append it to frag
+  }
 
-      <div class="img-info" style="color: #fff; padding: 15px">
-        <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 5px; color: #fff">#${r.id} ${r.type || 'Pothole'}</div>
-        <div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 3px">${fLat}, ${fLon}</div>
-        <div style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 8px">${timeStr}</div>
-         <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px">
-           <div style="display:flex; justify-content:space-between; align-items:center">
-             <div style="text-transform: lowercase; font-size: 0.85rem; color: var(--accent); font-weight: 600">${r.severity || 'medium'}</div>
-             <div style="font-size: 0.75rem; color: var(--success); font-weight: 700">${Math.round((r.confidence || 0) * 100)}% Conf.</div>
-           </div>
-           <div style="font-size: 0.85rem; color: #fff; font-weight: 500">${r.status || 'Approved'}</div>
-         </div>
-      </div>
-    </div>`;
-  }).join('');
+  // Remove excess nodes if previous page had more items (e.g. going to last page)
+  for (let i = records.length; i < currentNodes.length; i++) {
+      grid.removeChild(currentNodes[i]);
+  }
+
+  // Only append newly created nodes (if any) to the grid
+  if (frag.children.length > 0) {
+      grid.appendChild(frag);
+  }
 
   renderPagination(filtered.length);
 }

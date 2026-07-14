@@ -26,7 +26,7 @@ download_model()
 logger.info("📥 Model downloaded")
 
 logger.info(f"RAILWAY_ENVIRONMENT = {os.getenv('RAILWAY_ENVIRONMENT')}")
-IS_RAILWAY = os.getenv("RAILWAY_ENVIRONMENT", "").lower() in ("true", "1", "yes")
+IS_RAILWAY = os.getenv("RAILWAY_ENVIRONMENT") is not None
 logger.info(f"IS_RAILWAY = {IS_RAILWAY}")
 
 if IS_RAILWAY:
@@ -58,9 +58,9 @@ Config.check_env()
 supabase: Client = None
 if Config.SUPABASE_URL and Config.SUPABASE_KEY:
     try:
-        options = ClientOptions(postgrest_client_timeout=15, storage_client_timeout=15)
+        options = ClientOptions(postgrest_client_timeout=45, storage_client_timeout=45)
         supabase = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY, options=options)
-        logger.info("[+] Supabase client initialized successfully with 15s timeout.")
+        logger.info("[+] Supabase client initialized successfully with 45s timeout.")
     except Exception as e:
         logger.error(f"[!] Critical: Failed to initialize Supabase: {e}", exc_info=True)
 else:
