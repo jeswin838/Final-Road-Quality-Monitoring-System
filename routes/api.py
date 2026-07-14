@@ -1769,6 +1769,7 @@ def get_user_reports():
 
 @api_bp.route("/user-reports/action", methods=["POST"])
 def report_action():
+    global _stats_cache
     if session.get("role") != "admin":
         return jsonify({"error": "Unauthorized"}), 403
         
@@ -1806,7 +1807,6 @@ def report_action():
                 "review_required": False
             }).eq("id", rid).execute()
             
-            global _stats_cache
             _stats_cache = {"data": None, "time": None}
             
             dlog.log_admin_approved(rid)
@@ -1818,7 +1818,6 @@ def report_action():
                 "review_required": False
             }).eq("id", rid).execute()
             
-            global _stats_cache
             _stats_cache = {"data": None, "time": None}
             
             dlog.log_admin_rejected(rid)          
