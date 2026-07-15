@@ -3,7 +3,12 @@ package com.example.potholedetector;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
+import android.app.AlertDialog;
+import android.content.Context;
+import android.content.Intent;
 import android.location.Location;
+import android.location.LocationManager;
+import android.provider.Settings;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -25,7 +30,11 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.Priority;
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.common.util.concurrent.ListenableFuture;
 
@@ -70,6 +79,11 @@ public class MainActivity extends AppCompatActivity {
     private ImageCapture imageCapture;
     private ExecutorService cameraExecutor;
     private FusedLocationProviderClient fusedLocationClient;
+    private LocationCallback locationCallback;
+    private Location currentLocation;
+    private boolean isTrackingLocation = false;
+    private boolean isGpsReady = false;
+    private static final float REQUIRED_ACCURACY_METERS = 10.0f;
 
     private volatile boolean isCapturing = false;
     private final Handler pollingHandler  = new Handler(Looper.getMainLooper());
@@ -89,6 +103,8 @@ public class MainActivity extends AppCompatActivity {
         cameraExecutor       = Executors.newSingleThreadExecutor();
         fusedLocationClient  = LocationServices.getFusedLocationProviderClient(this);
 
+        fabReport.setEnabled(false);
+        locationTextView.setText("Waiting for GPS...");
         fabReport.setOnClickListener(v -> handleManualReport());
 
         if (allPermissionsGranted()) {
@@ -164,18 +180,75 @@ public class MainActivity extends AppCompatActivity {
 
     @SuppressLint("MissingPermission")
     private void startLocationUpdates() {
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                fusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
-                    if (location != null) {
-                        locationTextView.setText(String.format(Locale.US,
-                                "%.4f, %.4f", location.getLatitude(), location.getLongitude()));
-                    }
-                });
-                new Handler(Looper.getMainLooper()).postDelayed(this, 3000);
+        if (!checkGPSEnabled()) return;
+        if (isTrackingLocation) return;
+        
+        isGpsReady = false;
+        runOnUiThread(() -> {
+            fabReport.setEnabled(false);
+            if (locationTextView != null && !locationTextView.getText().toString().contains("Acc:")) {
+                locationTextView.setText("Acquiring accurate location...");
             }
-        }, 3000);
+        });
+        
+        if (locationCallback == null) {
+            locationCallback = new LocationCallback() {
+                @Override
+                public void onLocationResult(@NonNull LocationResult locationResult) {
+                    if (locationResult == null) return;
+                    Location location = locationResult.getLastLocation();
+                    if (location != null) {
+                        currentLocation = location;
+                        float acc = location.getAccuracy();
+                        if (acc <= REQUIRED_ACCURACY_METERS && location.getLatitude() != 0 && location.getLongitude() != 0) {
+                            isGpsReady = true;
+                            fabReport.setEnabled(true);
+                            locationTextView.setText(String.format(Locale.US,
+                                    "%.4f, %.4f (Acc: %.1fm) - GPS Ready", 
+                                    location.getLatitude(), location.getLongitude(), acc));
+                        } else {
+                            isGpsReady = false;
+                            fabReport.setEnabled(false);
+                            locationTextView.setText(String.format(Locale.US,
+                                    "Waiting for accurate GPS... (Acc: %.1fm)", acc));
+                        }
+                    }
+                }
+            };
+        }
+
+        LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000)
+                .setMinUpdateDistanceMeters(2.0f)
+                .build();
+
+        fusedLocationClient.requestLocationUpdates(locationRequest,
+                locationCallback,
+                Looper.getMainLooper());
+                
+        isTrackingLocation = true;
+    }
+
+    private void stopLocationUpdates() {
+        if (fusedLocationClient != null && locationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(locationCallback);
+            isTrackingLocation = false;
+        }
+    }
+
+    private boolean checkGPSEnabled() {
+        LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        if (locationManager != null && !locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            new AlertDialog.Builder(this)
+                    .setMessage("GPS is disabled. Please enable it for accurate tracking.")
+                    .setCancelable(false)
+                    .setPositiveButton("Enable GPS", (dialog, which) -> {
+                        startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+            return false;
+        }
+        return true;
     }
 
     private void checkServerTrigger() {
@@ -211,6 +284,10 @@ public class MainActivity extends AppCompatActivity {
 
     // ── Manual Report ────────────────────────────────────────
     private void handleManualReport() {
+        if (!isGpsReady) {
+            Toast.makeText(this, "Waiting for accurate GPS...", Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (isCapturing) {
             Toast.makeText(this, "System busy...", Toast.LENGTH_SHORT).show();
             return;
@@ -226,7 +303,12 @@ public class MainActivity extends AppCompatActivity {
      */
     private void startBurstCapture(boolean isManual) {
         if (isCapturing || imageCapture == null) return;
+        if (!isGpsReady && !isManual) {
+            addLog("⚠️ Trigger ignored: GPS not ready");
+            return;
+        }
         isCapturing = true;
+        stopLocationUpdates();
 
         addLog("📸 Burst capture starting (" + BURST_COUNT + " frames)...");
 
@@ -271,15 +353,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @SuppressLint("MissingPermission")
     private void fetchLocationAndUploadBurst(List<File> files) {
-        fusedLocationClient.getLastLocation()
-                .addOnSuccessListener(location -> {
-                    double lat = (location != null) ? location.getLatitude()  : 0.0;
-                    double lon = (location != null) ? location.getLongitude() : 0.0;
-                    uploadBurst(files, lat, lon);
-                })
-                .addOnFailureListener(e -> uploadBurst(files, 0.0, 0.0));
+        double lat = (currentLocation != null) ? currentLocation.getLatitude()  : 0.0;
+        double lon = (currentLocation != null) ? currentLocation.getLongitude() : 0.0;
+        uploadBurst(files, lat, lon);
     }
 
     /**
@@ -355,6 +432,7 @@ public class MainActivity extends AppCompatActivity {
     private void captureAndUploadSingle(boolean isManual) {
         if (isCapturing || imageCapture == null) return;
         isCapturing = true;
+        stopLocationUpdates();
 
         File photoFile = new File(getExternalFilesDir(null),
                 "USER_" + new SimpleDateFormat("HHmmss", Locale.US).format(new Date()) + ".jpg");
@@ -377,15 +455,10 @@ public class MainActivity extends AppCompatActivity {
                 });
     }
 
-    @SuppressLint("MissingPermission")
     private void fetchLocationAndUploadSingle(File photoFile) {
-        fusedLocationClient.getLastLocation()
-                .addOnSuccessListener(location -> {
-                    double lat = (location != null) ? location.getLatitude()  : 0.0;
-                    double lon = (location != null) ? location.getLongitude() : 0.0;
-                    uploadSingle(photoFile, lat, lon);
-                })
-                .addOnFailureListener(e -> uploadSingle(photoFile, 0.0, 0.0));
+        double lat = (currentLocation != null) ? currentLocation.getLatitude()  : 0.0;
+        double lon = (currentLocation != null) ? currentLocation.getLongitude() : 0.0;
+        uploadSingle(photoFile, lat, lon);
     }
 
     private void uploadSingle(File photoFile, double lat, double lon) {
@@ -439,6 +512,7 @@ public class MainActivity extends AppCompatActivity {
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 isCapturing = false;
                 addLog("✨ Ready for next detection.");
+                startLocationUpdates();
             }, COOLDOWN_PERIOD);
         });
     }
@@ -475,6 +549,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        stopLocationUpdates();
         cameraExecutor.shutdown();
         pollingHandler.removeCallbacksAndMessages(null);
         captureHandler.removeCallbacksAndMessages(null);

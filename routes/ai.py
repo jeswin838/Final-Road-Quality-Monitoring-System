@@ -9,6 +9,8 @@ import numpy as np
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify
 
+import gc
+import psutil
 # Production-safe YOLO import
 from ultralytics import YOLO
 import torch
@@ -338,6 +340,7 @@ def run_inference(m, img: np.ndarray) -> tuple:
         # Reduced from 5 to 3 to allow more realistically blurred road captures.
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         blur_score = cv2.Laplacian(gray, cv2.CV_64F).var()
+        del gray
         if blur_score < 5:
             return None, []
         
@@ -345,7 +348,7 @@ def run_inference(m, img: np.ndarray) -> tuple:
         # A 0.15 threshold ensures we don't miss slightly deformed potholes
         # captured at an angle, while the backend 'strong_detections' logic
         # still filters out pure noise later.
-        with torch.no_grad():
+        with torch.inference_mode():
             device = "cuda:0" if torch.cuda.is_available() else "cpu"
             results = m.predict(
                 source=img,
@@ -356,6 +359,7 @@ def run_inference(m, img: np.ndarray) -> tuple:
                 half=torch.cuda.is_available(),
                 verbose=False
             )
+            
         elapsed = (time.time() - start) * 1000
         print(f"[AI] Inference: {elapsed:.0f}ms")
         
@@ -408,6 +412,9 @@ def select_best_frame(frames: list) -> tuple:
     pick the Best 10 Live Frames with the highest weighted score.
     Returns (results, detections, img, idx, score) of the best frame.
     """
+    if not frames:
+        return None, [], None, -1, -1
+        
     best_score = -1
     best = frames[0]
     for frame in frames:
@@ -635,13 +642,27 @@ def analyze():
         # ----- 4. Decode & Infer Best 10 Live Frames -----
         dlog.inference_start()
         _t_yolo_start = time.time()
-        frames = []
-        valid_frames = []
+        
+        best_results = None
+        best_detections = []
+        best_img = None
+        best_idx = -1
+        best_score = -1
+        any_valid_frames = False
 
         for idx, item in enumerate(files):
             f, file_bytes, q_val = item
+            
+            mem_bd = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
+            print(f"[MEM] Before decode: {mem_bd:.1f}MB")
+            
             np_arr = np.frombuffer(file_bytes, np.uint8)
             img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            
+            mem_ad = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
+            print(f"[MEM] After decode: {mem_ad:.1f}MB")
+            
+            del np_arr
 
             if img is None:
                 continue
@@ -651,8 +672,13 @@ def analyze():
                 cv2.imwrite(f"received_{idx}.jpg", img)
 
             if m:
+                mem_bi = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
+                print(f"[MEM] Before YOLO inference: {mem_bi:.1f}MB")
+                
                 results, detections = run_inference(m, img)
-                frames.append((results, detections, img, idx, q_val))
+                
+                mem_ai = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
+                print(f"[MEM] After YOLO inference: {mem_ai:.1f}MB")
 
                 strong_detections = [
                     d for d in detections
@@ -660,24 +686,43 @@ def analyze():
                 ]
 
                 if len(strong_detections) > 0:
-                    valid_frames.append((results, strong_detections, img, idx, q_val))
-            else:
-                frames.append((None, [], img, idx, q_val))
+                    any_valid_frames = True
+                    # Calculate score manually instead of storing all frames
+                    primary = max(strong_detections, key=lambda d: d.get("bbox_ratio", 0.0))
+                    
+                    yolo_conf = primary.get("confidence", 0.0)
+                    bbox_ratio = primary.get("bbox_ratio", 0.0)
+                    center_x_ratio = primary.get("center_x_ratio", 0.5)
+                    center_pos = 1.0 - abs(center_x_ratio - 0.5) * 2.0
+                    
+                    score = (0.40 * yolo_conf * 100) + (0.30 * bbox_ratio * 100) + (0.20 * q_val) + (0.10 * center_pos * 100)
+                    
+                    if score > best_score:
+                        if best_img is not None:
+                            del best_img
+                            del best_results
+                        best_score = score
+                        best_results = results
+                        best_detections = strong_detections
+                        best_img = img.copy()
+                        best_idx = idx
+                
+                del results
+                del detections
+                del strong_detections
+
+            del img
+            gc.collect()
 
         _yolo_ms = (time.time() - _t_yolo_start) * 1000
 
-        if not frames:
-            return jsonify({"error": "All frames invalid"}), 400
-
         # ----- 5. Best Frame Selection -----
-        if len(valid_frames) == 0:
+        if not any_valid_frames or best_img is None:
             dlog.no_detection()
             return jsonify({
                 "success": False,
                 "message": "No pothole detected"
             })
-
-        best_results, best_detections, best_img, best_idx, best_score = select_best_frame(valid_frames)
 
         if len(best_detections) == 0:
             dlog.no_detection()
@@ -828,7 +873,7 @@ def analyze():
         print("========== PERFORMANCE LOGGING ==========")
         print(f"Received Frames: {len(raw_files)}")
         print(f"Valid Frames: {len(files)}")
-        print(f"Frames Sent To YOLO: {len(frames)}")
+        print(f"Frames Sent To YOLO: {len(files)}")
         print(f"Best Frame Index: {best_idx}")
         print(f"Best Frame Score: {best_score:.2f}")
         print(f"YOLO Inference Time: {_yolo_ms:.2f}ms")
@@ -859,6 +904,9 @@ def analyze():
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         processing = False
+        mem_after_resp = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
+        print(f"[MEM] After response: {mem_after_resp:.1f}MB")
+        gc.collect()
 
 
 # ================= USER REPORT ENDPOINT =================
