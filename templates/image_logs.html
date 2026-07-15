@@ -204,6 +204,46 @@ function isSameIncident(a, b) {
   }
 }
 
+async function downloadImage(url) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Network response was not ok');
+        const blob = await response.blob();
+        const urlBlob = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = urlBlob;
+        
+        let filename = 'RoadReport_' + new Date().toISOString().replace(/[:\.]/g, '-').replace('T', '_') + '.jpg';
+        try {
+            const urlObj = new URL(url);
+            const pathParts = urlObj.pathname.split('/');
+            const lastPart = pathParts[pathParts.length - 1];
+            if (lastPart && lastPart.includes('.')) {
+                filename = lastPart;
+            }
+        } catch (e) {}
+
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(urlBlob);
+        document.body.removeChild(a);
+        
+        if (typeof showToast === 'function') {
+            showToast('✓ Image saved successfully', 'success');
+        } else {
+            alert('✓ Image saved successfully');
+        }
+    } catch (e) {
+        if (typeof showToast === 'function') {
+            showToast('✗ Failed to save image', 'error');
+        } else {
+            alert('✗ Failed to save image');
+        }
+    }
+}
+
 function mergeLogRecords(rows) {
   // Simple deduplication based on ID or proximity if needed, 
   // but since we are fetching from a single table (potholes), 
@@ -398,9 +438,9 @@ function createCardHTML(r) {
         </div>
         
         <div class="card-actions">
-            <button class="btn-card-action" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${fLat},${fLon}', '_blank')"><i class="fa-solid fa-map-location-dot"></i> Map</button>
+            <button class="btn-card-action" onclick="window.location.href='{{ url_for('pages.dashboard') }}?report_id=${r.id}'"><i class="fa-solid fa-map-location-dot"></i> Map</button>
             <button class="btn-card-action" onclick="openLightbox('${mediaUrl}', ${r.id}, '${r.latitude}', '${r.longitude}', '${r.severity}', '${r.created_at}', '${isVideo ? 'video' : 'image'}')"><i class="fa-solid fa-magnifying-glass"></i> View</button>
-            <button class="btn-card-action" onclick="window.open('${mediaUrl}', '_blank')"><i class="fa-solid fa-download"></i> Save</button>
+            <button class="btn-card-action" onclick="downloadImage('${mediaUrl}')"><i class="fa-solid fa-download"></i> Save</button>
         </div>
       </div>
     `;

@@ -4,8 +4,10 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.location.Location;
 import android.location.LocationManager;
 import android.provider.Settings;
@@ -89,6 +91,24 @@ public class MainActivity extends AppCompatActivity {
     private final Handler pollingHandler  = new Handler(Looper.getMainLooper());
     private final Handler captureHandler  = new Handler(Looper.getMainLooper());
 
+    private final BroadcastReceiver gpsReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (LocationManager.PROVIDERS_CHANGED_ACTION.equals(intent.getAction())) {
+                if (isGpsProviderEnabled()) {
+                    Log.d(TAG, "GPS Enabled");
+                    if (!isTrackingLocation && !isCapturing) {
+                        startLocationUpdates();
+                    }
+                } else {
+                    Log.d(TAG, "GPS Disabled");
+                    Log.d(TAG, "GPS Lost");
+                    invalidateGpsState();
+                }
+            }
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -106,6 +126,8 @@ public class MainActivity extends AppCompatActivity {
         fabReport.setEnabled(false);
         locationTextView.setText("Waiting for GPS...");
         fabReport.setOnClickListener(v -> handleManualReport());
+
+        registerReceiver(gpsReceiver, new IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION));
 
         if (allPermissionsGranted()) {
             startCamera();
@@ -132,8 +154,41 @@ public class MainActivity extends AppCompatActivity {
                 startPolling();
                 startLocationUpdates();
             } else {
-                Toast.makeText(this, "Permissions not granted.", Toast.LENGTH_SHORT).show();
-                finish();
+                fabReport.setEnabled(false);
+                if (locationTextView != null) {
+                    locationTextView.setText("Location permission required.");
+                }
+
+                boolean shouldShowRationale = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION);
+                
+                if (shouldShowRationale) {
+                    new AlertDialog.Builder(this)
+                            .setMessage("Location permission required.")
+                            .setCancelable(false)
+                            .setPositiveButton("Grant Permission Again", (dialog, which) -> {
+                                ActivityCompat.requestPermissions(MainActivity.this,
+                                        new String[]{Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION},
+                                        PERMISSION_REQUEST_CODE);
+                            })
+                            .setNegativeButton("Back", (dialog, which) -> {
+                                finish();
+                            })
+                            .show();
+                } else {
+                    new AlertDialog.Builder(this)
+                            .setMessage("Location permission is required to detect potholes.")
+                            .setCancelable(false)
+                            .setPositiveButton("Open Settings", (dialog, which) -> {
+                                Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                                android.net.Uri uri = android.net.Uri.fromParts("package", getPackageName(), null);
+                                intent.setData(uri);
+                                startActivity(intent);
+                            })
+                            .setNegativeButton("Back", (dialog, which) -> {
+                                finish();
+                            })
+                            .show();
+                }
             }
         }
     }
@@ -198,9 +253,14 @@ public class MainActivity extends AppCompatActivity {
                     if (locationResult == null) return;
                     Location location = locationResult.getLastLocation();
                     if (location != null) {
+                        Log.d(TAG, "New Location Received");
+                        long age = System.currentTimeMillis() - location.getTime();
+                        if (age > 15000) return; // skip old cached locations
+                        
                         currentLocation = location;
                         float acc = location.getAccuracy();
                         if (acc <= REQUIRED_ACCURACY_METERS && location.getLatitude() != 0 && location.getLongitude() != 0) {
+                            if (!isGpsReady) Log.d(TAG, "GPS Ready");
                             isGpsReady = true;
                             fabReport.setEnabled(true);
                             locationTextView.setText(String.format(Locale.US,
@@ -235,11 +295,27 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private boolean checkGPSEnabled() {
+    private void invalidateGpsState() {
+        currentLocation = null;
+        isGpsReady = false;
+        runOnUiThread(() -> {
+            fabReport.setEnabled(false);
+            if (locationTextView != null) {
+                locationTextView.setText("Enable GPS to continue.");
+            }
+        });
+    }
+
+    private boolean isGpsProviderEnabled() {
         LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        if (locationManager != null && !locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+        return locationManager != null && locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+    }
+
+    private boolean checkGPSEnabled() {
+        if (!isGpsProviderEnabled()) {
+            invalidateGpsState();
             new AlertDialog.Builder(this)
-                    .setMessage("GPS is disabled. Please enable it for accurate tracking.")
+                    .setMessage("Enable GPS to continue.")
                     .setCancelable(false)
                     .setPositiveButton("Enable GPS", (dialog, which) -> {
                         startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
@@ -354,8 +430,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void fetchLocationAndUploadBurst(List<File> files) {
-        double lat = (currentLocation != null) ? currentLocation.getLatitude()  : 0.0;
-        double lon = (currentLocation != null) ? currentLocation.getLongitude() : 0.0;
+        if (!isGpsProviderEnabled() || currentLocation == null || !isGpsReady) {
+            Log.d(TAG, "Upload Cancelled (GPS unavailable)");
+            runOnUiThread(() -> {
+                locationTextView.setText("Enable GPS to continue.");
+                addLog("❌ Upload Cancelled (GPS unavailable)");
+            });
+            releaseCooldown();
+            return;
+        }
+        double lat = currentLocation.getLatitude();
+        double lon = currentLocation.getLongitude();
+        Log.d(TAG, "Frozen GPS:\nLatitude=" + lat + "\nLongitude=" + lon + "\nAccuracy=" + currentLocation.getAccuracy());
         uploadBurst(files, lat, lon);
     }
 
@@ -456,8 +542,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void fetchLocationAndUploadSingle(File photoFile) {
-        double lat = (currentLocation != null) ? currentLocation.getLatitude()  : 0.0;
-        double lon = (currentLocation != null) ? currentLocation.getLongitude() : 0.0;
+        if (!isGpsProviderEnabled() || currentLocation == null || !isGpsReady) {
+            Log.d(TAG, "Upload Cancelled (GPS unavailable)");
+            runOnUiThread(() -> {
+                locationTextView.setText("Enable GPS to continue.");
+                addLog("❌ Upload Cancelled (GPS unavailable)");
+            });
+            releaseCooldown();
+            return;
+        }
+        double lat = currentLocation.getLatitude();
+        double lon = currentLocation.getLongitude();
+        Log.d(TAG, "Frozen GPS:\nLatitude=" + lat + "\nLongitude=" + lon + "\nAccuracy=" + currentLocation.getAccuracy());
         uploadSingle(photoFile, lat, lon);
     }
 
@@ -549,6 +645,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        try {
+            unregisterReceiver(gpsReceiver);
+        } catch (IllegalArgumentException e) {
+            // ignored
+        }
         stopLocationUpdates();
         cameraExecutor.shutdown();
         pollingHandler.removeCallbacksAndMessages(null);

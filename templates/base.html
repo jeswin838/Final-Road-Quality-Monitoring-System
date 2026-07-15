@@ -1,18 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}PotholePro{% endblock %}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}"/>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/design_system.css') }}"/>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/glassmorphism.css') }}"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/design_system.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/glassmorphism.css') }}" />
   <script>
     // Globally mock user geolocation to match the coordinates of the test potholes
     if (navigator.geolocation) {
@@ -26,7 +28,7 @@
         speed: null
       };
 
-      navigator.geolocation.getCurrentPosition = function(success, error, options) {
+      navigator.geolocation.getCurrentPosition = function (success, error, options) {
         setTimeout(() => {
           success({
             coords: mockCoords,
@@ -35,7 +37,7 @@
         }, 50);
       };
 
-      navigator.geolocation.watchPosition = function(success, error, options) {
+      navigator.geolocation.watchPosition = function (success, error, options) {
         setTimeout(() => {
           success({
             coords: mockCoords,
@@ -48,6 +50,7 @@
   </script>
   {% block head %}{% endblock %}
 </head>
+
 <body class="dashboard-body">
 
   <!-- Ambient Background Elements -->
@@ -62,13 +65,21 @@
 
   <!-- ════ SIDEBAR ════════════════════════════════════════════════════════ -->
   <aside class="sidebar">
-    <div class="sidebar-header">
-      <div class="sidebar-brand">
-        <div class="brand-icon"><i class="fa-solid fa-road"></i></div>
-        <span class="brand-text">PotholePro</span>
+    <div class="sidebar-header" style="margin-bottom: 15px;">
+      <div class="sidebar-brand premium-brand">
+        <div class="brand-icon-premium">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12c0 0 3.5-7 10-7s10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M12 15v7"></path>
+            <path d="M8 22h8"></path>
+          </svg>
+        </div>
+        <span class="brand-text-premium">VisionaryRoad</span>
       </div>
     </div>
-    
+
     <nav class="sidebar-nav">
       <div class="nav-section">
         <div class="nav-label">Core Monitoring</div>
@@ -85,7 +96,7 @@
           <i class="fa-solid fa-camera"></i><span>Report Pothole</span>
         </a>
       </div>
-      
+
       {% if session.get('role') == 'admin' %}
       <div class="nav-section">
         <div class="nav-label">Maintenance</div>
@@ -99,7 +110,7 @@
           <i class="fa-solid fa-wrench"></i><span>Tracking</span>
         </a>
       </div>
-      
+
       <div class="nav-section">
         <div class="nav-label">System</div>
         <a href="{{ url_for('pages.settings') }}" class="nav-item {% if page=='settings' %}active{% endif %}">
@@ -169,7 +180,7 @@
   </main>
 
   <!-- ════ MODALS ═══════════════════════════════════════════════════════════ -->
-  
+
   <!-- Logout Modal -->
   <div class="modal-overlay" id="logoutModal" style="display:none">
     <div class="modal-box" style="max-width:320px; text-align:center">
@@ -190,13 +201,14 @@
   <!-- Delete Modal -->
   <div class="modal-overlay" id="deleteModal" style="display:none">
     <div class="modal-box" style="max-width:340px; text-align:center">
-      <input type="hidden" id="deleteTargetId"/>
+      <input type="hidden" id="deleteTargetId" />
       <div class="modal-header">
         <h3 style="color:var(--danger)"><i class="fa-solid fa-trash-can"></i> Confirm Delete</h3>
         <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
       </div>
       <div class="modal-body">
-        <p style="margin:20px 0; color:var(--muted)">Are you sure you want to delete this pothole record? This action cannot be undone.</p>
+        <p style="margin:20px 0; color:var(--muted)">Are you sure you want to delete this pothole record? This action
+          cannot be undone.</p>
       </div>
       <div class="modal-footer" style="flex-direction:column; gap:8px">
         <button class="btn btn-danger btn-full" onclick="confirmGlobalDelete()">Delete Record</button>
@@ -213,10 +225,10 @@
         <button class="modal-close" id="closeAssignModal">&times;</button>
       </div>
       <div class="modal-body">
-        <input type="hidden" id="assignPotholeId"/>
+        <input type="hidden" id="assignPotholeId" />
         <div class="form-group">
           <label>Worker Name</label>
-          <input type="text" id="assignWorkerName" placeholder="Enter worker name" class="form-input"/>
+          <input type="text" id="assignWorkerName" placeholder="Enter worker name" class="form-input" />
         </div>
         <div class="form-group">
           <label>Notes</label>
@@ -244,14 +256,68 @@
     .sidebar-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.4);
+      background: rgba(0, 0, 0, 0.4);
       z-index: 150;
       display: none;
       backdrop-filter: blur(4px);
     }
+
     body.sidebar-open .sidebar-overlay {
       display: block;
     }
+
+    /* Premium AI Brand Styling */
+    .premium-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 0;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .brand-icon-premium {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #4f46e5, #3b82f6, #06b6d4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.35), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .brand-icon-premium::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 100%);
+      border-radius: 12px;
+      pointer-events: none;
+    }
+
+    .premium-brand:hover .brand-icon-premium {
+      transform: scale(1.05) translateY(-3px);
+      box-shadow: 0 12px 32px rgba(59, 130, 246, 0.45), inset 0 2px 6px rgba(255, 255, 255, 0.4);
+    }
+
+    .brand-text-premium {
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 0.04em;
+      color: #ffffff;
+      background: linear-gradient(90deg, #ffffff, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.2;
+    }
   </style>
 </body>
+
 </html>

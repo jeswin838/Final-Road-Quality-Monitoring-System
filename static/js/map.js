@@ -311,8 +311,70 @@ async function loadMarkers() {
     if (typeof pollAlerts === 'function') {
       pollAlerts(allData);
     }
+
+    if (firstLoad) {
+      focusTargetReport();
+      firstLoad = false;
+    }
   } finally {
     isLoadingMarkers = false;
+  }
+}
+
+function focusTargetReport() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const targetReportId = urlParams.get('report_id');
+  const targetMarkerId = urlParams.get('marker_id');
+  
+  if (!targetReportId && !targetMarkerId) return;
+  if (!allData || allData.length === 0) return;
+
+  let targetGroup = null;
+
+  for (let group of allData) {
+     if (targetMarkerId && group.marker_id === targetMarkerId) {
+         targetGroup = group;
+         break;
+     }
+     if (targetReportId && group.reports) {
+         if (group.reports.some(r => String(r.id) === String(targetReportId))) {
+             targetGroup = group;
+             break;
+         }
+     }
+  }
+
+  if (targetGroup) {
+      const lat = parseFloat(targetGroup.latitude);
+      const lon = parseFloat(targetGroup.longitude);
+      
+      map.flyTo([lat, lon], 18, { animate: true, duration: 1.5 });
+      
+      setTimeout(() => {
+          let foundLayer = null;
+          markerClusterGroup.eachLayer(layer => {
+              if (layer.options && layer.options.marker_id === targetGroup.marker_id) {
+                  foundLayer = layer;
+              }
+          });
+          
+          if (foundLayer) {
+              markerClusterGroup.zoomToShowLayer(foundLayer, () => {
+                  foundLayer.openPopup();
+                  setTimeout(() => {
+                      if (typeof showReports === 'function') {
+                          showReports(targetGroup.marker_id, targetReportId);
+                      }
+                  }, 500);
+              });
+          }
+      }, 1600);
+  } else {
+      if (typeof showToast === 'function') {
+          showToast('Report location not found.', 'error');
+      } else {
+          alert('Report location not found.');
+      }
   }
 }
 
@@ -328,6 +390,7 @@ function renderMarkers() {
       const isUserReport = r.type === 'user_report';
       const color = isUserReport ? '#3b82f6' : (r.severity === 'critical' ? '#DC2626' : r.severity === 'high' ? '#ef4444' : r.severity === 'medium' ? '#f97316' : '#22c55e');
       const marker = L.marker([lat, lon], { icon: makeIcon(r.severity, isUserReport) });
+      marker.options.marker_id = r.marker_id;
       
       const popupHtml = buildPremiumPopup(r, lat, lon, isUserReport);
       
@@ -411,7 +474,7 @@ window.markFixedFromMap = async function(id) {
 };
 
 // ── Reports Modal Logic ──────────────────────────────────────────────────────
-window.showReports = async function(marker_id) {
+window.showReports = async function(marker_id, highlightReportId = null) {
   const modal = document.getElementById('reportsModal');
   const container = document.getElementById('reportsContainer');
   const countBadge = document.getElementById('reportsCountBadge');
@@ -470,7 +533,7 @@ window.showReports = async function(marker_id) {
             alt="Report ${idx + 1}"
             style="width:100%;height:100%;object-fit:contain;cursor:zoom-in"
             onclick="window.open('${displayMedia}','_blank')"
-            onerror="this.src='/static/img/placeholder.jpg';this.onerror=null;"
+            onerror="this.onerror=null;this.outerHTML='<div style=\\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35);color:#7d8590;\\'><i class=\\'fa-solid fa-image-slash fa-3x\\'></i></div>';"
           >`;
 
       const confPct = r.confidence ? Math.round(r.confidence * 100) : 0;
@@ -490,7 +553,7 @@ window.showReports = async function(marker_id) {
                         statLower === 'rejected' ? '#f87171' : '#fbbf24';
 
       return `
-        <div class="report-gallery-card">
+        <div class="report-gallery-card" id="reportCard_${r.id || ''}">
           <div class="report-gallery-img-wrap">
             ${displayMedia ? mediaTag : `<div class="reports-gallery-empty" style="padding:40px"><i class="fa-solid fa-image" style="opacity:.3"></i></div>`}
           </div>
@@ -526,6 +589,17 @@ window.showReports = async function(marker_id) {
         </div>
       `;
     }).join('');
+
+    if (highlightReportId) {
+      setTimeout(() => {
+        const el = document.getElementById(`reportCard_${highlightReportId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.style.border = '2px solid var(--accent)';
+          el.style.boxShadow = '0 0 20px rgba(99,102,241,0.5)';
+        }
+      }, 300);
+    }
 
   } catch (err) {
     console.error('[Reports] Modal Error:', err);
