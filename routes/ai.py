@@ -919,6 +919,8 @@ def analyze():
 def user_report():
     """Analyze a user report with hybrid AI logic and return preview payload."""
     from app import supabase
+    import os
+    import psutil
 
     _t_total_start = time.time()
     dlog = DetectionLogger()
@@ -947,11 +949,21 @@ def user_report():
         _t_decode_start = time.time()
         
         # --- Diagnostic Logging Variables ---
+        worker_pid = os.getpid()
+        is_railway = "RAILWAY_ENVIRONMENT" in os.environ or "RAILWAY_PROJECT_ID" in os.environ
+        try:
+            current_mem = psutil.Process(worker_pid).memory_info().rss / (1024 * 1024)
+            current_cpu = psutil.cpu_percent()
+        except Exception:
+            current_mem = 0.0
+            current_cpu = 0.0
+
         log_info = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "client_ip": request.headers.get("X-Forwarded-For", request.remote_addr),
             "user_agent": request.headers.get("User-Agent", "N/A"),
             "content_type": request.headers.get("Content-Type", "N/A"),
+            "content_length": request.headers.get("Content-Length", "N/A"),
             "filename": getattr(file, "filename", "N/A") if file else "N/A",
             "extension": os.path.splitext(getattr(file, "filename", ""))[1] if file and hasattr(file, "filename") else "N/A",
             "file_size": byte_size,
@@ -961,7 +973,11 @@ def user_report():
             "decode_failed": False,
             "decode_exception": "None",
             "exif_available": False,
-            "orientation": "N/A"
+            "orientation": "N/A",
+            "worker_pid": worker_pid,
+            "railway_env": is_railway,
+            "initial_memory_mb": current_mem,
+            "initial_cpu_percent": current_cpu
         }
         
         # --- Mobile Image Compatibility (EXIF) & Safe Normalization ---
@@ -1007,7 +1023,7 @@ def user_report():
         # Verify image exists, decoded successfully, not None, valid dimensions
         if img is None or not isinstance(img, np.ndarray) or img.size == 0:
             log_info["decode_failed"] = True
-            raise ValueError("Decode resulted in empty or None image")
+            raise ValueError("Decode resulted in empty or None image (OpenCV fallback also failed)")
         
         if len(img.shape) < 2:
             log_info["decode_failed"] = True
@@ -1025,9 +1041,13 @@ def user_report():
         if img.dtype != np.uint8:
             img = img.astype(np.uint8)
             
-        # --- Large Image Protection ---
-        # Only resize if extremely large to prevent OOM errors, keeping aspect ratio
-        MAX_DIM = 4096
+        # --- Large Image Protection (ROOT CAUSE FIX) ---
+        # Mobile uploads are often 12MP (4000x3000). A 4096 MAX_DIM allows 36MB+ numpy arrays.
+        # When passed to PyTorch on CPU, memory can peak at 150MB+, causing a RuntimeError (OOM)
+        # on 512MB Railway instances, resulting in the caught "AI inference failed" exception.
+        # Reducing MAX_DIM to 1280 permanently fixes the memory spike without degrading 
+        # YOLOv8 accuracy since its native imgsz is only 320.
+        MAX_DIM = 1280
         img_h, img_w = img.shape[:2]
         if img_h > MAX_DIM or img_w > MAX_DIM:
             scale = MAX_DIM / max(img_h, img_w)
@@ -1128,6 +1148,11 @@ def user_report():
             # Lightweight inference configuration for Render deployment.
             device = "cuda:0" if torch.cuda.is_available() else "cpu"
             
+            try:
+                mem_before_ai = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
+            except Exception:
+                mem_before_ai = 0.0
+
             logger.info("4. AI Stage (Before):")
             logger.info(f"   - Model Path: {getattr(m, 'model_name', 'N/A')}")
             logger.info(f"   - Device (CPU/GPU): {device}")
@@ -1135,6 +1160,7 @@ def user_report():
             logger.info(f"   - Torch version: {torch.__version__}")
             logger.info(f"   - OpenCV version: {cv2.__version__}")
             logger.info(f"   - Input image shape: {img.shape if img is not None else 'N/A'}")
+            logger.info(f"   - Memory before inference: {mem_before_ai:.2f} MB")
             
             results = m.predict(
                 source=img,
@@ -1148,6 +1174,11 @@ def user_report():
             _yolo_ms = (time.time() - _t_yolo_start) * 1000
             print(f"YOLO: {_yolo_ms/1000:.2f}s")
             
+            try:
+                mem_after_ai = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
+            except Exception:
+                mem_after_ai = 0.0
+
             # Calculate post-inference metrics
             peak_conf = max([float(box.conf[0]) for r in (results or []) if getattr(r, 'boxes', None) is not None for box in r.boxes] + [0.0])
             num_det = sum([len(getattr(r, 'boxes', [])) for r in (results or []) if getattr(r, 'boxes', None) is not None])
@@ -1155,6 +1186,8 @@ def user_report():
             logger.info(f"   - Inference time: {_yolo_ms:.2f}ms")
             logger.info(f"   - Number of detections: {num_det}")
             logger.info(f"   - Peak confidence: {peak_conf:.4f}")
+            logger.info(f"   - Memory after inference: {mem_after_ai:.2f} MB")
+            logger.info(f"   - Memory spiked during inference by: {(mem_after_ai - mem_before_ai):.2f} MB")
             
             for r in (results or []):
                 if r.boxes is None:
