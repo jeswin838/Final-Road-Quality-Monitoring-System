@@ -43,25 +43,48 @@ async function startCamera() {
   }
 }
 
-function processAndSetBlob(imgSource, originalWidth, originalHeight) {
-  const MAX_DIM = 1920;
-  let targetWidth = originalWidth;
-  let targetHeight = originalHeight;
-  
-  if (targetWidth > MAX_DIM || targetHeight > MAX_DIM) {
-    const scale = MAX_DIM / Math.max(targetWidth, targetHeight);
-    targetWidth = Math.round(targetWidth * scale);
-    targetHeight = Math.round(targetHeight * scale);
+function captureImage() {
+  const track = stream && stream.getVideoTracks ? stream.getVideoTracks()[0] : null;
+
+  // Prefer ImageCapture to keep original camera quality.
+  if (track && 'ImageCapture' in window) {
+    const imageCapture = new ImageCapture(track);
+    imageCapture.takePhoto()
+      .then((blob) => {
+        capturedBlob = blob; // original-quality capture blob
+        captureSource = 'live_camera';
+        const url = URL.createObjectURL(blob);
+        preview.src = url;
+        preview.style.display = 'block';
+        video.style.display = 'none';
+        captureBtn.style.display = 'none';
+        retakeBtn.style.display = 'flex';
+        checkSubmitReady();
+      })
+      .catch(() => {
+        // Fallback only if ImageCapture fails.
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        canvas.toBlob((blob) => {
+          capturedBlob = blob;
+          captureSource = 'live_camera';
+          const url = URL.createObjectURL(blob);
+          preview.src = url;
+          preview.style.display = 'block';
+          video.style.display = 'none';
+          captureBtn.style.display = 'none';
+          retakeBtn.style.display = 'flex';
+          checkSubmitReady();
+        }, 'image/png');
+      });
+    return;
   }
 
-  canvas.width = targetWidth;
-  canvas.height = targetHeight;
-  const ctx = canvas.getContext('2d');
-  // Fill white background to prevent transparent PNG to JPEG black-background artifacts
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, targetWidth, targetHeight);
-  ctx.drawImage(imgSource, 0, 0, targetWidth, targetHeight);
-  
+  // Legacy fallback (avoid lossy JPEG recompression).
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
   canvas.toBlob((blob) => {
     capturedBlob = blob;
     captureSource = 'live_camera';
@@ -72,33 +95,7 @@ function processAndSetBlob(imgSource, originalWidth, originalHeight) {
     captureBtn.style.display = 'none';
     retakeBtn.style.display = 'flex';
     checkSubmitReady();
-  }, 'image/jpeg', 0.92); // 0.92 is optimal for quality/size ratio (1-3MB)
-}
-
-function captureImage() {
-  const track = stream && stream.getVideoTracks ? stream.getVideoTracks()[0] : null;
-
-  if (track && 'ImageCapture' in window) {
-    const imageCapture = new ImageCapture(track);
-    imageCapture.takePhoto()
-      .then((blob) => {
-        if (blob.type.includes('heic') || blob.type.includes('heif')) {
-            throw new Error("Unsupported HEIC/HEIF");
-        }
-        const img = new Image();
-        img.onload = () => {
-          processAndSetBlob(img, img.width, img.height);
-          URL.revokeObjectURL(img.src);
-        };
-        img.src = URL.createObjectURL(blob);
-      })
-      .catch(() => {
-        processAndSetBlob(video, video.videoWidth, video.videoHeight);
-      });
-    return;
-  }
-
-  processAndSetBlob(video, video.videoWidth, video.videoHeight);
+  }, 'image/png');
 }
 
 function retake() {
@@ -161,20 +158,6 @@ function checkSubmitReady() {
 async function handleAnalyze() {
   if (!capturedBlob || !currentCoords) return;
 
-  console.log("=== FRONTEND UPLOAD LOG ===");
-  console.log(`Blob MIME type: ${capturedBlob.type}`);
-  console.log(`Blob size: ${(capturedBlob.size / 1024 / 1024).toFixed(2)} MB`);
-  console.log(`File name: capture.jpg`);
-  if (capturedBlob instanceof Blob) {
-     const tempImg = new Image();
-     tempImg.src = URL.createObjectURL(capturedBlob);
-     await new Promise(r => { tempImg.onload = r; });
-     console.log(`Image width: ${tempImg.width}`);
-     console.log(`Image height: ${tempImg.height}`);
-  }
-  console.log(`Capture source: ${captureSource}`);
-  console.log("===========================");
-
   if (watchId !== null) {
     navigator.geolocation.clearWatch(watchId);
     watchId = null;
@@ -196,26 +179,13 @@ async function handleAnalyze() {
   if (gpsAccuracy !== null) formData.append('gps_accuracy', gpsAccuracy);
 
   try {
-    let res;
-    let data;
-    let attempt = 0;
-    while (attempt < 2) {
-      try {
-        res = await fetch('/user-report', {
-          method: 'POST',
-          body: formData
-        });
-        data = await res.json();
-        break; // Success
-      } catch (networkErr) {
-        attempt++;
-        if (attempt >= 2) throw networkErr;
-        console.warn("Upload network failed, retrying in 1s...");
-        await new Promise(r => setTimeout(r, 1000));
-      }
-    }
+    const res = await fetch('/user-report', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
 
-    if (res && res.ok) {
+    if (res.ok) {
       analysisResult = data;
       renderAnalyzeResult(data);
       showToast(`Analysis complete: ${formatStatus(data.status)}`, data.status === 'approved' ? 'success' : data.status === 'rejected' ? 'error' : 'warning');

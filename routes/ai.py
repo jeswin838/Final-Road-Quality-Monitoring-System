@@ -915,21 +915,7 @@ def analyze():
 
 
 # ================= USER REPORT ENDPOINT =================
-def mask_errors(f):
-    import functools
-    @functools.wraps(f)
-    def decorated_function(*args, **kwargs):
-        try:
-            return f(*args, **kwargs)
-        except Exception as e:
-            import uuid, traceback
-            error_id = uuid.uuid4().hex[:8]
-            logger.exception(f"[ERROR ID: {error_id}] Unhandled exception in {f.__name__}")
-            return jsonify({"error": "AI inference failed", "error_id": error_id}), 500
-    return decorated_function
-
 @ai_bp.route("/user-report", methods=["POST"])
-@mask_errors
 def user_report():
     """Analyze a user report with hybrid AI logic and return preview payload."""
     from app import supabase
@@ -937,21 +923,18 @@ def user_report():
     _t_total_start = time.time()
     dlog = DetectionLogger()
 
+    file = request.files.get("image")
     lat = request.form.get("lat") or request.form.get("latitude")
     lon = request.form.get("lon") or request.form.get("longitude")
 
-    if not lat or not lon:
-        return jsonify({"error": "Missing location"}), 400
+    if not file or not lat or not lon:
+        return jsonify({"error": "Missing image or location"}), 400
 
     try:
         lat_f = float(lat)
         lon_f = float(lon)
     except ValueError:
         return jsonify({"error": "Invalid coordinates"}), 400
-        
-    file = request.files.get("image")
-    if not file:
-        return jsonify({"error": "Missing image"}), 400
 
     # --- Preprocessing & Validation ---
     # Decode image once. AI uses this frame; upload uses annotated or original.
@@ -981,20 +964,12 @@ def user_report():
             "orientation": "N/A"
         }
         
-        import psutil
-        process = psutil.Process()
-        mem_before_decode = process.memory_info().rss / 1024 / 1024
-        logger.info(f"[MEM] Before Decode: {mem_before_decode:.2f} MB")
-
-        # --- 3-Stage Robust Decode Pipeline ---
-        img = None
-        decode_strategy = "None"
-        
-        # Strategy 1: Pillow -> EXIF Transpose -> RGB -> NumPy
+        # --- Mobile Image Compatibility (EXIF) & Safe Normalization ---
+        # 1. We use PIL to read and automatically correct EXIF orientation (mobile cameras)
+        # 2. This prevents YOLO from seeing sideways images and failing
         try:
             from PIL import Image, ImageOps, ExifTags
             import io
-            Image.MAX_IMAGE_PIXELS = 50_000_000  # 50 MP limit for safety
             pil_img = Image.open(io.BytesIO(file_bytes))
             
             try:
@@ -1011,8 +986,6 @@ def user_report():
             pil_img = ImageOps.exif_transpose(pil_img)
             img = np.array(pil_img)
             log_info["pil_succeeded"] = True
-            decode_strategy = "Strategy 1 (Pillow -> Transpose)"
-            del pil_img  # Explicit memory release
             
             # Convert to standard OpenCV BGR format and remove alpha
             if len(img.shape) == 3 and img.shape[2] == 3:
@@ -1023,55 +996,37 @@ def user_report():
                 img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) # Grayscale to 3 channels
             else:
                 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) # Fallback
-        except Exception as e1:
-            log_info["decode_exception"] = str(e1)
-            # Strategy 2: OpenCV imdecode (Fallback for headers that pillow fails on)
-            try:
-                np_arr = np.frombuffer(file_bytes, np.uint8)
-                img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-                if img is None:
-                    raise ValueError("cv2.imdecode returned None")
-                log_info["cv2_fallback"] = True
-                decode_strategy = "Strategy 2 (OpenCV imdecode)"
-                del np_arr
-            except Exception as e2:
-                # Strategy 3: Pillow verify() and reopen (Deep fallback for corrupted metadata)
-                try:
-                    pil_img = Image.open(io.BytesIO(file_bytes))
-                    pil_img.verify()
-                    pil_img = Image.open(io.BytesIO(file_bytes)) # reopen after verify
-                    pil_img = pil_img.convert("RGB")
-                    img = np.array(pil_img)
-                    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-                    decode_strategy = "Strategy 3 (Pillow Verify -> RGB)"
-                    del pil_img
-                except Exception as e3:
-                    # All 3 strategies failed
-                    log_info["decode_failed"] = True
-                    return jsonify({"error": "Invalid image data"}), 400
+        except Exception as pil_e:
+            log_info["decode_exception"] = str(pil_e)
+            log_info["cv2_fallback"] = True
+            print(f"[DEBUG] PIL processing failed, falling back to OpenCV: {pil_e}")
+            np_arr = np.frombuffer(file_bytes, np.uint8)
+            img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
         # --- Robust Image Validation ---
+        # Verify image exists, decoded successfully, not None, valid dimensions
         if img is None or not isinstance(img, np.ndarray) or img.size == 0:
             log_info["decode_failed"] = True
-            return jsonify({"error": "Invalid image data"}), 400
+            raise ValueError("Decode resulted in empty or None image")
         
         if len(img.shape) < 2:
             log_info["decode_failed"] = True
-            return jsonify({"error": "Invalid image data"}), 400
+            raise ValueError("Invalid image dimensions (1D array)")
 
-        # Final safety fallback for channels
+        # Final safety fallback for channels if fallback to OpenCV triggered
         if len(img.shape) == 2:
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         elif len(img.shape) == 3 and img.shape[2] == 4:
             img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
         elif len(img.shape) == 3 and img.shape[2] != 3:
-            return jsonify({"error": "Invalid image data"}), 400
+            raise ValueError(f"Unsupported number of channels: {img.shape[2]}")
 
         # Enforce uint8 dtype required by YOLO
         if img.dtype != np.uint8:
             img = img.astype(np.uint8)
             
         # --- Large Image Protection ---
+        # Only resize if extremely large to prevent OOM errors, keeping aspect ratio
         MAX_DIM = 4096
         img_h, img_w = img.shape[:2]
         if img_h > MAX_DIM or img_w > MAX_DIM:
@@ -1079,12 +1034,7 @@ def user_report():
             new_w, new_h = int(img_w * scale), int(img_h * scale)
             img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
-        mem_after_decode = process.memory_info().rss / 1024 / 1024
-        logger.info(f"[MEM] After Decode: {mem_after_decode:.2f} MB")
-
         _decode_ms = (time.time() - _t_decode_start) * 1000
-        if _decode_ms > 500:
-            logger.warning(f"SLOW DECODE DETECTED: {_decode_ms:.2f}ms")
         
         img_memory_mb = img.nbytes / (1024 * 1024)
         logger.info("\n" + "="*50)
@@ -1103,14 +1053,16 @@ def user_report():
         logger.info(f"   - Orientation: {log_info['orientation']}")
         logger.info(f"   - EXIF available or not: {log_info['exif_available']}")
         logger.info("3. Decode Stage:")
-        logger.info(f"   - Strategy used: {decode_strategy}")
+        logger.info(f"   - Whether PIL succeeded: {log_info['pil_succeeded']}")
+        logger.info(f"   - Whether OpenCV fallback was used: {log_info['cv2_fallback']}")
+        logger.info(f"   - Whether decode failed: {log_info['decode_failed']}")
         logger.info(f"   - Exact decode exception: {log_info['decode_exception']}")
         logger.info("="*50 + "\n")
         
         print(f"Decode & Normalize: {_decode_ms/1000:.2f}s")
     except Exception as e:
         # Proper validation error without exposing internals
-        return jsonify({"error": "Invalid image data"}), 400
+        return jsonify({"error": "Invalid image data", "details": str(e)}), 400
 
     # ----- Detect source (Website vs Android vs API) -----
     ua = request.headers.get("User-Agent", "")
@@ -1139,7 +1091,6 @@ def user_report():
         client_ip=client_ip,
     )
 
-    _t_preproc_start = time.time()
     # Basic quality gates to reduce false detections.
     h, w = img.shape[:2]
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -1163,11 +1114,6 @@ def user_report():
 
     m = load_model(dlog)
     ai_available = m is not None
-    
-    _preproc_ms = (time.time() - _t_preproc_start) * 1000
-    if _preproc_ms > 300:
-        logger.warning(f"SLOW PREPROC DETECTED: {_preproc_ms:.2f}ms")
-        
     results = None
     allowed_detections = []
     top_detection = None
@@ -1178,41 +1124,29 @@ def user_report():
             dlog.inference_start()
             _t_yolo_start = time.time()
             print("✅ Starting AI inference...")
-            mem_before_infer = process.memory_info().rss / 1024 / 1024
-            logger.info(f"[MEM] Before Inference: {mem_before_infer:.2f} MB")
             print("MODEL CLASSES:", m.names)
             # Lightweight inference configuration for Render deployment.
             device = "cuda:0" if torch.cuda.is_available() else "cpu"
             
             logger.info("4. AI Stage (Before):")
-            import os
-            logger.info(f"   - Model File: {os.path.abspath('models/best.pt')}")
+            logger.info(f"   - Model Path: {getattr(m, 'model_name', 'N/A')}")
             logger.info(f"   - Device (CPU/GPU): {device}")
             logger.info(f"   - CUDA available: {torch.cuda.is_available()}")
             logger.info(f"   - Torch version: {torch.__version__}")
             logger.info(f"   - OpenCV version: {cv2.__version__}")
-            logger.info(f"   - Image dtype: {img.dtype}")
-            logger.info(f"   - Image shape: {img.shape}")
-            logger.info(f"   - Image contiguous: {img.flags['C_CONTIGUOUS']}")
-            logger.info(f"   - Image writable: {img.flags['WRITEABLE']}")
+            logger.info(f"   - Input image shape: {img.shape if img is not None else 'N/A'}")
             
-            with torch.inference_mode():
-                results = m.predict(
-                    source=img,
-                    conf=0.10,
-                    iou=0.20,
-                    imgsz=320,
-                    device=device,
-                    half=torch.cuda.is_available(),
-                    verbose=False
-                )
+            results = m.predict(
+                source=img,
+                conf=0.10,
+                iou=0.20,
+                imgsz=320,
+                device=device,
+                half=torch.cuda.is_available(),
+                verbose=False
+            )
             _yolo_ms = (time.time() - _t_yolo_start) * 1000
             print(f"YOLO: {_yolo_ms/1000:.2f}s")
-            if _yolo_ms > 5000:
-                logger.warning(f"SLOW YOLO DETECTED: {_yolo_ms:.2f}ms")
-            
-            mem_after_infer = process.memory_info().rss / 1024 / 1024
-            logger.info(f"[MEM] After Inference: {mem_after_infer:.2f} MB")
             
             # Calculate post-inference metrics
             peak_conf = max([float(box.conf[0]) for r in (results or []) if getattr(r, 'boxes', None) is not None for box in r.boxes] + [0.0])
@@ -1276,8 +1210,7 @@ def user_report():
             img_dtype = str(img.dtype) if 'img' in locals() and img is not None else "N/A"
             img_size = byte_size if 'byte_size' in locals() else "N/A"
             dev_str = "cuda:0" if torch.cuda.is_available() else "cpu"
-            import os
-            model_path_val = os.path.abspath('models/best.pt')
+            model_path_val = getattr(m, "model_name", "N/A") if 'm' in locals() and m else "N/A"
             filename_val = getattr(file, 'filename', 'N/A') if 'file' in locals() and file else "N/A"
             content_type_val = request.headers.get("Content-Type", "N/A")
             
@@ -1315,16 +1248,12 @@ def user_report():
             print(f"Complete traceback:\n{traceback.format_exc()}")
             print("="*50 + "\n")
             
-            error_id = uuid.uuid4().hex[:8]
-            logger.exception(f"[ERROR ID: {error_id}] AI inference failed: Full traceback for cloud logs:")
+            logger.exception("AI INFERENCE ERROR: Full traceback for cloud logs:")
             dlog.error(e)
             
             # Do NOT replace the existing API response format
             # Send standard error message to avoid exposing internal paths/logs
-            return jsonify({
-                "error": "AI inference failed",
-                "error_id": error_id
-            }), 500
+            return jsonify({"error": "AI inference failed"}), 500
         finally:
             # --- Cleanup & Memory Safety ---
             # Do NOT delete 'results' here because the background upload thread needs it to plot bounding boxes!
@@ -1532,13 +1461,11 @@ def user_report():
             # --- Memory Safety Cleanup ---
             # Release variables explicitly inside the background thread once upload is complete
             if 'ai_results' in locals():
-                del ai_results
+                ai_results = None
             if 'img_to_process' in locals():
-                del img_to_process
+                img_to_process = None
             if 'annotated_or_raw' in locals():
-                del annotated_or_raw
-            if 'annotated_buffer' in locals():
-                del annotated_buffer
+                annotated_or_raw = None
             
             import gc
             gc.collect()
@@ -1560,7 +1487,6 @@ def user_report():
 
     _total_s = time.time() - _t_total_start
     print(f"Total: {_total_s:.2f}s")
-    logger.info(f"5. Request Complete: Total Time: {_total_s:.2f}s")
     dlog.timings(yolo_ms=_yolo_ms, upload_ms=_upload_ms, total_s=_total_s)
     dlog.request_end()
 
@@ -1594,13 +1520,6 @@ def user_report():
     }
     if status == "rejected" and not pothole_detected:
         response_payload["message"] = "not detected anything"
-    
-    try:
-        mem_after_resp = process.memory_info().rss / 1024 / 1024
-        logger.info(f"[MEM] After Response: {mem_after_resp:.2f} MB")
-    except Exception:
-        pass
-        
     return jsonify(response_payload)
 
 
