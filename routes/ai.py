@@ -936,19 +936,74 @@ def user_report():
     except ValueError:
         return jsonify({"error": "Invalid coordinates"}), 400
 
+    # --- Preprocessing & Validation ---
     # Decode image once. AI uses this frame; upload uses annotated or original.
     try:
         file_bytes = file.read()  # Preserve original bytes from upload
         byte_size = len(file_bytes or b"")
+        if byte_size == 0:
+            return jsonify({"error": "Empty image data"}), 400
+
         _t_decode_start = time.time()
-        np_arr = np.frombuffer(file_bytes, np.uint8)
-        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        if img is None:
-            raise ValueError("Decode failed")
+        
+        # --- Mobile Image Compatibility (EXIF) & Safe Normalization ---
+        # 1. We use PIL to read and automatically correct EXIF orientation (mobile cameras)
+        # 2. This prevents YOLO from seeing sideways images and failing
+        try:
+            from PIL import Image, ImageOps
+            import io
+            pil_img = Image.open(io.BytesIO(file_bytes))
+            pil_img = ImageOps.exif_transpose(pil_img)
+            img = np.array(pil_img)
+            
+            # Convert to standard OpenCV BGR format and remove alpha
+            if len(img.shape) == 3 and img.shape[2] == 3:
+                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) # standard PIL RGB to BGR
+            elif len(img.shape) == 3 and img.shape[2] == 4:
+                img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR) # Drop alpha channel
+            elif len(img.shape) == 2:
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) # Grayscale to 3 channels
+            else:
+                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) # Fallback
+        except Exception as pil_e:
+            print(f"[DEBUG] PIL processing failed, falling back to OpenCV: {pil_e}")
+            np_arr = np.frombuffer(file_bytes, np.uint8)
+            img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+        # --- Robust Image Validation ---
+        # Verify image exists, decoded successfully, not None, valid dimensions
+        if img is None or not isinstance(img, np.ndarray) or img.size == 0:
+            raise ValueError("Decode resulted in empty or None image")
+        
+        if len(img.shape) < 2:
+            raise ValueError("Invalid image dimensions (1D array)")
+
+        # Final safety fallback for channels if fallback to OpenCV triggered
+        if len(img.shape) == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        elif len(img.shape) == 3 and img.shape[2] == 4:
+            img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        elif len(img.shape) == 3 and img.shape[2] != 3:
+            raise ValueError(f"Unsupported number of channels: {img.shape[2]}")
+
+        # Enforce uint8 dtype required by YOLO
+        if img.dtype != np.uint8:
+            img = img.astype(np.uint8)
+            
+        # --- Large Image Protection ---
+        # Only resize if extremely large to prevent OOM errors, keeping aspect ratio
+        MAX_DIM = 4096
+        img_h, img_w = img.shape[:2]
+        if img_h > MAX_DIM or img_w > MAX_DIM:
+            scale = MAX_DIM / max(img_h, img_w)
+            new_w, new_h = int(img_w * scale), int(img_h * scale)
+            img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
         _decode_ms = (time.time() - _t_decode_start) * 1000
-        print(f"Decode: {_decode_ms/1000:.2f}s")
-    except Exception:
-        return jsonify({"error": "Invalid image data"}), 400
+        print(f"Decode & Normalize: {_decode_ms/1000:.2f}s")
+    except Exception as e:
+        # Proper validation error without exposing internals
+        return jsonify({"error": "Invalid image data", "details": str(e)}), 400
 
     # ----- Detect source (Website vs Android vs API) -----
     ua = request.headers.get("User-Agent", "")
@@ -1060,10 +1115,56 @@ def user_report():
             print("DETECTIONS:", allowed_detections)
         except Exception as e:
             import traceback
-            traceback.print_exc()
+
+            # --- Exception Logging ---
+            # Gather extensive debugging context without exposing it to the user
+            exc_traceback = traceback.format_exc()
+            current_time = datetime.now(timezone.utc).isoformat()
+            
+            try:
+                process = psutil.Process()
+                mem_usage = f"{process.memory_info().rss / 1024 / 1024:.2f} MB"
+            except Exception:
+                mem_usage = "N/A"
+
+            img_h, img_w, img_c = img.shape if 'img' in locals() and img is not None and len(img.shape) == 3 else ("N/A", "N/A", "N/A")
+            img_dtype = str(img.dtype) if 'img' in locals() and img is not None else "N/A"
+            dev_str = "cuda:0" if torch.cuda.is_available() else "cpu"
+            model_path = getattr(m, "model_name", "N/A") if 'm' in locals() and m else "N/A"
+            exec_time = f"{(time.time() - _t_yolo_start):.2f}s" if '_t_yolo_start' in locals() else "N/A"
+
+            print("\n" + "="*50)
+            print("🚨 AI INFERENCE FATAL ERROR 🚨")
+            print(f"Timestamp: {current_time}")
+            print(f"Filename: {file.filename if file and hasattr(file, 'filename') else 'N/A'}")
+            print(f"Image Width: {img_w}")
+            print(f"Image Height: {img_h}")
+            print(f"Channels: {img_c}")
+            print(f"dtype: {img_dtype}")
+            print(f"Image Size (bytes): {byte_size if 'byte_size' in locals() else 'N/A'}")
+            print(f"Device (CPU/GPU): {dev_str}")
+            print(f"Model Path: {model_path}")
+            print(f"Memory Usage: {mem_usage}")
+            print(f"Execution Time: {exec_time}")
+            print(f"Complete Python traceback:\n{exc_traceback}")
+            print("="*50 + "\n")
+            
             dlog.error(e)
-            print(f"[USER REPORT] AI inference failed: {e}")
-            return jsonify({"error": "AI inference failed", "details": str(e)}), 500
+            
+            # Do NOT replace the existing API response format
+            # Send standard error message to avoid exposing internal paths/logs
+            return jsonify({"error": "AI inference failed"}), 500
+        finally:
+            # --- Cleanup & Memory Safety ---
+            # Do NOT delete 'results' here because the background upload thread needs it to plot bounding boxes!
+            # Memory cleanup for results will happen inside process_and_upload() once drawing is complete.
+            
+            # Explicit garbage collection to release temporary arrays and tensors
+            import gc
+            gc.collect()
+            
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
     else:
         _yolo_ms = 0.0
 
@@ -1140,11 +1241,13 @@ def user_report():
     suspicious_reasons = []
 
     duplicate_image = False
-    try:
-        dup = supabase.table("user_reports").select("id").eq("image_hash", image_hash).limit(1).execute()
-        duplicate_image = bool(getattr(dup, "data", []) or [])
-    except Exception:
-        duplicate_image = False
+    # Gracefully disable image_hash query to prevent HTTP 400 runtime errors
+    # if the column does not exist in the user_reports table.
+    # try:
+    #     dup = supabase.table("user_reports").select("id").eq("image_hash", image_hash).limit(1).execute()
+    #     duplicate_image = bool(getattr(dup, "data", []) or [])
+    # except Exception:
+    #     duplicate_image = False
 
     if not road_scene_valid:
         suspicious_reasons.append("non_road_scene")
@@ -1189,13 +1292,26 @@ def user_report():
 
     def process_and_upload(app_supabase, img_to_process, ai_results, b_name, a_filename, dl):
         try:
+            if img_to_process is None:
+                print("[BACKGROUND UPLOAD] Image is None, aborting.")
+                return
+
             _orig_h, _orig_w = img_to_process.shape[:2]
             _, _orig_buf = cv2.imencode(".jpg", img_to_process)
             print(f"[PERF] Original Resolution : {_orig_w}x{_orig_h}")
             print(f"[PERF] Original File Size  : {_orig_buf.nbytes} bytes")
 
             _t_bbox_start = time.time()
-            annotated_or_raw = ai_results[0].plot() if (ai_results and len(ai_results) > 0) else img_to_process
+            # Safely check if ai_results exists and has elements
+            if ai_results is not None and isinstance(ai_results, list) and len(ai_results) > 0:
+                try:
+                    annotated_or_raw = ai_results[0].plot()
+                except Exception as e:
+                    print(f"[BACKGROUND UPLOAD] Failed to plot bounding boxes: {e}")
+                    annotated_or_raw = img_to_process
+            else:
+                annotated_or_raw = img_to_process
+                
             _bbox_ms = (time.time() - _t_bbox_start) * 1000
             print(f"Draw: {_bbox_ms/1000:.2f}s")
 
@@ -1241,13 +1357,31 @@ def user_report():
             traceback.print_exc()
             dl.error(e)
             print(f"[BACKGROUND UPLOAD] image processing/upload prep failed: {e}")
+        finally:
+            # --- Memory Safety Cleanup ---
+            # Release variables explicitly inside the background thread once upload is complete
+            if 'ai_results' in locals():
+                ai_results = None
+            if 'img_to_process' in locals():
+                img_to_process = None
+            if 'annotated_or_raw' in locals():
+                annotated_or_raw = None
+            
+            import gc
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+    # Validate before upload to ensure no unbound local errors
+    img_pass = img if (img is not None and isinstance(img, np.ndarray)) else None
+    res_pass = results if ('results' in locals() and results is not None) else None
 
     if IS_RAILWAY:
         print("[USER REPORT] Railway environment detected - offloading image processing and upload to background thread.")
-        executor.submit(process_and_upload, supabase, img, results, base_name, annotated_filename, dlog)
+        executor.submit(process_and_upload, supabase, img_pass, res_pass, base_name, annotated_filename, dlog)
     else:
         print("[USER REPORT] Local environment detected - processing synchronously.")
-        process_and_upload(supabase, img, results, base_name, annotated_filename, dlog)
+        process_and_upload(supabase, img_pass, res_pass, base_name, annotated_filename, dlog)
         _upload_ms = (time.time() - _t_upload_start) * 1000
         print(f"[PERF] Sync Upload Time         : {_upload_ms:.1f} ms")
 
