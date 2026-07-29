@@ -946,15 +946,46 @@ def user_report():
 
         _t_decode_start = time.time()
         
+        # --- Diagnostic Logging Variables ---
+        log_info = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "client_ip": request.headers.get("X-Forwarded-For", request.remote_addr),
+            "user_agent": request.headers.get("User-Agent", "N/A"),
+            "content_type": request.headers.get("Content-Type", "N/A"),
+            "filename": getattr(file, "filename", "N/A") if file else "N/A",
+            "extension": os.path.splitext(getattr(file, "filename", ""))[1] if file and hasattr(file, "filename") else "N/A",
+            "file_size": byte_size,
+            "capture_source": request.form.get("capture_source", "N/A"),
+            "pil_succeeded": False,
+            "cv2_fallback": False,
+            "decode_failed": False,
+            "decode_exception": "None",
+            "exif_available": False,
+            "orientation": "N/A"
+        }
+        
         # --- Mobile Image Compatibility (EXIF) & Safe Normalization ---
         # 1. We use PIL to read and automatically correct EXIF orientation (mobile cameras)
         # 2. This prevents YOLO from seeing sideways images and failing
         try:
-            from PIL import Image, ImageOps
+            from PIL import Image, ImageOps, ExifTags
             import io
             pil_img = Image.open(io.BytesIO(file_bytes))
+            
+            try:
+                exif = pil_img.getexif()
+                if exif is not None:
+                    log_info["exif_available"] = True
+                    for k, v in ExifTags.TAGS.items():
+                        if v == 'Orientation' and k in exif:
+                            log_info["orientation"] = str(exif[k])
+                            break
+            except Exception:
+                pass
+                
             pil_img = ImageOps.exif_transpose(pil_img)
             img = np.array(pil_img)
+            log_info["pil_succeeded"] = True
             
             # Convert to standard OpenCV BGR format and remove alpha
             if len(img.shape) == 3 and img.shape[2] == 3:
@@ -966,6 +997,8 @@ def user_report():
             else:
                 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) # Fallback
         except Exception as pil_e:
+            log_info["decode_exception"] = str(pil_e)
+            log_info["cv2_fallback"] = True
             print(f"[DEBUG] PIL processing failed, falling back to OpenCV: {pil_e}")
             np_arr = np.frombuffer(file_bytes, np.uint8)
             img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
@@ -973,9 +1006,11 @@ def user_report():
         # --- Robust Image Validation ---
         # Verify image exists, decoded successfully, not None, valid dimensions
         if img is None or not isinstance(img, np.ndarray) or img.size == 0:
+            log_info["decode_failed"] = True
             raise ValueError("Decode resulted in empty or None image")
         
         if len(img.shape) < 2:
+            log_info["decode_failed"] = True
             raise ValueError("Invalid image dimensions (1D array)")
 
         # Final safety fallback for channels if fallback to OpenCV triggered
@@ -1000,6 +1035,30 @@ def user_report():
             img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
         _decode_ms = (time.time() - _t_decode_start) * 1000
+        
+        img_memory_mb = img.nbytes / (1024 * 1024)
+        logger.info("\n" + "="*50)
+        logger.info("UPLOAD DEBUG LOG")
+        logger.info("="*50)
+        logger.info("1. Request Information:")
+        for k, v in log_info.items():
+            if k not in ["pil_succeeded", "cv2_fallback", "decode_failed", "decode_exception", "exif_available", "orientation"]:
+                logger.info(f"   - {k.replace('_', ' ').title()}: {v}")
+        logger.info("2. Image Information:")
+        logger.info(f"   - Width: {img.shape[1]}")
+        logger.info(f"   - Height: {img.shape[0]}")
+        logger.info(f"   - Channels: {img.shape[2] if len(img.shape)==3 else 1}")
+        logger.info(f"   - dtype: {str(img.dtype)}")
+        logger.info(f"   - Memory Size (MB): {img_memory_mb:.2f}")
+        logger.info(f"   - Orientation: {log_info['orientation']}")
+        logger.info(f"   - EXIF available or not: {log_info['exif_available']}")
+        logger.info("3. Decode Stage:")
+        logger.info(f"   - Whether PIL succeeded: {log_info['pil_succeeded']}")
+        logger.info(f"   - Whether OpenCV fallback was used: {log_info['cv2_fallback']}")
+        logger.info(f"   - Whether decode failed: {log_info['decode_failed']}")
+        logger.info(f"   - Exact decode exception: {log_info['decode_exception']}")
+        logger.info("="*50 + "\n")
+        
         print(f"Decode & Normalize: {_decode_ms/1000:.2f}s")
     except Exception as e:
         # Proper validation error without exposing internals
@@ -1068,6 +1127,19 @@ def user_report():
             print("MODEL CLASSES:", m.names)
             # Lightweight inference configuration for Render deployment.
             device = "cuda:0" if torch.cuda.is_available() else "cpu"
+            
+            logger.info("4. AI Stage (Before):")
+            import os
+            logger.info(f"   - Model File: {os.path.abspath('models/best.pt')}")
+            logger.info(f"   - Device (CPU/GPU): {device}")
+            logger.info(f"   - CUDA available: {torch.cuda.is_available()}")
+            logger.info(f"   - Torch version: {torch.__version__}")
+            logger.info(f"   - OpenCV version: {cv2.__version__}")
+            logger.info(f"   - Image dtype: {img.dtype}")
+            logger.info(f"   - Image shape: {img.shape}")
+            logger.info(f"   - Image contiguous: {img.flags['C_CONTIGUOUS']}")
+            logger.info(f"   - Image writable: {img.flags['WRITEABLE']}")
+            
             results = m.predict(
                 source=img,
                 conf=0.10,
@@ -1079,6 +1151,15 @@ def user_report():
             )
             _yolo_ms = (time.time() - _t_yolo_start) * 1000
             print(f"YOLO: {_yolo_ms/1000:.2f}s")
+            
+            # Calculate post-inference metrics
+            peak_conf = max([float(box.conf[0]) for r in (results or []) if getattr(r, 'boxes', None) is not None for box in r.boxes] + [0.0])
+            num_det = sum([len(getattr(r, 'boxes', [])) for r in (results or []) if getattr(r, 'boxes', None) is not None])
+            logger.info("4. AI Stage (After):")
+            logger.info(f"   - Inference time: {_yolo_ms:.2f}ms")
+            logger.info(f"   - Number of detections: {num_det}")
+            logger.info(f"   - Peak confidence: {peak_conf:.4f}")
+            
             for r in (results or []):
                 if r.boxes is None:
                     continue
@@ -1115,45 +1196,73 @@ def user_report():
             print("DETECTIONS:", allowed_detections)
         except Exception as e:
             import traceback
+            import sys
+            import platform
 
             # --- Exception Logging ---
-            # Gather extensive debugging context without exposing it to the user
-            exc_traceback = traceback.format_exc()
             current_time = datetime.now(timezone.utc).isoformat()
             
             try:
                 process = psutil.Process()
                 mem_usage = f"{process.memory_info().rss / 1024 / 1024:.2f} MB"
+                cpu_usage = f"{psutil.cpu_percent()}%"
             except Exception:
                 mem_usage = "N/A"
+                cpu_usage = "N/A"
 
             img_h, img_w, img_c = img.shape if 'img' in locals() and img is not None and len(img.shape) == 3 else ("N/A", "N/A", "N/A")
             img_dtype = str(img.dtype) if 'img' in locals() and img is not None else "N/A"
+            img_size = byte_size if 'byte_size' in locals() else "N/A"
             dev_str = "cuda:0" if torch.cuda.is_available() else "cpu"
-            model_path = getattr(m, "model_name", "N/A") if 'm' in locals() and m else "N/A"
-            exec_time = f"{(time.time() - _t_yolo_start):.2f}s" if '_t_yolo_start' in locals() else "N/A"
+            import os
+            model_path_val = os.path.abspath('models/best.pt')
+            filename_val = getattr(file, 'filename', 'N/A') if 'file' in locals() and file else "N/A"
+            content_type_val = request.headers.get("Content-Type", "N/A")
+            
+            tb = sys.exc_info()[2]
+            if tb is not None:
+                while tb.tb_next is not None:
+                    tb = tb.tb_next
+                err_line = tb.tb_lineno
+                err_func = tb.tb_frame.f_code.co_name
+                err_file = tb.tb_frame.f_code.co_filename
+            else:
+                err_line, err_func, err_file = "N/A", "N/A", "N/A"
 
             print("\n" + "="*50)
-            print("🚨 AI INFERENCE FATAL ERROR 🚨")
+            print("AI INFERENCE ERROR")
+            print("="*50)
             print(f"Timestamp: {current_time}")
-            print(f"Filename: {file.filename if file and hasattr(file, 'filename') else 'N/A'}")
+            print(f"Python version: {platform.python_version()}")
+            print(f"OS: {platform.system()} {platform.release()}")
+            print(f"Memory usage: {mem_usage}")
+            print(f"CPU usage: {cpu_usage}")
+            print(f"GPU available: {torch.cuda.is_available()}")
+            print(f"Device used: {dev_str}")
+            print(f"Model path: {model_path_val}")
+            print(f"Filename: {filename_val}")
+            print(f"Content-Type: {content_type_val}")
             print(f"Image Width: {img_w}")
             print(f"Image Height: {img_h}")
             print(f"Channels: {img_c}")
             print(f"dtype: {img_dtype}")
-            print(f"Image Size (bytes): {byte_size if 'byte_size' in locals() else 'N/A'}")
-            print(f"Device (CPU/GPU): {dev_str}")
-            print(f"Model Path: {model_path}")
-            print(f"Memory Usage: {mem_usage}")
-            print(f"Execution Time: {exec_time}")
-            print(f"Complete Python traceback:\n{exc_traceback}")
+            print(f"Image Size: {img_size}")
+            print(f"Current line number: {err_line}")
+            print(f"Current function: {err_func}")
+            print(f"Current file: {err_file}")
+            print(f"Complete traceback:\n{traceback.format_exc()}")
             print("="*50 + "\n")
             
+            error_id = uuid.uuid4().hex[:8]
+            logger.exception(f"[ERROR ID: {error_id}] AI inference failed: Full traceback for cloud logs:")
             dlog.error(e)
             
             # Do NOT replace the existing API response format
             # Send standard error message to avoid exposing internal paths/logs
-            return jsonify({"error": "AI inference failed"}), 500
+            return jsonify({
+                "error": "AI inference failed",
+                "error_id": error_id
+            }), 500
         finally:
             # --- Cleanup & Memory Safety ---
             # Do NOT delete 'results' here because the background upload thread needs it to plot bounding boxes!
