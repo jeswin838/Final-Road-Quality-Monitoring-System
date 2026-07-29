@@ -16,31 +16,8 @@ from ultralytics import YOLO
 import torch
 from concurrent.futures import ThreadPoolExecutor
 
-from concurrent.futures import ThreadPoolExecutor
-import threading
-import hashlib
-from collections import OrderedDict
-
-# Global thread pool optimized dynamically based on CPU cores to prevent exhaustion
-max_workers = int(os.environ.get("MAX_WORKERS", max(4, (os.cpu_count() or 2) * 2)))
-executor = ThreadPoolExecutor(max_workers=max_workers)
-
-# Safe duplicate prevention (TTL Cache for image hashes)
-recent_hashes = OrderedDict()
-recent_hashes_lock = threading.Lock()
-
-def is_duplicate_request(img_hash: str) -> bool:
-    """Returns True if the image was processed within the last 60 seconds. Prevents duplicates without blocking IPs."""
-    now = time.time()
-    with recent_hashes_lock:
-        # Purge entries older than 60 seconds to avoid memory leaks
-        while recent_hashes and (now - next(iter(recent_hashes.values()))) > 60:
-            recent_hashes.popitem(last=False)
-            
-        if img_hash in recent_hashes:
-            return True
-        recent_hashes[img_hash] = now
-        return False
+# Global thread pool for background tasks (e.g., image upload)
+executor = ThreadPoolExecutor(max_workers=4)
 
 from config import Config
 import logging
@@ -65,15 +42,11 @@ ai_bp = Blueprint("ai", __name__)
 
 # ================= MODEL (LAZY LOADING) =================
 model = None
-model_lock = threading.Lock()
 
 def load_model(dlog: "DetectionLogger | None" = None):
     global model
     
     if model is None:
-        with model_lock:
-            # Double-checked locking to prevent multiple threads from loading simultaneously
-            if model is None:
         if dlog:
             dlog.model_loading()
         print("Loading YOLO model...")
@@ -106,6 +79,7 @@ def load_model(dlog: "DetectionLogger | None" = None):
 trigger_flag      = False
 last_trigger_time = 0
 last_sensor       = {"diff": 0.0, "vib": 0.0, "spike_ms": 0}
+processing        = False   # Global request lock — prevents duplicate inserts
 
 
 @ai_bp.route("/trigger", methods=["POST"])
@@ -376,12 +350,11 @@ def run_inference(m, img: np.ndarray) -> tuple:
         # still filters out pure noise later.
         with torch.inference_mode():
             device = "cuda:0" if torch.cuda.is_available() else "cpu"
-            imgsz = int(os.environ.get("YOLO_IMAGE_SIZE", 640))
             results = m.predict(
                 source=img,
                 conf=0.08,
                 iou=0.30,
-                imgsz=imgsz,
+                imgsz=640,
                 device=device,
                 half=torch.cuda.is_available(),
                 verbose=False
@@ -549,7 +522,12 @@ def analyze():
     7. Upload annotated image
     8. Persist (insert or update duplicate)
     """
-    req_id = uuid.uuid4().hex[:8]
+    global processing
+    if processing:
+        print("[FUSION] Already processing → skip")
+        return jsonify({"status": "busy"})
+
+    processing = True
     _t_total_start = time.time()
     dlog = DetectionLogger()
 
@@ -618,9 +596,8 @@ def analyze():
         print("LAT:", lat)
         print("LON:", lon)
 
-        # STRICT VALIDATION & DUPLICATE PREVENTION
+        # STRICT VALIDATION
         valid_files = []
-        first_valid_hash = None
 
         for i, f in enumerate(raw_files):
             try:
@@ -633,18 +610,10 @@ def analyze():
                             q_val = float(qualities_str[i])
                     except (ValueError, TypeError):
                         pass
-                    
-                    if first_valid_hash is None:
-                        first_valid_hash = hashlib.md5(data).hexdigest()
-                        
                     valid_files.append((f, data, q_val))
 
             except Exception as e:
-                print(f"[LIVE BUFFER ERROR] {req_id}: {e}")
-
-        if first_valid_hash and is_duplicate_request(first_valid_hash):
-            print(f"[FUSION] {req_id}: Duplicate request ignored based on image hash")
-            return jsonify({"status": "ignored", "reason": "duplicate_request"})
+                print("[LIVE BUFFER ERROR]", e)
 
         files = valid_files
         request_filename = files[0][0].filename if files else "unknown"
@@ -685,31 +654,18 @@ def analyze():
             f, file_bytes, q_val = item
             
             mem_bd = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
+            print(f"[MEM] Before decode: {mem_bd:.1f}MB")
             
-            _t_decode = time.time()
             np_arr = np.frombuffer(file_bytes, np.uint8)
-            try:
-                img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-            except Exception as e:
-                print(f"[IMAGE DECODE FAILURE] {req_id}: {e}")
-                img = None
-            finally:
-                del np_arr
-            _decode_ms = (time.time() - _t_decode) * 1000
+            img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
             
             mem_ad = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
+            print(f"[MEM] After decode: {mem_ad:.1f}MB")
             
+            del np_arr
+
             if img is None:
                 continue
-
-            # Safe Preprocessing: Resize if too large
-            _t_resize = time.time()
-            max_dim = int(os.environ.get("MAX_IMAGE_DIM", 1920))
-            h, w = img.shape[:2]
-            if max(h, w) > max_dim:
-                scale = max_dim / float(max(h, w))
-                img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
-            _resize_ms = (time.time() - _t_resize) * 1000
 
             # ===== DEBUG =====
             if not IS_RAILWAY:
@@ -717,18 +673,12 @@ def analyze():
 
             if m:
                 mem_bi = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
+                print(f"[MEM] Before YOLO inference: {mem_bi:.1f}MB")
                 
-                max_mem = float(os.environ.get("MAX_MEMORY_MB", 1500))
-                if mem_bi > max_mem:
-                    raise MemoryError("Out Of Memory: Server memory is critically high")
-
-                try:
-                    results, detections = run_inference(m, img)
-                except Exception as e:
-                    print(f"[MODEL INFERENCE FAILURE] {req_id}: {e}")
-                    results, detections = None, []
+                results, detections = run_inference(m, img)
                 
                 mem_ai = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
+                print(f"[MEM] After YOLO inference: {mem_ai:.1f}MB")
 
                 strong_detections = [
                     d for d in detections
@@ -911,13 +861,12 @@ def analyze():
                 
                 # Upload
                 ann_filename = upload_with_retry(supabase_client, ann_buffer.tobytes(), f"{b_name}_annotated")
-                del ann_buffer
                 
                 if ann_filename:
                     final_url = f"{Config.SUPABASE_URL}/storage/v1/object/public/pothole-images/{ann_filename}"
                     supabase_client.table("potholes").update({"image_url": final_url}).eq("id", pid).execute()
             except Exception as e:
-                print(f"[UPLOAD ERROR] Background upload failed: {e}")
+                pass
             _t_bg_ms = (time.time() - _t_bg_start) * 1000
             print(f"[PERFORMANCE] Background Upload Time: {_t_bg_ms:.2f}ms")
 
@@ -926,19 +875,17 @@ def analyze():
 
         # ----- 10. Immediate API Response -----
         _total_s = time.time() - _t_total_start
-        cpu_usage = psutil.cpu_percent()
-        thread_cnt = threading.active_count()
-        mem_after_resp = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
-
-        print(f"========== PERFORMANCE LOGGING [{req_id}] ==========")
-        print(f"Received Frames: {len(raw_files)} | Valid: {len(files)}")
-        print(f"Decode Time: {_decode_ms:.2f}ms | Resize Time: {_resize_ms:.2f}ms")
+        print("========== PERFORMANCE LOGGING ==========")
+        print(f"Received Frames: {len(raw_files)}")
+        print(f"Valid Frames: {len(files)}")
+        print(f"Frames Sent To YOLO: {len(files)}")
+        print(f"Best Frame Index: {best_idx}")
+        print(f"Best Frame Score: {best_score:.2f}")
         print(f"YOLO Inference Time: {_yolo_ms:.2f}ms")
         print(f"Database Insert Time: {_db_ms:.2f}ms")
+        print(f"Background Upload Time: Delegated to async thread")
         print(f"Total Request Time: {_total_s * 1000:.2f}ms")
-        print(f"Memory Before/After: {mem_bd:.1f}MB / {mem_after_resp:.1f}MB")
-        print(f"CPU Usage: {cpu_usage}% | Thread Count: {thread_cnt}")
-        print("======================================================")
+        print("=========================================")
 
         dlog.timings(yolo_ms=_yolo_ms, upload_ms=0.0, db_ms=_db_ms, total_s=_total_s)
         dlog.request_end()
@@ -954,21 +901,16 @@ def analyze():
             "fusion_enabled": True
         })
 
-    except MemoryError as e:
-        dlog.error(e)
-        print(f"[FUSION] [{req_id}] ❌ Memory Error: {e}")
-        return jsonify({"status": "error", "message": "Out Of Memory"}), 503
-    except TimeoutError as e:
-        dlog.error(e)
-        print(f"[FUSION] [{req_id}] ❌ Timeout Error: {e}")
-        return jsonify({"status": "error", "message": "Timeout Error"}), 504
     except Exception as e:
         import traceback
         traceback.print_exc()
         dlog.error(e)
-        print(f"[FUSION] [{req_id}] ❌ Unexpected Exception: {e} - Type: {type(e).__name__}")
-        return jsonify({"status": "error", "message": "Unexpected Exception"}), 500
+        print(f"[FUSION] ❌ Unhandled error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
     finally:
+        processing = False
+        mem_after_resp = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
+        print(f"[MEM] After response: {mem_after_resp:.1f}MB")
         gc.collect()
 
 
@@ -977,10 +919,8 @@ def analyze():
 def user_report():
     """Analyze a user report with hybrid AI logic and return preview payload."""
     from app import supabase
-    req_id = uuid.uuid4().hex[:8]
 
     _t_total_start = time.time()
-    mem_before = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
     dlog = DetectionLogger()
 
     file = request.files.get("image")
@@ -1000,33 +940,14 @@ def user_report():
     try:
         file_bytes = file.read()  # Preserve original bytes from upload
         byte_size = len(file_bytes or b"")
-        
-        # Deduplication using image hash
-        image_hash = hashlib.sha256(file_bytes).hexdigest()
-        if is_duplicate_request(image_hash):
-            return jsonify({"error": "duplicate_request", "message": "Image already processed recently"}), 429
-            
         _t_decode_start = time.time()
         np_arr = np.frombuffer(file_bytes, np.uint8)
-        try:
-            img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        finally:
-            del np_arr
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         if img is None:
             raise ValueError("Decode failed")
         _decode_ms = (time.time() - _t_decode_start) * 1000
-
-        # Safe Preprocessing: Resize if too large
-        _t_resize_start = time.time()
-        max_dim = int(os.environ.get("MAX_IMAGE_DIM", 1920))
-        h, w = img.shape[:2]
-        if max(h, w) > max_dim:
-            scale = max_dim / float(max(h, w))
-            img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
-        _resize_ms = (time.time() - _t_resize_start) * 1000
-
-    except Exception as e:
-        print(f"[IMAGE DECODE FAILURE] [{req_id}] {e}")
+        print(f"Decode: {_decode_ms/1000:.2f}s")
+    except Exception:
         return jsonify({"error": "Invalid image data"}), 400
 
     # ----- Detect source (Website vs Android vs API) -----
@@ -1075,7 +996,7 @@ def user_report():
     capture_type = "upload" if capture_source in ("upload", "gallery_upload") else "live"
     strict_live_only = bool(getattr(Config, "STRICT_LIVE_CAPTURE_ONLY", False))
     gps_accuracy = request.form.get("gps_accuracy", type=float)
-    # image_hash generated above
+    image_hash = hashlib.sha256(file_bytes).hexdigest()
 
     m = load_model(dlog)
     ai_available = m is not None
@@ -1092,17 +1013,11 @@ def user_report():
             print("MODEL CLASSES:", m.names)
             # Lightweight inference configuration for Render deployment.
             device = "cuda:0" if torch.cuda.is_available() else "cpu"
-            mem_bi = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
-            max_mem = float(os.environ.get("MAX_MEMORY_MB", 1500))
-            if mem_bi > max_mem:
-                raise MemoryError("Out Of Memory: Server memory is critically high")
-
-            imgsz = int(os.environ.get("YOLO_IMAGE_SIZE_REPORT", 320))
             results = m.predict(
                 source=img,
                 conf=0.10,
                 iou=0.20,
-                imgsz=imgsz,
+                imgsz=320,
                 device=device,
                 half=torch.cuda.is_available(),
                 verbose=False
@@ -1143,16 +1058,12 @@ def user_report():
                     if top_detection is None or conf > top_detection["confidence"]:
                         top_detection = det
             print("DETECTIONS:", allowed_detections)
-        except MemoryError as e:
-            print(f"[USER REPORT] Out Of Memory: {e}")
-            dlog.error(e)
-            return jsonify({"error": "Out Of Memory", "details": str(e)}), 503
         except Exception as e:
             import traceback
             traceback.print_exc()
             dlog.error(e)
             print(f"[USER REPORT] AI inference failed: {e}")
-            return jsonify({"error": "Unexpected Exception", "details": str(e)}), 500
+            return jsonify({"error": "AI inference failed", "details": str(e)}), 500
     else:
         _yolo_ms = 0.0
 
@@ -1332,31 +1243,18 @@ def user_report():
             print(f"[BACKGROUND UPLOAD] image processing/upload prep failed: {e}")
 
     if IS_RAILWAY:
+        print("[USER REPORT] Railway environment detected - offloading image processing and upload to background thread.")
         executor.submit(process_and_upload, supabase, img, results, base_name, annotated_filename, dlog)
     else:
+        print("[USER REPORT] Local environment detected - processing synchronously.")
         process_and_upload(supabase, img, results, base_name, annotated_filename, dlog)
         _upload_ms = (time.time() - _t_upload_start) * 1000
+        print(f"[PERF] Sync Upload Time         : {_upload_ms:.1f} ms")
 
     _total_s = time.time() - _t_total_start
-    cpu_usage = psutil.cpu_percent()
-    thread_cnt = threading.active_count()
-    mem_after = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
-
-    print(f"========== PERFORMANCE LOGGING [{req_id}] ==========")
-    print(f"Decode Time: {_decode_ms:.2f}ms | Resize Time: {_resize_ms:.2f}ms")
-    print(f"YOLO Inference Time: {_yolo_ms:.2f}ms")
-    print(f"Total Request Time: {_total_s * 1000:.2f}ms")
-    print(f"Memory Before/After: {mem_before:.1f}MB / {mem_after:.1f}MB")
-    print(f"CPU Usage: {cpu_usage}% | Thread Count: {thread_cnt}")
-    print("======================================================")
-
+    print(f"Total: {_total_s:.2f}s")
     dlog.timings(yolo_ms=_yolo_ms, upload_ms=_upload_ms, total_s=_total_s)
     dlog.request_end()
-    
-    del img
-    if results:
-        del results
-    gc.collect()
 
     # Determine response message based on status
     response_payload = {
