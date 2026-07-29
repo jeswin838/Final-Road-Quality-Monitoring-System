@@ -123,7 +123,12 @@
   </div>
   <div class="stat-card" id="card-pending">
     <div class="stat-icon"><i class="fa-solid fa-clock"></i></div>
-    <div class="stat-info"><span class="stat-label">Pending</span><span class="stat-value" id="stat-pending">—</span>
+    <div class="stat-info"><span class="stat-label">Pending Repairs</span><span class="stat-value" id="stat-pending">—</span>
+    </div>
+  </div>
+  <div class="stat-card" id="card-inprogress">
+    <div class="stat-icon" style="color:#0ea5e9; background:rgba(14,165,233,0.1)"><i class="fa-solid fa-person-digging"></i></div>
+    <div class="stat-info"><span class="stat-label">In Progress</span><span class="stat-value" id="stat-inprogress">—</span>
     </div>
   </div>
 </div>
@@ -580,9 +585,7 @@
   onclick="if(event.target===this)closeReportsModal()">
   <div class="reports-modal-inner">
     <div class="reports-modal-header" style="display:flex; justify-content:space-between; align-items:center;">
-      <h3 style="margin:0; display:flex; align-items:center; gap:8px;">
-        📍 Location Reports
-      </h3>
+      <h3 style="margin:0; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-file-invoice"></i> Report Details</h3>
       <div style="display:flex; align-items:center; gap:16px;">
         <span class="reports-count-badge" id="reportsCountBadge" style="display:none">0 Reports</span>
         <button class="reports-modal-close" onclick="closeReportsModal()" title="Close">&times;</button>
@@ -602,9 +605,9 @@
 <script>
   const MAP_SETTINGS = {
     lat: {{ settings.map_center_lat | default (20.5937, true) }},
-  lon: { { settings.map_center_lon | default (78.9629, true) } },
-  zoom: { { settings.map_zoom | default (13, true) } },
-  refresh: { { settings.auto_refresh_seconds | default (10, true) } }
+    lon: {{ settings.map_center_lon | default (78.9629, true) }},
+    zoom: {{ settings.map_zoom | default (13, true) }},
+    refresh: {{ settings.auto_refresh_seconds | default (10, true) }}
   };
 </script>
 <script src="{{ url_for('static', filename='js/map.js') }}"></script>

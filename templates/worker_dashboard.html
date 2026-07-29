@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Worker Dashboard — PotholePro{% endblock %}
+{% block page_title %}Worker Dashboard{% endblock %}
+
+{% block content %}
+<div class="wk-dash-grid wk-animate-fade-in-up">
+  <div class="wk-stat-card">
+    <i class="fa-solid fa-briefcase bg-icon"></i>
+    <div class="wk-stat-label">Status</div>
+    <div class="wk-stat-val" id="dashStatusVal">...</div>
+    <div class="wk-stat-trend" id="dashStatusTrend">Updating</div>
+  </div>
+  <div class="wk-stat-card" onclick="window.location.href='/worker/active-job'" style="cursor:pointer;">
+    <i class="fa-solid fa-hammer bg-icon"></i>
+    <div class="wk-stat-label">Current Assignment</div>
+    <div class="wk-stat-val" id="dashActiveVal">...</div>
+    <div class="wk-stat-trend" id="dashActiveTrend">...</div>
+  </div>
+  <div class="wk-stat-card">
+    <i class="fa-solid fa-check-double bg-icon"></i>
+    <div class="wk-stat-label">Completed Today</div>
+    <div class="wk-stat-val" id="dashCompVal">...</div>
+    <div class="wk-stat-trend"><i class="fa-solid fa-check"></i> Great job!</div>
+  </div>
+  <div class="wk-stat-card">
+    <i class="fa-solid fa-clock-rotate-left bg-icon"></i>
+    <div class="wk-stat-label">Average Repair Time</div>
+    <div class="wk-stat-val"><span id="dashAvgVal">...</span><span style="font-size:1rem;font-weight:600;margin-left:4px;">mins</span></div>
+    <div class="wk-stat-trend"><i class="fa-solid fa-bolt"></i> Speed track</div>
+  </div>
+</div>
+
+<div class="worker-layout" style="display:grid; grid-template-columns: 2fr 1fr; gap:24px; min-height:auto;">
+  <!-- Main Column -->
+  <div class="wk-flex-column wk-gap-6 wk-animate-slide-right delay-100">
+    
+    <div class="wk-card worker-glass">
+      <div class="wk-card-header">
+        <div class="wk-card-title">
+          <div class="wk-card-icon"><i class="fa-solid fa-calendar-day"></i></div>
+          Today's Schedule & Summary
+        </div>
+      </div>
+      <p class="worker-p">Your shift started at 08:00 AM. You have completed 4 repairs, and 1 repair is currently in progress. Great work keeping the roads safe!</p>
+      
+      <div class="wk-mt-6">
+        <h4 class="worker-h4 wk-mb-4">Performance Target</h4>
+        <div class="wk-progress-container wk-mb-2">
+          <div class="wk-progress-bar wk-progress-success" style="width: 80%;"></div>
+        </div>
+        <div class="wk-flex-between worker-small">
+          <span>80% Daily Goal Reached</span>
+          <span>4 / 5 Repairs</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="wk-card worker-glass">
+      <div class="wk-card-header">
+        <div class="wk-card-title">
+          <div class="wk-card-icon"><i class="fa-solid fa-bolt"></i></div>
+          Quick Actions
+        </div>
+      </div>
+      <div class="wk-dash-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 0;">
+        <button class="wk-btn wk-btn-primary" onclick="window.location.href='/worker/available-jobs'"><i class="fa-solid fa-search-location"></i> Find New Jobs</button>
+        <button class="wk-btn wk-btn-outline" onclick="window.location.href='/worker/upload'"><i class="fa-solid fa-camera"></i> Upload Evidence</button>
+      </div>
+    </div>
+    
+  </div>
+  
+  <!-- Side Column -->
+  <div class="wk-flex-column wk-gap-6 wk-animate-fade-in-up delay-200">
+    
+    <div class="wk-card worker-glass" id="workerWelcome">
+      <div class="wk-card-header">
+        <div class="wk-card-title">
+          <div class="wk-card-icon"><i class="fa-solid fa-user-astronaut"></i></div>
+          Your Status
+        </div>
+      </div>
+      <div class="worker-info wk-mb-4">
+        <h2 id="wName" class="worker-gradient-text" style="font-size:1.5rem; font-weight:700; margin-bottom:8px;">Welcome, Worker</h2>
+        <div style="font-size:0.9rem; color:var(--worker-text-muted);">
+          <i class="fa-solid fa-users"></i> <span id="wTeam">---</span> &bull; <span id="wDesig">---</span>
+        </div>
+      </div>
+      
+      <div class="wk-mb-2">
+        <label class="worker-small wk-mb-2" style="display:block;">Update Status:</label>
+        <select id="statusSelect" class="wk-select wk-w-full" onchange="updateStatus(this.value)">
+          <option value="Available">Available</option>
+          <option value="Busy">Busy</option>
+          <option value="Offline">Offline</option>
+          <option value="On Leave">On Leave</option>
+        </select>
+      </div>
+      <div id="statusIndicator" style="font-size: 0.85rem; color: var(--worker-success); display: none; text-align:right;">Status Saved</div>
+    </div>
+    
+    <div class="wk-card worker-glass">
+      <div class="wk-card-header">
+        <div class="wk-card-title">
+          <div class="wk-card-icon"><i class="fa-solid fa-bell"></i></div>
+          Recent Notifications
+        </div>
+        <button class="wk-btn wk-btn-outline" style="padding: 4px 12px; font-size:0.8rem;" onclick="window.location.href='/worker/notifications'">View All</button>
+      </div>
+      <div class="wk-notif-list">
+        <div class="wk-notif-card unread">
+          <div class="wk-notif-icon"><i class="fa-solid fa-map-pin"></i></div>
+          <div class="wk-notif-content">
+            <h4>New High Priority Job</h4>
+            <p>A severe pothole on Main St requires immediate attention.</p>
+            <span class="wk-notif-time">10 mins ago</span>
+          </div>
+        </div>
+        <div class="wk-notif-card">
+          <div class="wk-notif-icon"><i class="fa-solid fa-check"></i></div>
+          <div class="wk-notif-content">
+            <h4>Repair Verified</h4>
+            <p>Your work on Elm St has been approved.</p>
+            <span class="wk-notif-time">2 hours ago</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const res = await fetch('/api/worker/profile');
+      if (res.ok) {
+        let data = await res.json();
+      if (data && data.success !== undefined) data = data.data;
+        document.getElementById('wName').textContent = `Welcome, ${data.name || 'Worker'}`;
+        document.getElementById('wTeam').textContent = data.team_name || '---';
+        document.getElementById('wDesig').textContent = data.designation || '---';
+        if (data.worker_status) {
+          document.getElementById('statusSelect').value = data.worker_status;
+          document.getElementById('dashStatusVal').textContent = data.worker_status;
+        }
+      }
+      
+      const statsRes = await fetch('/api/worker/dashboard-stats');
+      if (statsRes.ok) {
+        const stats = await statsRes.json();
+        
+        document.getElementById('dashCompVal').textContent = stats.completed_today;
+        document.getElementById('dashAvgVal').textContent = stats.average_repair_time;
+        
+        const act = document.getElementById('dashActiveVal');
+        const actTrend = document.getElementById('dashActiveTrend');
+        if (stats.has_active_assignment) {
+          act.textContent = "1";
+          actTrend.innerHTML = `In Progress`;
+          actTrend.style.color = "var(--worker-warning)";
+          actTrend.style.background = "rgba(245, 158, 11, 0.1)";
+        } else {
+          act.textContent = "0";
+          actTrend.innerHTML = `Ready`;
+          actTrend.style.color = "var(--worker-success)";
+          actTrend.style.background = "rgba(16, 185, 129, 0.1)";
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  async function updateStatus(status) {
+    try {
+      const res = await fetch('/api/worker/status', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        const ind = document.getElementById('statusIndicator');
+        ind.style.display = 'block';
+        setTimeout(() => ind.style.display = 'none', 2000);
+      }
+    } catch(e) {
+      console.error(e);
+    }
+  }
+</script>
+{% endblock %}

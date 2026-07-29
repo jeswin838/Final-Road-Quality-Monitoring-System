@@ -1,0 +1,750 @@
+{% extends "base.html" %}
+{% block title %}Available Jobs — Worker{% endblock %}
+{% block page_title %}Available Jobs{% endblock %}
+
+{% block content %}
+<style>
+/* Glassmorphism & Premium UI Enhancements */
+.wk-filter-bar-premium {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 1000;
+}
+
+.wk-search-wrapper {
+    flex: 1;
+    min-width: 250px;
+    position: relative;
+}
+.wk-search-wrapper i {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--worker-muted);
+}
+.wk-search-input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    padding: 10px 14px 10px 40px;
+    border-radius: 8px;
+    outline: none;
+    transition: all 0.3s ease;
+}
+.wk-search-input:focus {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: var(--worker-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+}
+
+/* Custom Dropdown Styles */
+.custom-dropdown {
+    position: relative;
+    min-width: 180px;
+}
+.dropdown-trigger {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: white;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+.dropdown-trigger:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+.dropdown-trigger i {
+    transition: transform 0.3s ease;
+    font-size: 0.8rem;
+    margin-left: 8px;
+}
+.custom-dropdown.open .dropdown-trigger i {
+    transform: rotate(180deg);
+}
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: 220px;
+    background: rgba(25, 25, 30, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    padding: 8px 0;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 1001;
+    max-height: 300px;
+    overflow-y: auto;
+}
+.custom-dropdown.open .dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+.dropdown-item {
+    padding: 10px 16px;
+    color: var(--worker-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.dropdown-item:hover, .dropdown-item.selected {
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+}
+.dropdown-item.selected {
+    border-left: 3px solid var(--worker-primary);
+}
+
+/* Scrollbar for menus */
+.dropdown-menu::-webkit-scrollbar {
+    width: 6px;
+}
+.dropdown-menu::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+}
+
+/* Filter Chips */
+.filter-chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.filter-chip {
+    background: rgba(37, 99, 235, 0.2);
+    border: 1px solid rgba(37, 99, 235, 0.5);
+    color: #93c5fd;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    animation: fadeInScale 0.3s ease;
+}
+.filter-chip i {
+    cursor: pointer;
+    transition: color 0.2s;
+}
+.filter-chip i:hover {
+    color: white;
+}
+.filter-reset-btn {
+    background: none;
+    border: none;
+    color: var(--worker-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 4px 8px;
+}
+.filter-reset-btn:hover {
+    color: white;
+}
+
+/* Smooth Card Animations */
+.wk-job-card {
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease, box-shadow 0.3s ease;
+    will-change: transform, opacity;
+}
+.wk-job-card.is-hidden {
+    display: none !important;
+}
+.wk-job-card.is-leaving {
+    opacity: 0;
+    transform: scale(0.95);
+}
+.wk-job-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.4);
+    border-color: rgba(255,255,255,0.2);
+}
+
+@keyframes fadeInScale {
+    0% { opacity: 0; transform: scale(0.9); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+/* Skeleton Loader */
+.skeleton {
+    background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+}
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.map-card-active {
+    border-color: var(--worker-primary) !important;
+    box-shadow: 0 0 0 2px var(--worker-primary) !important;
+}
+</style>
+
+<div class="wk-filter-bar-premium wk-animate-fade-in-up">
+    <!-- Search -->
+    <div class="wk-search-wrapper">
+        <i class="fa-solid fa-search"></i>
+        <input type="text" id="searchInput" class="wk-search-input" placeholder="Search Road, ID, Severity...">
+    </div>
+
+    <!-- Priority Dropdown -->
+    <div class="custom-dropdown" id="dd-priority">
+        <div class="dropdown-trigger" onclick="toggleDropdown('dd-priority')">
+            <span id="label-priority">All Priorities</span>
+            <i class="fa-solid fa-chevron-down"></i>
+        </div>
+        <div class="dropdown-menu">
+            <div class="dropdown-item selected" onclick="selectFilter('priority', 'All')">All Priorities</div>
+            <div class="dropdown-item" onclick="selectFilter('priority', 'Critical')"><i class="fa-solid fa-fire text-danger"></i> Critical</div>
+            <div class="dropdown-item" onclick="selectFilter('priority', 'High')"><i class="fa-solid fa-arrow-up text-warning"></i> High</div>
+            <div class="dropdown-item" onclick="selectFilter('priority', 'Medium')"><i class="fa-solid fa-minus text-info"></i> Medium</div>
+            <div class="dropdown-item" onclick="selectFilter('priority', 'Low')"><i class="fa-solid fa-arrow-down text-muted"></i> Low</div>
+        </div>
+    </div>
+
+    <!-- Sort Dropdown -->
+    <div class="custom-dropdown" id="dd-sort">
+        <div class="dropdown-trigger" onclick="toggleDropdown('dd-sort')">
+            <span id="label-sort"><i class="fa-solid fa-location-crosshairs"></i> Nearest First</span>
+            <i class="fa-solid fa-chevron-down"></i>
+        </div>
+        <div class="dropdown-menu" style="width: 240px;">
+            <div class="dropdown-item selected" onclick="selectSort('distance')">Nearest First (GPS)</div>
+            <div class="dropdown-item" onclick="selectSort('eta')">Fastest ETA</div>
+            <div class="dropdown-item" onclick="selectSort('risk')">Highest Risk</div>
+            <div class="dropdown-item" onclick="selectSort('priority')">Highest Priority</div>
+            <div class="dropdown-item" onclick="selectSort('confidence')">Highest Confidence</div>
+            <div class="dropdown-item" onclick="selectSort('newest')">Newest First</div>
+            <div class="dropdown-item" onclick="selectSort('oldest')">Oldest First</div>
+            <div class="dropdown-item" onclick="selectSort('reports_desc')">Most Reports</div>
+            <div class="dropdown-item" onclick="selectSort('wait')">Longest Waiting Time</div>
+            <div class="dropdown-item" onclick="selectSort('repair')">Longest Repair Time</div>
+        </div>
+    </div>
+
+    <!-- More Filters -->
+    <div class="custom-dropdown" id="dd-more">
+        <div class="dropdown-trigger" onclick="toggleDropdown('dd-more')">
+            <span><i class="fa-solid fa-filter"></i> More Filters</span>
+            <i class="fa-solid fa-chevron-down"></i>
+        </div>
+        <div class="dropdown-menu" style="width: 260px; padding: 12px;">
+            <label class="wk-text-muted wk-text-sm wk-mb-1 wk-block">Distance Range</label>
+            <div class="wk-flex wk-mb-3" style="gap:5px;">
+                <button class="wk-btn wk-btn-outline" style="padding:4px;font-size:0.8rem;" onclick="selectFilter('distanceMax', 5)">5km</button>
+                <button class="wk-btn wk-btn-outline" style="padding:4px;font-size:0.8rem;" onclick="selectFilter('distanceMax', 10)">10km</button>
+                <button class="wk-btn wk-btn-outline" style="padding:4px;font-size:0.8rem;" onclick="selectFilter('distanceMax', 50)">50km</button>
+                <button class="wk-btn wk-btn-outline" style="padding:4px;font-size:0.8rem;" onclick="selectFilter('distanceMax', null)">Any</button>
+            </div>
+            
+            <label class="wk-text-muted wk-text-sm wk-mb-1 wk-block">Min Confidence</label>
+            <div class="wk-flex wk-mb-3" style="gap:5px;">
+                <button class="wk-btn wk-btn-outline" style="padding:4px;font-size:0.8rem;" onclick="selectFilter('minConf', 90)">>90%</button>
+                <button class="wk-btn wk-btn-outline" style="padding:4px;font-size:0.8rem;" onclick="selectFilter('minConf', 75)">>75%</button>
+                <button class="wk-btn wk-btn-outline" style="padding:4px;font-size:0.8rem;" onclick="selectFilter('minConf', 50)">>50%</button>
+                <button class="wk-btn wk-btn-outline" style="padding:4px;font-size:0.8rem;" onclick="selectFilter('minConf', null)">Any</button>
+            </div>
+            
+            <label class="wk-text-muted wk-text-sm wk-mb-1 wk-block">Severity</label>
+            <div class="wk-flex wk-mb-2" style="gap:5px;">
+                <button class="wk-btn wk-btn-outline" style="padding:4px;font-size:0.8rem;" onclick="selectFilter('severity', 'High')">High</button>
+                <button class="wk-btn wk-btn-outline" style="padding:4px;font-size:0.8rem;" onclick="selectFilter('severity', 'Medium')">Medium</button>
+                <button class="wk-btn wk-btn-outline" style="padding:4px;font-size:0.8rem;" onclick="selectFilter('severity', 'Low')">Low</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="filter-chips-container" id="filterChips"></div>
+
+<div class="wk-jobs-layout wk-animate-slide-right delay-100">
+    <div class="wk-jobs-list wk-scrollable-y" id="jobsListContainer">
+        <!-- Skeleton Loader -->
+        <div id="jobsLoading">
+            <div class="wk-job-card" style="padding:16px;">
+                <div class="wk-flex" style="gap:16px; margin-bottom:16px;">
+                    <div class="skeleton" style="width:80px; height:80px; border-radius:8px;"></div>
+                    <div style="flex:1;">
+                        <div class="skeleton" style="height:20px; width:40%; margin-bottom:8px;"></div>
+                        <div class="skeleton" style="height:14px; width:70%; margin-bottom:16px;"></div>
+                        <div class="wk-flex" style="gap:8px;"><div class="skeleton" style="height:24px; width:60px; border-radius:12px;"></div></div>
+                    </div>
+                </div>
+                <div class="skeleton" style="height:40px; width:100%;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="wk-job-map-container" id="workerJobsMap">
+        <div class="wk-map-overlay-panel wk-animate-scale-in delay-200">
+            <h4 class="worker-h4 wk-mb-2">Radar Online</h4>
+            <p class="worker-small wk-mb-4" id="radarStatus">Live tracking active. Fetching jobs...</p>
+            <div class="wk-flex-between">
+                <span class="wk-badge" style="background:rgba(255,255,255,0.1);"><i class="fa-solid fa-satellite-dish"></i> <span id="gpsStatus">Acquiring GPS...</span></span>
+                <button class="wk-btn wk-btn-outline" style="padding: 4px 8px; font-size:0.7rem;" onclick="MapManager.recenter()"><i class="fa-solid fa-crosshairs"></i></button>
+            </div>
+        </div>
+        <div id="jobsMap" style="width: 100%; height: 100%;"></div>
+    </div>
+</div>
+
+<!-- Custom Accept Job Modal -->
+<div id="acceptJobModal" class="wk-modal-overlay" tabindex="-1" style="display:none; position:fixed; inset:0; background:rgba(15, 23, 42, 0.85); z-index:9999; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); flex-direction:column; justify-content:center; align-items:center; opacity:0; transition: opacity 0.3s ease;">
+  <div class="glass-panel" style="width:90%; max-width:420px; padding:32px 24px; text-align:center; position:relative; border:1px solid rgba(255,255,255,0.15); border-radius:24px; box-shadow: 0 24px 48px rgba(0,0,0,0.6); background: rgba(30, 41, 59, 0.7); transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+    <i class="fa-solid fa-clipboard-check" style="font-size:4rem; color:var(--worker-primary); margin-bottom:20px; filter: drop-shadow(0 0 16px rgba(37,99,235,0.6));"></i>
+    <h3 style="color:white; margin:0 0 12px 0; font-size:1.6rem; font-weight:700;">Accept Assignment</h3>
+    <p style="color:#94a3b8; font-size:1rem; line-height:1.6; margin-bottom:28px;">Are you sure you want to accept this road repair assignment?<br><br>Once accepted, this job will become your active assignment until it is completed or cancelled.</p>
+    
+    <div id="acceptModalError" style="display:none; color:#ef4444; background:rgba(239,68,68,0.1); padding:10px 14px; border-radius:10px; font-size:0.9rem; margin-bottom:20px; border:1px solid rgba(239,68,68,0.2);"></div>
+    
+    <div style="display:flex; gap:14px; flex-direction:column;">
+      <button id="confirmAcceptBtn" class="wk-btn wk-btn-primary" style="padding:14px; font-size:1.05rem; border-radius:14px; transition:all 0.3s ease; box-shadow:0 8px 24px rgba(37,99,235,0.3); font-weight:600;"><i class="fa-solid fa-check"></i> Accept Job</button>
+      <button id="cancelAcceptBtn" class="wk-btn wk-btn-outline" style="padding:14px; font-size:1.05rem; border-radius:14px; transition:all 0.3s ease; font-weight:600;" onclick="closeAcceptModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/**
+ * Frontend Architecture for Worker Jobs Dashboard
+ * Premium UI/UX Implementation with Vanilla JS
+ */
+
+const Store = {
+    jobs: [],          // Original payload from API
+    processed: [],     // Jobs enriched with distance, eta, etc.
+    activeFilters: {
+        search: "",
+        priority: "All",
+        distanceMax: null,
+        minConf: null,
+        severity: null
+    },
+    currentSort: "distance", // Default sort
+    gps: { lat: null, lon: null, speed: null, active: false }
+};
+
+// 1. Math & Utils
+const Utils = {
+    haversine(lat1, lon1, lat2, lon2) {
+        if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+        const R = 6371e3; 
+        const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
+        const Δφ = (lat2-lat1) * Math.PI/180, Δλ = (lon2-lon1) * Math.PI/180;
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    },
+    formatWait(dateStr) {
+        if (!dateStr) return "Unknown";
+        const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+        if (mins < 60) return `${mins} mins`;
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return `${hrs} hrs`;
+        return `${Math.floor(hrs / 24)} days`;
+    }
+};
+
+// 2. Dropdown Manager
+const DropdownManager = {
+    init() {
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.custom-dropdown')) {
+                document.querySelectorAll('.custom-dropdown.open').forEach(el => el.classList.remove('open'));
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') document.querySelectorAll('.custom-dropdown.open').forEach(el => el.classList.remove('open'));
+        });
+    }
+};
+function toggleDropdown(id) {
+    document.querySelectorAll('.custom-dropdown.open').forEach(el => { if(el.id !== id) el.classList.remove('open'); });
+    document.getElementById(id).classList.toggle('open');
+}
+
+// 3. Location Manager
+const LocationManager = {
+    init() {
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                pos => {
+                    Store.gps = { lat: pos.coords.latitude, lon: pos.coords.longitude, speed: pos.coords.speed, active: true };
+                    document.getElementById('gpsStatus').innerHTML = 'GPS Linked';
+                    document.getElementById('gpsStatus').style.color = '#4ade80';
+                    if(!MapManager.workerMarker) MapManager.initWorkerMarker();
+                    else MapManager.workerMarker.setLatLng([Store.gps.lat, Store.gps.lon]);
+                    
+                    this.enrichData();
+                    Engine.process();
+                },
+                err => {
+                    console.warn("GPS Unavailable");
+                    document.getElementById('gpsStatus').innerHTML = 'GPS Offline';
+                    document.getElementById('gpsStatus').style.color = '#f87171';
+                },
+                { enableHighAccuracy: true, maximumAge: 5000, timeout: 5000 }
+            );
+        }
+    },
+    enrichData() {
+        Store.processed = Store.jobs.map(j => {
+            const nj = {...j};
+            if (Store.gps.active) {
+                nj.distM = Utils.haversine(Store.gps.lat, Store.gps.lon, j.latitude, j.longitude);
+                nj.distKm = nj.distM ? (nj.distM / 1000) : null;
+                const speed = (Store.gps.speed > 0) ? Store.gps.speed * 3.6 : 35; // Default 35km/h
+                nj.etaMins = nj.distKm ? Math.round(nj.distKm / speed * 60) : null;
+            } else {
+                nj.distM = null; nj.distKm = null; nj.etaMins = null;
+            }
+            nj.waitMins = Math.floor((Date.now() - new Date(j.created_at).getTime()) / 60000);
+            return nj;
+        });
+    }
+};
+
+// 4. Map Synchronization Manager
+const MapManager = {
+    map: null, workerMarker: null, markers: {},
+    init() {
+        this.map = L.map('jobsMap', { zoomControl: false, attributionControl: false }).setView([40.7128, -74.0060], 13);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(this.map);
+    },
+    initWorkerMarker() {
+        const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="wk-map-marker-pulse"></div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
+        this.workerMarker = L.marker([Store.gps.lat, Store.gps.lon], { icon }).addTo(this.map).bindPopup("Your Location");
+        this.map.setView([Store.gps.lat, Store.gps.lon], 14);
+    },
+    recenter() {
+        if(Store.gps.active) this.map.setView([Store.gps.lat, Store.gps.lon], 14);
+    },
+    syncMarkers(jobs) {
+        Object.values(this.markers).forEach(m => this.map.removeLayer(m));
+        this.markers = {};
+        const icon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div style="background:var(--worker-danger); width:14px; height:14px; border-radius:50%; border:2px solid white; box-shadow:0 0 10px red;"></div>`,
+            iconSize: [18, 18], iconAnchor: [9, 9]
+        });
+        jobs.forEach(j => {
+            if(j.latitude && j.longitude) {
+                const m = L.marker([j.latitude, j.longitude], { icon }).addTo(this.map).bindPopup(`<b>${j.road_name}</b><br>${j.priority} Priority`);
+                m.on('click', () => {
+                    const card = document.getElementById(`job-card-${j.hazard_id}`);
+                    if(card) {
+                        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        card.classList.add('map-card-active');
+                        setTimeout(() => card.classList.remove('map-card-active'), 2000);
+                    }
+                });
+                this.markers[j.hazard_id] = m;
+            }
+        });
+    }
+};
+
+// 5. Engine (Filter + Sort)
+const Engine = {
+    process() {
+        if(!Store.processed.length) LocationManager.enrichData();
+        let results = [...Store.processed];
+        
+        // Filter: Search
+        if (Store.activeFilters.search) {
+            const q = Store.activeFilters.search.toLowerCase();
+            results = results.filter(j => 
+                (j.road_name||"").toLowerCase().includes(q) || 
+                (j.display_id||"").toLowerCase().includes(q) ||
+                (j.severity||"").toLowerCase().includes(q)
+            );
+        }
+        
+        // Filter: Priority
+        if (Store.activeFilters.priority !== "All") {
+            results = results.filter(j => j.priority === Store.activeFilters.priority);
+        }
+        
+        // Filter: More
+        if (Store.activeFilters.distanceMax) results = results.filter(j => j.distKm !== null && j.distKm <= Store.activeFilters.distanceMax);
+        if (Store.activeFilters.minConf) results = results.filter(j => j.confidence_percent >= Store.activeFilters.minConf);
+        if (Store.activeFilters.severity) results = results.filter(j => j.severity === Store.activeFilters.severity);
+
+        // Sort
+        const sort = Store.currentSort;
+        results.sort((a, b) => {
+            if (sort === 'distance') {
+                if (a.distM === null) return 1; if (b.distM === null) return -1;
+                return a.distM - b.distM;
+            }
+            if (sort === 'eta') {
+                if (a.etaMins === null) return 1; if (b.etaMins === null) return -1;
+                return a.etaMins - b.etaMins;
+            }
+            if (sort === 'risk') return b.risk_score - a.risk_score;
+            if (sort === 'priority') {
+                const map = {Critical:4, High:3, Medium:2, Low:1};
+                return (map[b.priority]||0) - (map[a.priority]||0);
+            }
+            if (sort === 'confidence') return b.confidence_percent - a.confidence_percent;
+            if (sort === 'newest') return new Date(b.created_at) - new Date(a.created_at);
+            if (sort === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
+            if (sort === 'reports_desc') return b.report_count - a.report_count;
+            if (sort === 'wait') return b.waitMins - a.waitMins;
+            if (sort === 'repair') return b.repair_time_minutes - a.repair_time_minutes;
+            return 0;
+        });
+
+        DOMManager.render(results);
+        MapManager.syncMarkers(results);
+        DOMManager.renderChips();
+    }
+};
+
+// 6. DOM Manager
+const DOMManager = {
+    render(jobs) {
+        const container = document.getElementById('jobsListContainer');
+        document.getElementById('radarStatus').textContent = `Live tracking active. ${jobs.length} jobs matched.`;
+        
+        if (jobs.length === 0) {
+            container.innerHTML = `
+                <div class="wk-empty-state">
+                    <img src="https://illustrations.popsy.co/amber/shredder.svg" style="height:150px; margin-bottom:20px; opacity:0.8;">
+                    <div class="wk-empty-title">No jobs found</div>
+                    <div class="wk-empty-text">Try adjusting your filters or search terms.</div>
+                    <button class="wk-btn wk-btn-outline wk-mt-3" onclick="resetFilters()">Reset Filters</button>
+                </div>`;
+            return;
+        }
+
+        // Live DOM diffing to preserve animations and prevent jarring re-renders
+        // For simplicity and speed, we rewrite innerHTML but with staggered animation delays
+        let html = '';
+        jobs.forEach((j, idx) => {
+            const pClass = (j.priority === 'High' || j.priority === 'Critical') ? 'wk-badge-priority-high' : 'wk-badge-priority-medium';
+            let distStr = j.distKm ? (j.distKm < 1 ? `${Math.round(j.distM)}m away` : `${j.distKm.toFixed(1)}km away`) : 'Location Unavailable';
+            let etaStr = j.etaMins !== null ? (j.etaMins < 60 ? `${j.etaMins} mins` : `${Math.floor(j.etaMins/60)}h ${j.etaMins%60}m`) : 'Unknown ETA';
+            
+            html += `
+            <div class="wk-job-card" id="job-card-${j.hazard_id}" style="animation: fadeInScale 0.3s ease forwards; animation-delay: ${idx * 0.05}s; opacity:0;">
+                <div class="wk-job-header">
+                    <img src="${j.image}" class="wk-job-hazard-img" alt="Hazard">
+                    <div class="wk-job-meta">
+                        <div class="wk-flex-between wk-mb-2">
+                            <span class="wk-job-id">${j.display_id}</span>
+                            <span class="wk-badge ${pClass}">${j.priority} Priority</span>
+                        </div>
+                        <div class="wk-job-title">${j.road_name}</div>
+                        <div class="wk-job-tags">
+                            <span class="wk-badge" style="background:rgba(255,255,255,0.1);"><i class="fa-solid fa-triangle-exclamation"></i> Risk ${j.risk_score}</span>
+                            <span class="wk-badge" style="background:rgba(255,255,255,0.1);"><i class="fa-solid fa-users"></i> ${j.report_count} Reports</span>
+                            <span class="wk-badge" style="background:rgba(255,255,255,0.1);"><i class="fa-solid fa-layer-group"></i> ${j.severity}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="wk-job-details-grid">
+                    <div class="wk-job-detail-item"><i class="fa-solid fa-location-dot text-info"></i> ${distStr}</div>
+                    <div class="wk-job-detail-item"><i class="fa-solid fa-car-side text-warning"></i> ETA: ${etaStr}</div>
+                    <div class="wk-job-detail-item"><i class="fa-solid fa-screwdriver-wrench"></i> Fix: ${j.repair_time_minutes}m</div>
+                    <div class="wk-job-detail-item"><i class="fa-solid fa-hourglass-half"></i> Wait: ${Utils.formatWait(j.created_at)}</div>
+                    <div class="wk-job-detail-item" style="grid-column: span 2;"><i class="fa-solid fa-robot text-success"></i> ${j.confidence_percent}% AI Confidence</div>
+                </div>
+                <div class="wk-job-actions">
+                    <button class="wk-btn wk-btn-outline" style="flex:1;" onclick="focusMap(${j.latitude}, ${j.longitude}, '${j.hazard_id}')"><i class="fa-solid fa-map-location-dot"></i> View Map</button>
+                    <button class="wk-btn wk-btn-primary" style="flex:1;" onclick="acceptJob('${j.hazard_id}')"><i class="fa-solid fa-check"></i> Accept Job</button>
+                </div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    },
+    renderChips() {
+        const c = document.getElementById('filterChips');
+        let html = '';
+        if (Store.activeFilters.search) html += `<div class="filter-chip">Search: ${Store.activeFilters.search} <i class="fa-solid fa-xmark" onclick="selectFilter('search','')"></i></div>`;
+        if (Store.activeFilters.priority !== 'All') html += `<div class="filter-chip">Priority: ${Store.activeFilters.priority} <i class="fa-solid fa-xmark" onclick="selectFilter('priority','All')"></i></div>`;
+        if (Store.activeFilters.distanceMax) html += `<div class="filter-chip">Within ${Store.activeFilters.distanceMax}km <i class="fa-solid fa-xmark" onclick="selectFilter('distanceMax',null)"></i></div>`;
+        if (Store.activeFilters.minConf) html += `<div class="filter-chip">Conf > ${Store.activeFilters.minConf}% <i class="fa-solid fa-xmark" onclick="selectFilter('minConf',null)"></i></div>`;
+        if (Store.activeFilters.severity) html += `<div class="filter-chip">Severity: ${Store.activeFilters.severity} <i class="fa-solid fa-xmark" onclick="selectFilter('severity',null)"></i></div>`;
+        
+        if (html) html += `<button class="filter-reset-btn" onclick="resetFilters()">Reset All</button>`;
+        c.innerHTML = html;
+    }
+};
+
+// Global Integrations
+function selectFilter(key, value) {
+    Store.activeFilters[key] = value;
+    if (key === 'priority') {
+        document.getElementById('label-priority').textContent = value === 'All' ? 'All Priorities' : `${value} Priority`;
+        const items = document.querySelectorAll('#dd-priority .dropdown-item');
+        items.forEach(el => el.classList.remove('selected'));
+        event.currentTarget.classList.add('selected');
+    }
+    Engine.process();
+}
+function selectSort(sortKey) {
+    Store.currentSort = sortKey;
+    document.getElementById('label-sort').innerHTML = event.currentTarget.innerHTML;
+    const items = document.querySelectorAll('#dd-sort .dropdown-item');
+    items.forEach(el => el.classList.remove('selected'));
+    event.currentTarget.classList.add('selected');
+    Engine.process();
+}
+function resetFilters() {
+    Store.activeFilters = { search: "", priority: "All", distanceMax: null, minConf: null, severity: null };
+    document.getElementById('searchInput').value = '';
+    document.getElementById('label-priority').textContent = 'All Priorities';
+    Engine.process();
+}
+function focusMap(lat, lon, id) {
+    if(MapManager.map && lat && lon) {
+        MapManager.map.setView([lat, lon], 17);
+        if(MapManager.markers[id]) MapManager.markers[id].openPopup();
+    }
+}
+let pendingAcceptJobId = null;
+
+function acceptJob(id) {
+    pendingAcceptJobId = id;
+    const modal = document.getElementById('acceptJobModal');
+    const panel = modal.querySelector('.glass-panel');
+    const err = document.getElementById('acceptModalError');
+    const btn = document.getElementById('confirmAcceptBtn');
+    
+    err.style.display = 'none';
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> Accept Job';
+    btn.disabled = false;
+    document.getElementById('cancelAcceptBtn').disabled = false;
+    
+    modal.style.display = 'flex';
+    void modal.offsetWidth; // Trigger reflow
+    modal.style.opacity = '1';
+    panel.style.transform = 'scale(1)';
+    
+    btn.focus();
+}
+
+function closeAcceptModal() {
+    const modal = document.getElementById('acceptJobModal');
+    const panel = modal.querySelector('.glass-panel');
+    modal.style.opacity = '0';
+    panel.style.transform = 'scale(0.9)';
+    setTimeout(() => { modal.style.display = 'none'; pendingAcceptJobId = null; }, 300);
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('acceptJobModal').style.display === 'flex') {
+        closeAcceptModal();
+    }
+});
+
+document.getElementById('acceptJobModal').addEventListener('click', (e) => {
+    if (e.target.id === 'acceptJobModal') closeAcceptModal();
+});
+
+document.getElementById('confirmAcceptBtn').addEventListener('click', async () => {
+    if (!pendingAcceptJobId) return;
+    
+    const btn = document.getElementById('confirmAcceptBtn');
+    const cancelBtn = document.getElementById('cancelAcceptBtn');
+    const err = document.getElementById('acceptModalError');
+    
+    btn.disabled = true;
+    cancelBtn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Accepting...';
+    err.style.display = 'none';
+    
+    try {
+        const res = await fetch(`/api/worker/jobs/${pendingAcceptJobId}/accept`, { method: 'POST' });
+        const data = await res.json();
+        
+        if (data.success) {
+            // Show custom toast UI
+            const toast = document.createElement('div');
+            toast.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:rgba(34, 197, 94, 0.9); color:white; padding:16px 24px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.3); z-index:10000; backdrop-filter:blur(8px); display:flex; align-items:center; gap:12px; animation:fadeInScale 0.3s ease forwards;">
+                <i class="fa-solid fa-circle-check" style="font-size:1.5rem;"></i>
+                <div>
+                    <div style="font-weight:700;">✅ Job Accepted Successfully</div>
+                    <div style="font-size:0.9rem; opacity:0.9;">Redirecting to active assignment...</div>
+                </div>
+            </div>`;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                window.location.href = "/worker/active-job";
+            }, 1000);
+        } else {
+            err.textContent = data.message || "Failed to accept job.";
+            err.style.display = 'block';
+            btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Retry';
+            btn.disabled = false;
+            cancelBtn.disabled = false;
+            initData(); // reload jobs
+        }
+    } catch(e) { 
+        err.textContent = "Network error occurred.";
+        err.style.display = 'block';
+        btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Retry';
+        btn.disabled = false;
+        cancelBtn.disabled = false;
+    }
+});
+
+// Initialization
+async function initData() {
+    try {
+        const res = await fetch('/api/worker/available-jobs');
+        let data = await res.json();
+        Store.jobs = data.data || data || [];
+        Engine.process();
+    } catch(e) {
+        document.getElementById('jobsListContainer').innerHTML = `<div class="wk-empty-state">Connection failed. Retrying...</div>`;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    DropdownManager.init();
+    MapManager.init();
+    LocationManager.init();
+    
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+        Store.activeFilters.search = e.target.value;
+        Engine.process();
+    });
+    
+    initData();
+    setInterval(initData, 15000); // Poll every 15s (increased from 5s to save network)
+});
+</script>
+{% endblock %}

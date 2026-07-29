@@ -1,0 +1,1417 @@
+/* ==========================================================================
+   VisionaryRoad - Road Operations Center
+   Enterprise Stylesheet (alerts.css)
+   Design Language: Linear, Notion, Arc, GitHub Enterprise
+   Theme: Dark Glassmorphism
+   ========================================================================== */
+
+/* ==========================================================================
+   1. Variables
+   ========================================================================== */
+:root {
+    /* Color System */
+    --bg: #090E17;
+    --surface: rgba(255, 255, 255, 0.03);
+    --glass: rgba(255, 255, 255, 0.05);
+    --hover: rgba(255, 255, 255, 0.07);
+    --selected: rgba(59, 130, 246, 0.12);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-hover: rgba(255, 255, 255, 0.15);
+    
+    /* Shadows */
+    --shadow-soft: 0 8px 30px rgba(0, 0, 0, 0.35);
+    --shadow-inner: inset 0 2px 4px rgba(255, 255, 255, 0.02);
+    --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.15);
+    --shadow-glow-active: 0 0 25px rgba(59, 130, 246, 0.3);
+    
+    /* Typography Colors */
+    --text-primary: #FFFFFF;
+    --text-secondary: #A0AEC0;
+    --text-muted: #718096;
+    --text-accent: #3B82F6;
+    
+    /* Priority Colors (Badges) */
+    --pri-emergency: #f87171;
+    --pri-emergency-bg: rgba(239, 68, 68, 0.12);
+    --pri-emergency-border: rgba(239, 68, 68, 0.25);
+    
+    --pri-critical: #fb923c;
+    --pri-critical-bg: rgba(249, 115, 22, 0.12);
+    --pri-critical-border: rgba(249, 115, 22, 0.25);
+    
+    --pri-high: #fbbf24;
+    --pri-high-bg: rgba(245, 158, 11, 0.12);
+    --pri-high-border: rgba(245, 158, 11, 0.25);
+    
+    --pri-medium: #60a5fa;
+    --pri-medium-bg: rgba(59, 130, 246, 0.12);
+    --pri-medium-border: rgba(59, 130, 246, 0.25);
+    
+    --pri-low: #9ca3af;
+    --pri-low-bg: rgba(107, 114, 128, 0.12);
+    --pri-low-border: rgba(107, 114, 128, 0.25);
+    
+    /* Status & Metrics Colors */
+    --status-green: #34d399;
+    --status-blue: #60a5fa;
+    --status-red: #f87171;
+    --status-orange: #fbbf24;
+    --status-purple: #c084fc;
+    
+    /* Animations */
+    --trans-fast: 150ms ease;
+    --trans-normal: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    --trans-slow: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    --trans-bounce: 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    
+    /* Typography */
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+/* ==========================================================================
+   2. Base & Resets
+   ========================================================================== */
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100vh;
+    background-color: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+    transition: var(--trans-fast);
+}
+
+button {
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 0;
+    margin: 0;
+}
+
+ul, ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+h1, h2, h3, h4, h5, h6, p {
+    margin: 0;
+}
+
+/* ==========================================================================
+   3. Typography Hierarchy
+   ========================================================================== */
+.roc-page-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.roc-section-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.roc-section-title i {
+    color: var(--text-accent);
+}
+
+.roc-subtitle {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+}
+
+.roc-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+.roc-body {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+.roc-helper {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.roc-mono {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    letter-spacing: -0.02em;
+}
+
+/* ==========================================================================
+   4. Custom Scrollbars
+   ========================================================================== */
+.roc-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+    transition: scrollbar-color var(--trans-normal);
+}
+
+.roc-scrollbar:hover {
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.roc-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.roc-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.roc-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.roc-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* ==========================================================================
+   5. Layout & Grid System
+   ========================================================================== */
+.roc-app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 1.5rem;
+    gap: 1.5rem;
+    overflow: hidden;
+}
+
+.roc-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.roc-main-layout {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    gap: 1.5rem;
+    position: relative;
+}
+
+.roc-left-panel {
+    flex: 0 0 35%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 1rem;
+    position: relative;
+}
+
+.roc-right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--glass);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border);
+    border-radius: 32px;
+    padding: 2.5rem;
+    box-shadow: var(--shadow-soft), var(--shadow-inner);
+    position: relative;
+    overflow: hidden;
+}
+
+.roc-panel-content {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    padding-right: 0.5rem;
+}
+
+.roc-grid-12 {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.roc-col-12 { grid-column: span 12; }
+.roc-col-8 { grid-column: span 8; }
+.roc-col-6 { grid-column: span 6; }
+.roc-col-4 { grid-column: span 4; }
+.roc-col-3 { grid-column: span 3; }
+
+/* ==========================================================================
+   6. Glassmorphism Utilities
+   ========================================================================== */
+.roc-glass-surface {
+    background: var(--surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+}
+
+.roc-glass-card {
+    background: var(--glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    box-shadow: var(--shadow-inner);
+}
+
+/* ==========================================================================
+   7. Filter Toolbar
+   ========================================================================== */
+.roc-toolbar {
+    height: 72px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0 1.5rem;
+    border-radius: 24px;
+    background: var(--glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.roc-toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.roc-search-wrapper {
+    position: relative;
+    flex: 1;
+    max-width: 360px;
+}
+
+.roc-search-icon {
+    position: absolute;
+    left: 1.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    pointer-events: none;
+}
+
+.roc-search-input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: 0.75rem 1.25rem 0.75rem 2.75rem;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    font-family: var(--font-sans);
+    transition: var(--trans-normal);
+}
+
+.roc-search-input:focus {
+    outline: none;
+    border-color: var(--text-accent);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.roc-search-input::placeholder {
+    color: var(--text-muted);
+}
+
+.roc-filter-select {
+    appearance: none;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: 0.75rem 2.5rem 0.75rem 1.25rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: var(--trans-normal);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23718096' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 16px;
+}
+
+.roc-filter-select:hover {
+    background-color: var(--hover);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.roc-filter-select:focus {
+    outline: none;
+    border-color: var(--text-accent);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+.roc-filter-select option {
+    background: var(--bg);
+    color: var(--text-primary);
+}
+
+/* ==========================================================================
+   8. Alert List & Compact Cards
+   ========================================================================== */
+.roc-alert-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.roc-alert-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 16px;
+    height: auto;
+    max-height: 110px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    cursor: pointer;
+    transition: var(--trans-normal);
+    position: relative;
+    overflow: hidden;
+}
+
+.roc-alert-card:hover {
+    background: var(--hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-soft);
+    border-color: var(--border-hover);
+}
+
+.roc-alert-card.selected {
+    background: var(--selected);
+    border-color: var(--text-accent);
+    box-shadow: var(--shadow-glow);
+}
+
+.roc-alert-card.selected::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--text-accent);
+    border-radius: 4px 0 0 4px;
+}
+
+.roc-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.roc-card-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.roc-card-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.roc-card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 8px;
+}
+
+.roc-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+}
+
+.roc-meta-item i {
+    font-size: 0.75rem;
+    opacity: 0.8;
+}
+
+.roc-meta-item.risk i { color: var(--status-red); }
+.roc-meta-item.reports i { color: var(--status-blue); }
+.roc-meta-item.wait i { color: var(--status-orange); }
+.roc-meta-item.assign i { color: var(--status-green); }
+
+/* ==========================================================================
+   9. Priority Badges
+   ========================================================================== */
+.roc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 99px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid transparent;
+}
+
+.roc-badge i {
+    font-size: 0.6rem;
+}
+
+.roc-badge.emergency {
+    background: var(--pri-emergency-bg);
+    color: var(--pri-emergency);
+    border-color: var(--pri-emergency-border);
+}
+
+.roc-badge.critical {
+    background: var(--pri-critical-bg);
+    color: var(--pri-critical);
+    border-color: var(--pri-critical-border);
+}
+
+.roc-badge.high {
+    background: var(--pri-high-bg);
+    color: var(--pri-high);
+    border-color: var(--pri-high-border);
+}
+
+.roc-badge.medium {
+    background: var(--pri-medium-bg);
+    color: var(--pri-medium);
+    border-color: var(--pri-medium-border);
+}
+
+.roc-badge.low {
+    background: var(--pri-low-bg);
+    color: var(--pri-low);
+    border-color: var(--pri-low-border);
+}
+
+/* ==========================================================================
+   10. Header Image & Location (Detail Panel - Section 1)
+   ========================================================================== */
+.roc-hero-section {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2.5rem;
+}
+
+.roc-hero-image-wrap {
+    position: relative;
+    width: 320px;
+    height: 220px;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #000;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.roc-hero-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.roc-hero-image-wrap:hover .roc-hero-image {
+    transform: scale(1.05);
+}
+
+.roc-hero-badges {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    right: 16px;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.roc-location-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex: 1;
+}
+
+.roc-loc-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.1;
+    margin: 0 0 1rem 0;
+    letter-spacing: -0.02em;
+}
+
+.roc-loc-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.roc-loc-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.roc-loc-row i {
+    color: var(--text-accent);
+    width: 16px;
+    text-align: center;
+}
+
+/* ==========================================================================
+   11. Summary Chips (Section 2)
+   ========================================================================== */
+.roc-chips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+}
+
+.roc-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    transition: var(--trans-normal);
+}
+
+.roc-chip:hover {
+    background: var(--hover);
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-soft);
+}
+
+.roc-chip-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.roc-chip-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+
+/* Chip Colors */
+.roc-chip.primary .roc-chip-value { color: var(--text-accent); }
+.roc-chip.warning .roc-chip-value { color: var(--status-orange); }
+.roc-chip.danger .roc-chip-value { color: var(--status-red); }
+.roc-chip.success .roc-chip-value { color: var(--status-green); }
+
+/* ==========================================================================
+   12. Priority & Checklist Cards (Section 2 Ext)
+   ========================================================================== */
+.roc-data-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 1.75rem;
+    height: 100%;
+    transition: var(--trans-normal);
+}
+
+.roc-data-card:hover {
+    border-color: var(--border-hover);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.roc-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.roc-check-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+}
+
+.roc-check-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.roc-check-label i {
+    color: var(--status-green);
+    font-size: 0.875rem;
+}
+
+.roc-check-value {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.roc-check-item.alert-row {
+    margin-top: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--border);
+}
+
+.roc-check-item.alert-row .roc-check-label,
+.roc-check-item.alert-row .roc-check-label i,
+.roc-check-item.alert-row .roc-check-value {
+    color: var(--status-red);
+}
+
+/* ==========================================================================
+   13. Progress Bars / Risk Breakdown (Section 3)
+   ========================================================================== */
+.roc-progress-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.roc-progress-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.roc-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+}
+
+.roc-progress-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+.roc-progress-val {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.roc-progress-track {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 99px;
+    overflow: hidden;
+    position: relative;
+}
+
+.roc-progress-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 99px;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fill-red { background: var(--status-red); box-shadow: 0 0 10px rgba(248, 113, 113, 0.5); }
+.fill-orange { background: var(--status-orange); box-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
+.fill-blue { background: var(--status-blue); box-shadow: 0 0 10px rgba(96, 165, 250, 0.5); }
+.fill-green { background: var(--status-green); box-shadow: 0 0 10px rgba(52, 211, 153, 0.5); }
+.fill-purple { background: var(--status-purple); box-shadow: 0 0 10px rgba(192, 132, 252, 0.5); }
+
+/* ==========================================================================
+   14. Road Information (Section 1 Extension)
+   ========================================================================== */
+.roc-road-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.roc-road-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.roc-road-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.roc-road-value {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.roc-road-helper {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+/* ==========================================================================
+   15. Reason Pills (Section 4)
+   ========================================================================== */
+.roc-reasons-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+}
+
+.roc-reason-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    transition: var(--trans-normal);
+}
+
+.roc-reason-pill:hover {
+    background: var(--hover);
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.roc-reason-pill i {
+    color: var(--text-accent);
+    font-size: 0.875rem;
+}
+
+/* ==========================================================================
+   16. Recommendation Card (Section 5)
+   ========================================================================== */
+.roc-rec-card {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.02) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 24px;
+    padding: 2rem;
+    height: 100%;
+}
+
+.roc-rec-card .roc-section-title i {
+    color: var(--text-accent);
+}
+
+.roc-rec-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem 1.5rem;
+}
+
+.roc-rec-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.roc-rec-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(147, 197, 253, 0.8);
+}
+
+.roc-rec-value {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.roc-rec-value i {
+    color: var(--text-accent);
+    font-size: 1rem;
+}
+
+/* ==========================================================================
+   17. Workflow Timeline (Section 6)
+   ========================================================================== */
+.roc-timeline-wrapper {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 1.5rem;
+    scrollbar-width: none; /* Firefox */
+}
+.roc-timeline-wrapper::-webkit-scrollbar {
+    display: none; /* Safari/Chrome */
+}
+
+.roc-timeline {
+    position: relative;
+    padding: 2.5rem 2rem 1rem 2rem;
+    min-width: max-content; /* Allow it to grow horizontally beyond container */
+}
+
+.roc-tl-track {
+    position: absolute;
+    top: 2.5rem; /* align with point centers */
+    left: 4rem;
+    right: 4rem;
+    height: 2px;
+    background: var(--border);
+    z-index: 1;
+}
+
+.roc-tl-nodes {
+    display: flex;
+    justify-content: flex-start;
+    gap: 140px; /* Minimum 140px between steps */
+    position: relative;
+    z-index: 2;
+}
+
+.roc-tl-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100px; /* Enough for labels without overlap */
+    position: relative;
+}
+
+.roc-tl-point {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface);
+    border: 2px solid var(--text-muted);
+    transition: var(--trans-normal);
+    z-index: 3;
+}
+
+.roc-tl-point i {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    transition: var(--trans-normal);
+}
+
+.roc-tl-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-align: center;
+    white-space: nowrap;
+}
+
+.roc-tl-time {
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.4);
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Animations */
+@keyframes pulse-border {
+    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+/* Timeline States */
+.roc-tl-node.completed .roc-tl-point {
+    background: var(--status-green);
+    border-color: var(--status-green);
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+}
+
+.roc-tl-node.completed .roc-tl-point i {
+    opacity: 1;
+    color: #000;
+}
+
+.roc-tl-node.completed .roc-tl-label {
+    color: var(--status-green);
+}
+
+.roc-tl-node.current .roc-tl-point {
+    background: var(--surface);
+    border-color: #3b82f6;
+    animation: pulse-border 2s infinite;
+}
+
+.roc-tl-node.current .roc-tl-point i {
+    opacity: 1;
+    color: #3b82f6;
+}
+
+.roc-tl-node.current .roc-tl-label {
+    color: #3b82f6;
+    font-weight: 700;
+}
+
+/* ==========================================================================
+   18. Quick Action Buttons (Section 7)
+   ========================================================================== */
+.roc-actions-bar {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: auto;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+}
+
+.roc-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-radius: 16px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: var(--trans-normal);
+}
+
+.roc-btn i {
+    font-size: 1rem;
+}
+
+.roc-btn-glass {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+}
+
+.roc-btn-glass:hover {
+    background: var(--hover);
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-soft);
+}
+
+.roc-btn-primary {
+    background: var(--text-accent);
+    border: 1px solid transparent;
+    color: #ffffff;
+    box-shadow: var(--shadow-glow);
+}
+
+.roc-btn-primary:hover {
+    background: #2563eb;
+    box-shadow: var(--shadow-glow-active);
+    transform: translateY(-2px);
+}
+
+.roc-btn:active {
+    transform: scale(0.98);
+}
+
+.roc-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+.roc-btn-primary:focus-visible {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+}
+
+/* ==========================================================================
+   19. Placeholder & Empty State
+   ========================================================================== */
+.roc-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: 3rem;
+}
+
+.roc-empty-icon {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2rem;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+}
+
+.roc-empty-icon i {
+    font-size: 2.5rem;
+    color: var(--text-muted);
+}
+
+.roc-empty-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 0.75rem 0;
+    letter-spacing: -0.01em;
+}
+
+.roc-empty-desc {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    max-width: 320px;
+    line-height: 1.6;
+}
+
+/* ==========================================================================
+   20. Loading Skeleton (Animated Shimmer)
+   ========================================================================== */
+@keyframes roc-shimmer {
+    0% { background-position: -1000px 0; }
+    100% { background-position: 1000px 0; }
+}
+
+.roc-skeleton {
+    background: linear-gradient(90deg, 
+        rgba(255,255,255,0.02) 25%, 
+        rgba(255,255,255,0.06) 50%, 
+        rgba(255,255,255,0.02) 75%
+    );
+    background-size: 1000px 100%;
+    animation: roc-shimmer 2s infinite linear;
+    border-radius: 8px;
+}
+
+.sk-text { height: 16px; width: 80%; margin-bottom: 10px; }
+.sk-text.short { width: 40%; }
+.sk-title { height: 28px; width: 60%; margin-bottom: 20px; }
+.sk-avatar { width: 40px; height: 40px; border-radius: 50%; }
+.sk-card { height: 110px; width: 100%; border-radius: 16px; margin-bottom: 12px; }
+.sk-hero { height: 220px; width: 320px; border-radius: 20px; }
+.sk-chip { height: 90px; border-radius: 20px; }
+
+/* ==========================================================================
+   21. Error State
+   ========================================================================== */
+.roc-error-card {
+    background: rgba(239, 68, 68, 0.03);
+    border: 1px solid rgba(239, 68, 68, 0.15);
+    border-radius: 24px;
+    padding: 3rem;
+    text-align: center;
+    max-width: 450px;
+    margin: auto;
+}
+
+.roc-error-card i {
+    font-size: 3rem;
+    color: rgba(239, 68, 68, 0.6);
+    margin-bottom: 1.5rem;
+}
+
+.roc-error-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+}
+
+.roc-error-desc {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    line-height: 1.5;
+}
+
+/* ==========================================================================
+   22. Responsive Breakpoints
+   ========================================================================== */
+
+/* Very Large Monitors (1920+) */
+@media (min-width: 1920px) {
+    .roc-app-container { padding: 2rem 10%; }
+    .roc-hero-image-wrap { width: 400px; height: 260px; }
+    .roc-loc-title { font-size: 3rem; }
+}
+
+/* Large Desktop (1440px - 1600px) */
+@media (max-width: 1600px) {
+    .roc-hero-image-wrap { width: 300px; height: 200px; }
+}
+
+/* Laptop (1024px - 1280px) */
+@media (max-width: 1280px) {
+    .roc-left-panel { flex: 0 0 30%; }
+    .roc-hero-image-wrap { width: 260px; height: 180px; }
+    .roc-loc-title { font-size: 2rem; }
+    .roc-actions-bar { flex-wrap: wrap; }
+    .roc-btn { min-width: calc(50% - 1rem); }
+}
+
+/* Tablet Slide Drawer (768px - 1024px) */
+@media (max-width: 1024px) {
+    .roc-main-layout {
+        flex-direction: column;
+    }
+    
+    .roc-left-panel {
+        flex: 1; /* List takes full width */
+        width: 100%;
+        border-radius: 24px;
+    }
+
+    /* Drawer Styles */
+    .roc-right-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 85%;
+        max-width: 700px;
+        z-index: 100;
+        border-radius: 32px 0 0 32px;
+        border: 1px solid var(--border);
+        border-right: none;
+        transform: translateX(100%);
+        transition: transform var(--trans-bounce);
+        background: rgba(9, 14, 23, 0.95); /* Opaque for readability */
+    }
+
+    .roc-right-panel.drawer-open {
+        transform: translateX(0);
+        box-shadow: -10px 0 40px rgba(0,0,0,0.5);
+    }
+    
+    .roc-grid-12 {
+        grid-template-columns: 1fr;
+    }
+    
+    .roc-col-6, .roc-col-4, .roc-col-8 {
+        grid-column: span 12;
+    }
+}
+
+/* Mobile Bottom Sheet (< 768px) */
+@media (max-width: 768px) {
+    .roc-app-container { padding: 1rem; gap: 1rem; }
+    
+    .roc-toolbar {
+        flex-direction: column;
+        height: auto;
+        padding: 1rem;
+        gap: 1rem;
+        border-radius: 16px;
+    }
+
+    .roc-search-wrapper, 
+    .roc-toolbar-group {
+        width: 100%;
+        max-width: none;
+    }
+
+    .roc-filter-select {
+        flex: 1;
+    }
+
+    /* Bottom Sheet Styles */
+    .roc-right-panel {
+        width: 100%;
+        max-width: none;
+        border-radius: 32px 32px 0 0;
+        top: 8vh; /* Leave top gap */
+        border: 1px solid var(--border);
+        border-bottom: none;
+        transform: translateY(100%);
+        transition: transform var(--trans-bounce);
+        padding: 1.5rem;
+    }
+
+    .roc-right-panel.drawer-open {
+        transform: translateY(0);
+        box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+    }
+
+    .roc-hero-section {
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .roc-hero-image-wrap {
+        width: 100%;
+        height: 220px;
+    }
+
+    .roc-actions-bar {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    /* Vertical Timeline for Mobile */
+    .roc-timeline {
+        padding: 1rem 0;
+    }
+    
+    .roc-tl-track {
+        left: 13px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        height: auto;
+        transform: none;
+    }
+    
+    .roc-tl-nodes {
+        flex-direction: column;
+        gap: 2rem;
+        align-items: flex-start;
+    }
+    
+    .roc-tl-node {
+        flex-direction: row;
+        width: 100%;
+    }
+    
+    .roc-tl-label {
+        position: relative;
+        left: 0;
+        bottom: 0;
+        text-align: left;
+    }
+}
+
+/* Very Small Mobile (< 480px) */
+@media (max-width: 480px) {
+    .roc-card-header { flex-direction: column; gap: 0.5rem; }
+    .roc-card-meta { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+    .roc-loc-title { font-size: 1.5rem; }
+}
+
+/* ==========================================================================
+   23. Accessibility Overrides
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+.roc-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* Drawer Clickaway Backdrop */
+.roc-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 90;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--trans-normal);
+}
+
+.roc-drawer-backdrop.active {
+    opacity: 1;
+    pointer-events: auto;
+}

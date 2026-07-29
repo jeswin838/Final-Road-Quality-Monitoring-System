@@ -134,7 +134,16 @@
         if(res.ok) {
           showSuccess("Login successful! Redirecting...");
           btn.innerHTML = '<i class="fa-solid fa-check"></i> Success';
-          setTimeout(() => { window.location.href = '/'; }, 600);
+          
+          setTimeout(() => { 
+            if (data.role === 'worker') {
+                window.location.href = '/worker/dashboard';
+            } else if (data.role === 'admin') {
+                window.location.href = '/dashboard'; 
+            } else {
+                window.location.href = '/home';
+            }
+          }, 600);
         } else {
           showError(data.error || "Invalid credentials");
           btn.disabled = false;

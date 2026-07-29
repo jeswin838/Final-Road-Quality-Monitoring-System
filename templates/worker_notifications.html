@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Notifications — Worker{% endblock %}
+{% block page_title %}Notifications Center{% endblock %}
+
+{% block content %}
+<div class="wk-card worker-glass wk-animate-slide-up">
+  <div class="wk-card-header" style="border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:20px; margin-bottom:20px;">
+    <div class="wk-card-title">
+      <div class="wk-card-icon"><i class="fa-solid fa-bell"></i></div>
+      Recent Activity & Alerts
+    </div>
+    <button class="wk-btn wk-btn-outline" style="padding: 6px 16px;"><i class="fa-solid fa-check-double"></i> Mark All as Read</button>
+  </div>
+  
+  <div class="wk-notif-list" id="notifListContainer">
+    <div style="text-align:center; padding: 24px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading notifications...</div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const res = await fetch('/api/worker/notifications');
+      let data = await res.json();
+      if (data && data.success !== undefined) data = data.data;
+      
+      const container = document.getElementById('notifListContainer');
+      if (!data || data.length === 0) {
+        container.innerHTML = `<div style="text-align:center; padding: 24px;">No new notifications.</div>`;
+        return;
+      }
+      
+      let html = '';
+      data.forEach((n, i) => {
+        const delay = i * 100;
+        let iconBg = "";
+        let colorClass = "";
+        if (n.type === 'danger') {
+            iconBg = `background:var(--worker-gradient-danger); color:white;`;
+            colorClass = "unread";
+        } else if (n.type === 'success') {
+            colorClass = "unread";
+        }
+        
+        let dateStr = "Unknown";
+        if (n.time) {
+            const d = new Date(n.time);
+            dateStr = d.toLocaleString();
+        }
+        
+        html += `
+        <div class="wk-notif-card ${colorClass} wk-animate-fade-in-up" style="animation-delay:${delay}ms;">
+          <div class="wk-notif-icon" style="${iconBg}"><i class="fa-solid ${n.icon}"></i></div>
+          <div class="wk-notif-content" style="flex:1;">
+            <div class="wk-flex-between">
+              <h4>${n.title}</h4>
+              <span class="wk-notif-time">${dateStr}</span>
+            </div>
+            <p>${n.message}</p>
+          </div>
+        </div>
+        `;
+      });
+      container.innerHTML = html;
+    } catch(e) {
+      console.error(e);
+      document.getElementById('notifListContainer').innerHTML = `<div style="text-align:center; padding: 24px;">Error loading notifications.</div>`;
+    }
+  });
+</script>
+{% endblock %}

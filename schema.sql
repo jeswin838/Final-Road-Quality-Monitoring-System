@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS assignments (
   pothole_id  INT NOT NULL,
   worker_name VARCHAR(100) NOT NULL,
   notes       TEXT,
-  status      ENUM('Pending','In Progress','Completed') NOT NULL DEFAULT 'Pending',
+  status      VARCHAR(30) NOT NULL DEFAULT 'Pending Repair',
   assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (pothole_id) REFERENCES pothole(id) ON DELETE CASCADE

@@ -59,3 +59,14 @@ BEGIN
 END;
 $$;
 
+
+-- Add GPS and Timestamp metadata columns to assignments table for worker verification
+ALTER TABLE public.assignments ADD COLUMN IF NOT EXISTS before_photo_lat DOUBLE PRECISION;
+ALTER TABLE public.assignments ADD COLUMN IF NOT EXISTS before_photo_lon DOUBLE PRECISION;
+ALTER TABLE public.assignments ADD COLUMN IF NOT EXISTS before_photo_accuracy DOUBLE PRECISION;
+ALTER TABLE public.assignments ADD COLUMN IF NOT EXISTS before_photo_timestamp TIMESTAMPTZ;
+
+ALTER TABLE public.assignments ADD COLUMN IF NOT EXISTS after_photo_lat DOUBLE PRECISION;
+ALTER TABLE public.assignments ADD COLUMN IF NOT EXISTS after_photo_lon DOUBLE PRECISION;
+ALTER TABLE public.assignments ADD COLUMN IF NOT EXISTS after_photo_accuracy DOUBLE PRECISION;
+ALTER TABLE public.assignments ADD COLUMN IF NOT EXISTS after_photo_timestamp TIMESTAMPTZ;

@@ -1,6 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Safe Navigation — PotholePro{% endblock %}
-{% block page_title %}Safe Route Navigation{% endblock %}
+{% block title %}Safe Navigation — PotholePro
+
+
+{% endblock %}
+{% block page_title %}Safe Route Navigation
+
+
+{% endblock %}
 
 {% block head %}
 <style>
@@ -90,281 +96,575 @@
   .report-gallery-img-wrap { height: 200px; }
 }
 
-/* ── Navigation Page Layout ─────────────────────────────────────────────── */
-.nav-layout {
-  display: grid;
-  grid-template-columns: 340px 1fr;
-  gap: 16px;
-  height: calc(100vh - var(--topbar-h) - 36px);
-}
-
-/* ── Control Panel ──────────────────────────────────────────────────────── */
-.nav-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  overflow-y: auto;
-}
-
-.panel-card {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 18px 20px;
-}
-
-.panel-card h3 {
-  font-size: .9rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-/* ── Location inputs ────────────────────────────────────────────────────── */
-.location-input-wrap {
+/* ── Full Screen Layout ─────────────────────────────────────────────── */
+.nav-fullscreen-wrap {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
+  width: calc(100% + 48px);
+  height: calc(100vh - 72px);
+  margin: -24px;
+  overflow: hidden;
 }
 
-.location-dot {
-  width: 12px; height: 12px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.dot-start { background: var(--success); box-shadow: 0 0 10px var(--success); }
-.dot-end   { background: var(--danger);  box-shadow: 0 0 10px var(--danger); }
-
-.location-input-wrap .form-input {
-  flex: 1;
-  padding-right: 36px;
-}
-
-.clear-input-btn {
-  position: absolute;
-  right: 8px;
-  background: none;
-  border: none;
-  color: var(--muted);
-  font-size: .8rem;
-  cursor: pointer;
-  transition: color var(--transition);
-}
-.clear-input-btn:hover { color: var(--danger); }
-
-.divider-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 4px 0;
-  color: var(--muted);
-  font-size: .7rem;
-}
-.divider-line::before, .divider-line::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
-
-/* ── Route Status Card ──────────────────────────────────────────────────── */
-#routeStatus { display: none; }
-
-.status-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: .82rem;
-}
-.status-row:last-child { border-bottom: none; }
-.status-label { color: var(--muted); }
-.status-value { font-weight: 600; }
-
-.safe-badge     { color: var(--success); }
-.moderate-badge { color: var(--warning); }
-.unsafe-badge   { color: var(--danger); }
-
-/* ── Legend ─────────────────────────────────────────────────────────────── */
-.legend-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: .8rem;
-  color: var(--muted);
-  padding: 5px 0;
-}
-.legend-dot {
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  opacity: .85;
-}
-.legend-line {
-  width: 24px; height: 4px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-/* ── Map container ──────────────────────────────────────────────────────── */
 #navMap {
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  width: 100%;
-  height: 100%;
-  min-height: 500px;
-  background: var(--surface);
-  position: relative;
-  z-index: 1;
-}
-
-/* ── Route info banner ─────────────────────────────────────────────────── */
-#routeBanner {
-  display: none;
   position: absolute;
-  bottom: 20px; left: 50%; transform: translateX(-50%);
-  z-index: 800;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px 20px;
-  font-size: .85rem;
-  font-weight: 500;
-  box-shadow: 0 8px 24px rgba(0,0,0,.5);
-  white-space: nowrap;
+  top: 0; left: 0; right: 0; bottom: 0;
+  width: 100%; height: 100%;
+  z-index: 1;
+  background: #1a1f27;
 }
 
-/* ── Spinner ────────────────────────────────────────────────────────────── */
-.spinner {
-  display: inline-block;
-  width: 14px; height: 14px;
-  border: 2px solid rgba(255,255,255,.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
-  margin-right: 6px;
-  vertical-align: middle;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── Responsive ─────────────────────────────────────────────────────────── */
-@media (max-width: 900px) {
-  .nav-layout { grid-template-columns: 1fr; height: auto; }
-  #navMap { height: 450px; }
-}
-
-/* Leaflet dark map tiles helper */
 .leaflet-container { background: #1a1f27; }
+.leaflet-control-zoom { display: none !important; }
+
+/* ── Floating Panels ────────────────────────────────────────────────── */
+.floating-panel {
+  position: absolute;
+  z-index: 1000;
+  background: rgba(22, 27, 34, 0.85);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-card { padding: 18px 20px; }
+.nav-card h3 { font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 8px; margin-bottom: 16px; color: #f1f5f9; }
+.nav-card-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 12px 0; }
+
+/* Positioning */
+.nav-top-left { top: 20px; left: 20px; width: 360px; display: flex; flex-direction: column; gap: 16px; }
+.nav-top-right { top: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 1000; position: absolute; }
+.nav-bottom-center { bottom: 20px; left: 50%; transform: translateX(-50%); width: 750px; }
+.nav-bottom-right { bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 16px; align-items: flex-end; }
+
+/* Location Inputs */
+.location-input-wrap { position: relative; display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.location-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.dot-start { background: #22c55e; box-shadow: 0 0 10px rgba(34, 197, 94, 0.5); }
+.dot-end   { background: #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
+.location-input-wrap input { 
+  flex: 1; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); 
+  border-radius: 10px; padding: 10px 32px 10px 12px; color: #fff; font-size: 0.85rem; outline: none; transition: border 0.2s;
+}
+.location-input-wrap input:focus { border-color: #3b82f6; }
+.clear-input-btn { position: absolute; right: 8px; background: none; border: none; color: #94a3b8; font-size: 0.85rem; cursor: pointer; }
+.clear-input-btn:hover { color: #f87171; }
+
+.route-btn { width: 100%; background: #3b82f6; color: #fff; border: none; border-radius: 12px; padding: 12px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; transition: background 0.2s; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
+.route-btn:hover { background: #2563eb; }
+.btn-gps { background: rgba(255,255,255,0.1); border: none; color: #fff; font-size: 0.8rem; padding: 8px 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.btn-gps:hover { background: rgba(255,255,255,0.15); }
+
+/* Hazard Filter Panel */
+.filter-btn {
+  background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1);
+  color: #fff; padding: 10px 16px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.3); font-weight: 600; font-size: 0.85rem; transition: background 0.2s, color 0.2s;
+}
+.filter-btn:hover, .filter-btn.active { background: rgba(255,255,255,0.15); color: #3b82f6; }
+.filter-dropdown {
+  display: none; flex-direction: column; background: rgba(22, 27, 34, 0.95); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 8px; box-shadow: 0 16px 32px rgba(0,0,0,0.5);
+  margin-top: 4px;
+}
+.filter-dropdown.show { display: flex; }
+.filter-option {
+  padding: 8px 12px; color: #cbd5e1; font-size: 0.8rem; cursor: pointer; border-radius: 8px; font-weight: 500;
+  display: flex; align-items: center; gap: 8px;
+}
+.filter-option:hover, .filter-option.active { background: rgba(255,255,255,0.1); color: #fff; }
+
+/* Upcoming Hazards List */
+#upcomingHazardsList { display: none; width: 340px; max-height: 50vh; overflow-y: auto; pointer-events: auto; padding-right: 4px; margin-top: 12px; }
+#upcomingHazardsList::-webkit-scrollbar { width: 6px; }
+#upcomingHazardsList::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+.hazard-card { background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-left: 4px solid #22c55e; border-radius: 12px; padding: 16px; margin-bottom: 12px; transition: all 0.2s ease; cursor: pointer; position: relative; }
+.hazard-card:last-child { margin-bottom: 0; }
+.hazard-card:hover { transform: translateX(4px); box-shadow: 0 4px 15px rgba(0,0,0,0.4); background: rgba(30, 36, 44, 0.95); }
+.hazard-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.hazard-title { font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.hazard-body { display: flex; gap: 12px; }
+.hazard-thumb { width: 70px; height: 70px; border-radius: 8px; object-fit: cover; background: rgba(0,0,0,0.3); flex-shrink: 0; }
+.hazard-details { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.hazard-metric { font-size: 0.85rem; color: #cbd5e1; display: flex; justify-content: space-between; }
+.hazard-metric strong { color: #fff; text-align: right; }
+.hazard-clear { text-align: center; padding: 16px; background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-left: 4px solid #22c55e; border-radius: 12px; color: #22c55e; font-weight: bold; margin-top: 12px; }
+.hazard-clear i { font-size: 2rem; margin-bottom: 8px; display: block; }
+.hazard-alert { background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 6px; border-radius: 4px; text-align: center; font-weight: 800; font-size: 0.8rem; margin-top: 8px; animation: flash 1s infinite alternate; }
+
+.marker-pulse {
+  animation: pulse-ring 1s cubic-bezier(0.215, 0.61, 0.355, 1) infinite !important;
+}
+@keyframes pulse-ring {
+  0% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0.8)); }
+  50% { transform: scale(1.2); filter: drop-shadow(0 0 15px rgba(255, 255, 255, 1)); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)); }
+}
+@keyframes flash { from { opacity: 1; } to { opacity: 0.5; } }
+
+/* Progress Bar styling */
+
+/* Navigation Bottom Card */
+#navActiveCard { display: none; }
+.nav-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.stat-box { text-align: center; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); }
+.stat-val { font-size: 1.4rem; font-weight: 800; color: #fff; margin-bottom: 4px; display: flex; align-items: baseline; justify-content: center; gap: 2px; }
+.stat-val span { font-size: 0.85rem; color: #94a3b8; font-weight: 600; }
+.stat-label { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+
+.progress-wrap { position: relative; margin-top: 4px; }
+.progress-bar-bg { width: 100%; height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.3); }
+.progress-bar-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #22c55e); width: 0%; transition: width 0.5s linear; box-shadow: 0 0 10px rgba(59,130,246,0.5); }
+.progress-labels { display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.8rem; color: #cbd5e1; font-weight: 600; }
+
+/* Map Controls */
+.map-controls { display: flex; flex-direction: column; gap: 10px; }
+.map-ctrl-btn { width: 48px; height: 48px; border-radius: 14px; background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 1.2rem; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: background 0.2s, color 0.2s, transform 0.2s; box-shadow: 0 8px 16px rgba(0,0,0,0.3); }
+.map-ctrl-btn:hover { background: rgba(255,255,255,0.15); color: #3b82f6; transform: scale(1.05); }
+
+/* Legend */
+.legend-panel { padding: 16px 20px; font-size: 0.8rem; color: #cbd5e1; font-weight: 600; }
+.legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.legend-item:last-child { margin-bottom: 0; }
+.leg-color { width: 14px; height: 14px; border-radius: 50%; }
+.leg-line { width: 20px; height: 4px; border-radius: 2px; }
+
+/* Pulsing Destination Marker */
+@keyframes pulseRed {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+.dest-marker-pulse {
+  background: #ef4444; width: 26px; height: 26px; border-radius: 50%;
+  border: 3px solid #fff; animation: pulseRed 2s infinite;
+  display: flex; justify-content: center; align-items: center;
+}
+.dest-marker-pulse i { color: #fff; font-size: 12px; }
+
+/* Hazard Marker Styles */
+.hazard-marker {
+  width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff;
+  display: flex; justify-content: center; align-items: center;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.4); font-size: 12px; color: #fff;
+}
+.hazard-high { background: #ef4444; }
+.hazard-medium { background: #f97316; }
+.hazard-low { background: #eab308; }
+
+/* Popup Styling Improvements */
+.leaflet-popup-content-wrapper { background: rgba(22,27,34,0.95); color: #f1f5f9; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; }
+.leaflet-popup-tip { background: rgba(22,27,34,0.95); }
+.custom-popup { font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.5; padding: 4px; }
+.custom-popup h4 { margin: 0 0 8px 0; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; }
+.custom-popup b { color: #94a3b8; }
+.custom-popup span { color: #e2e8f0; font-weight: 600; }
+
+/* Arrival Overlay */
+#arrivalOverlay { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); display: none; justify-content: center; align-items: center; flex-direction: column; animation: fadeIn 0.4s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+.arrival-card { background: rgba(22, 27, 34, 0.95); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 40px; text-align: center; max-width: 400px; box-shadow: 0 24px 60px rgba(0,0,0,0.6); }
+.arrival-icon { font-size: 4rem; color: #22c55e; margin-bottom: 16px; filter: drop-shadow(0 0 16px rgba(34,197,94,0.4)); }
+.arrival-title { font-size: 1.8rem; font-weight: 800; color: #fff; margin-bottom: 8px; }
+.arrival-desc { font-size: 0.95rem; color: #94a3b8; margin-bottom: 24px; line-height: 1.5; font-weight: 500; }
+.arrival-btn { width: 100%; background: #22c55e; color: #000; font-weight: 800; padding: 14px 24px; border-radius: 12px; border: none; font-size: 1rem; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 8px 24px rgba(34, 197, 94, 0.3); }
+.arrival-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(34, 197, 94, 0.4); }
+
+/* Recalculation Alert */
+#recalcAlert { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(245, 158, 11, 0.95); backdrop-filter: blur(8px); color: #000; font-weight: 800; font-size: 0.95rem; padding: 12px 24px; border-radius: 30px; box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4); z-index: 1500; display: none; align-items: center; gap: 10px; animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid rgba(255,255,255,0.2); }
+@keyframes slideDown { from { transform: translate(-50%, -100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+/* =========================================================================
+   RESPONSIVE LAYOUT OVERHAUL (ULTRA COMPACT COLLAPSIBLE)
+   ========================================================================= */
+
+/* Desktop (>1200px) */
+@media (min-width: 1200px) {
+  .nav-top-left { width: 380px; }
+}
+
+/* Laptop (992px - 1199px) */
+@media (max-width: 1199px) and (min-width: 992px) {
+  .nav-top-left { width: 360px; }
+}
+
+/* Tablet (768px - 991px) */
+@media (max-width: 991px) and (min-width: 768px) {
+  .nav-top-left { 
+    width: 340px; 
+    top: 15px; 
+    left: 15px; 
+    padding: 12px; 
+    height: auto !important; 
+    max-height: none !important; 
+    overflow: visible !important; 
+    display: flex !important; 
+  }
+  
+  .nav-top-left div[style*="display:flex"] { flex-direction: column !important; gap: 8px !important; display: flex !important; }
+  .nav-top-left div[style*="display: flex; justify-content: space-between"] { flex-direction: row !important; display: flex !important; }
+  .nav-top-left #routeActions { flex-direction: column !important; width: 100%; gap: 8px; display: flex !important; }
+  .nav-top-left .route-btn, .nav-top-left .btn { width: 100%; min-height: 44px; display: flex !important; }
+
+  .nav-bottom-center { width: 85%; left: 50%; transform: translateX(-50%); bottom: 15px; padding: 12px; }
+  .nav-top-right { right: 15px; top: 15px; }
+  .nav-bottom-right { right: 15px; bottom: 180px; }
+  
+  .nav-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px; }
+  
+  body:has(.nav-fullscreen-wrap) .sidebar { z-index: 10005 !important; }
+  body:has(.nav-fullscreen-wrap) .sidebar-overlay { z-index: 10004 !important; }
+  .floating-panel { z-index: 1000 !important; }
+}
+
+/* Mobile (480px - 767px) & Small Mobile (320px - 479px) Base */
+@media (max-width: 767px) {
+  /* Sidebar Overlay */
+  body:has(.nav-fullscreen-wrap) .sidebar {
+     position: fixed !important; left: -320px !important; top: 0; bottom: 0; 
+     z-index: 10005 !important; transition: left 0.3s ease; 
+     width: 85%; max-width: 320px; height: 100vh; overflow-y: auto;
+  }
+  body:has(.nav-fullscreen-wrap) .sidebar.open { left: 0 !important; }
+  body:has(.nav-fullscreen-wrap) .sidebar-overlay { z-index: 10004 !important; }
+  body:has(.nav-fullscreen-wrap) .sidebar-overlay.show { display: block; opacity: 1; pointer-events: auto; }
+  body:has(.nav-fullscreen-wrap) .main-content { margin-left: 0 !important; width: 100% !important; padding: 0 !important; }
+  
+  /* Topbar transparent wrapper */
+  body:has(.nav-fullscreen-wrap) .topbar { 
+    left: 0 !important; width: 100% !important; height: 50px; padding: 0 10px !important; 
+    position: absolute; z-index: 10002; background: transparent; border: none; box-shadow: none; pointer-events: none; 
+  }
+  body:has(.nav-fullscreen-wrap) .topbar * { pointer-events: auto; }
+  body:has(.nav-fullscreen-wrap) .sidebar-toggle { background: rgba(22, 27, 34, 0.95); border-radius: 8px; padding: 8px 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); }
+  body:has(.nav-fullscreen-wrap) .topbar-title { display: none; }
+  body:has(.nav-fullscreen-wrap) .topbar-actions { background: rgba(22, 27, 34, 0.95); border-radius: 8px; padding: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+  
+  /* Map Viewport overrides */
+  body:has(.nav-fullscreen-wrap), html { overflow: hidden !important; height: 100vh; width: 100vw; position: fixed; }
+  .nav-fullscreen-wrap { width: 100vw; height: 100vh; margin: 0; position: absolute; top: 0; left: 0; z-index: 1; overflow: hidden; }
+  .floating-panel { z-index: 1000 !important; }
+
+  /* =======================================
+     SET LOCATIONS CARD - ULTRA COMPACT
+     ======================================= */
+  .nav-top-left { 
+    top: 60px; 
+    left: 10px !important; 
+    right: auto !important;
+    width: min(300px, calc(100vw - 20px)) !important; 
+    transform: none !important;
+    
+    height: auto !important;
+    max-height: 70vh !important; 
+    overflow-y: auto !important; 
+    overflow-x: hidden !important;
+    
+    border-radius: 14px; 
+    padding: 10px !important; 
+    display: flex !important;
+    gap: 6px !important;
+    
+    transition: max-height 0.3s ease;
+  }
+  
+  /* Default Mobile State is Collapsed */
+  .nav-top-left:not(.expanded) { 
+    max-height: 38px !important;
+    overflow: hidden !important; 
+    cursor: pointer; 
+  }
+
+  .nav-top-left:not(.expanded) h3::after { 
+    content: '▼'; 
+    float: right; 
+    font-size: 12px; 
+    margin-top: 2px;
+  }
+  .nav-top-left.expanded h3::after { 
+    content: '▲'; 
+    float: right; 
+    font-size: 12px; 
+    margin-top: 2px;
+  }
+  
+  /* Header resizing */
+  .nav-top-left .nav-card-header {
+      margin-bottom: 4px !important;
+      height: 30px !important;
+      width: 100%;
+      cursor: pointer;
+  }
+  .nav-top-left h3 {
+      font-size: 0.9rem !important;
+      margin: 0 !important;
+      width: 100%;
+  }
+  .nav-top-left h3 i { font-size: 14px !important; }
+  
+  /* Prevent .btn-gps from showing when collapsed to keep header height tight */
+  .nav-top-left:not(.expanded) .btn-gps {
+      display: none !important;
+  }
+  
+  /* Inputs resizing */
+  .nav-top-left .location-input-wrap {
+      margin-bottom: 6px !important;
+      gap: 6px !important;
+      display: flex !important; 
+      width: 100%;
+  }
+  .nav-top-left .location-input-wrap input { 
+      width: 100%;
+      height: 38px !important;
+      font-size: 0.85rem !important;
+      padding: 6px 24px 6px 10px !important;
+      border-radius: 8px !important;
+  }
+  .nav-top-left .location-dot { width: 8px !important; height: 8px !important; flex-shrink: 0; }
+  
+  /* Stack Action Buttons vertically */
+  .nav-top-left div[style*="display:flex"] { flex-direction: column !important; gap: 6px !important; display: flex !important; }
+  .nav-top-left div[style*="display: flex; justify-content: space-between"] { flex-direction: row !important; display: flex !important; } 
+  .nav-top-left #routeActions { flex-direction: column !important; width: 100%; gap: 6px; display: flex !important; }
+  
+  /* Ultra-compact Button properties */
+  .nav-top-left .route-btn, .nav-top-left .btn, .nav-top-left .btn-gps { 
+      width: 100%; 
+      min-height: 40px !important; 
+      height: 40px !important;
+      display: flex !important; 
+      align-items: center !important;
+      justify-content: center !important;
+      font-size: 0.85rem !important;
+      padding: 0 10px !important;
+      border-radius: 8px !important;
+  }
+  .nav-top-left .route-btn i, .nav-top-left .btn i, .nav-top-left .btn-gps i {
+      font-size: 16px !important;
+  }
+
+  /* Miscellaneous top right */
+  .nav-top-right { right: 10px; top: 10px; position: absolute; z-index: 10001; }
+  .filter-btn { padding: 6px 10px; font-size: 0.75rem; }
+  
+  /* =======================================
+     BOTTOM NAVIGATION CARD
+     ======================================= */
+  .nav-bottom-center { 
+     bottom: 10px; left: 50%; transform: translateX(-50%); 
+     width: min(400px, calc(100vw - 20px)); 
+     height: auto; 
+     max-height: 110px !important; 
+     padding: 8px !important; 
+     border-radius: 14px; 
+  }
+  /* 2x2 grid */
+  .nav-stats-grid { 
+     grid-template-columns: repeat(2, 1fr); gap: 4px; margin-bottom: 6px; 
+  }
+  .stat-box { padding: 4px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); }
+  .stat-val { font-size: 1rem; margin-bottom: 0; }
+  .stat-label { font-size: 0.55rem; }
+  
+  .progress-wrap { margin-top: 2px; }
+  .progress-bar-bg { height: 4px; border-radius: 2px; }
+  #navVehicleMarker { font-size: 0.8rem; top: -8px; }
+  .progress-labels { display: none !important; }
+  
+  /* Bottom Right Map Controls */
+  .nav-bottom-right { 
+     bottom: 130px; right: 10px; left: auto; width: auto; 
+     display: flex; flex-direction: column; align-items: flex-end; z-index: 1000;
+  }
+  .map-controls { margin-bottom: 8px; gap: 6px; }
+  .map-ctrl-btn { width: 38px; height: 38px; font-size: 1rem; border-radius: 10px; }
+  
+  /* Hide unnecessary elements */
+  .hazards-sheet-toggle, #upcomingHazardsList, .legend-panel-wrap { display: none !important; }
+}
+
+/* Small Mobile (<480px) */
+@media (max-width: 479px) {
+  .nav-bottom-center { width: calc(100vw - 16px); padding: 6px !important; }
+  .stat-box { display: flex; align-items: center; justify-content: space-between; padding: 4px; text-align: left; }
+  .stat-val { font-size: 0.95rem; }
+  .stat-label { font-size: 0.55rem; }
+}
+
 </style>
+
+
+
+
 {% endblock %}
 
 {% block content %}
-<div class="nav-layout">
+<div class="nav-fullscreen-wrap">
 
-  <!-- ── LEFT PANEL ─────────────────────────────────────────────────────── -->
-  <div class="nav-panel">
+  <!-- ── MAP ──────────────────────────────────────────────────────────────── -->
+  <div id="navMap"></div>
 
+  <!-- ── Recalculation Alert ──────────────────────────────────────────────── -->
+  <div id="recalcAlert">
+    <i class="fa-solid fa-route"></i>
+    <span>Worker deviated from route. Recalculating...</span>
+  </div>
+
+  <!-- ── TOP LEFT PANEL: Controls & AI ────────────────────────────────────── -->
+  <div class="nav-top-left">
     <!-- Location Picker -->
-    <div class="panel-card">
-      <h3><i class="fa-solid fa-location-dot" style="color:var(--accent)"></i> Set Locations</h3>
-
-      <!-- Hint -->
-      <p style="font-size:.75rem;color:var(--muted);margin-bottom:12px">
-        Click the map to place markers, or use the fields below.
-      </p>
-
-      <!-- Start -->
-      <label style="font-size:.75rem;color:var(--muted);font-weight:500">📍 Start Point</label>
-      <div class="location-input-wrap" style="margin-top:5px">
-        <div class="location-dot dot-start"></div>
-        <input id="startInput" class="form-input" placeholder="Click map or enter lat,lon"/>
-        <button class="clear-input-btn" onclick="clearPoint('start')" title="Clear">✕</button>
-      </div>
-
-      <div class="divider-line">via safest road</div>
-
-      <!-- End -->
-      <label style="font-size:.75rem;color:var(--muted);font-weight:500">🏁 Destination</label>
-      <div class="location-input-wrap" style="margin-top:5px">
-        <div class="location-dot dot-end"></div>
-        <input id="endInput" class="form-input" placeholder="Click map or enter lat,lon"/>
-        <button class="clear-input-btn" onclick="clearPoint('end')" title="Clear">✕</button>
-      </div>
-
-      <!-- Map click mode toggle -->
-      <div style="display:flex;gap:8px;margin:14px 0 0">
-        <button id="modeStart" class="btn btn-success btn-xs" onclick="setClickMode('start')">
-          <i class="fa-solid fa-crosshairs"></i> Set Start
-        </button>
-        <button id="modeEnd" class="btn btn-danger btn-xs" onclick="setClickMode('end')">
-          <i class="fa-solid fa-crosshairs"></i> Set End
-        </button>
-        <button class="btn btn-secondary btn-xs" onclick="useMyLocation()" title="Use GPS">
+    <div class="floating-panel nav-card" id="locationPanel">
+      <div class="nav-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; ">
+        <h3 style="margin: 0;"><i class="fa-solid fa-location-dot" style="color:var(--accent)"></i> Set Locations</h3>
+        <button class="btn-gps" onclick="useMyLocation()" title="Use GPS">
           <i class="fa-solid fa-location-arrow"></i> My Location
         </button>
       </div>
-    </div>
 
-    <!-- Find Route Button -->
-    <button id="findRouteBtn" class="btn btn-primary btn-full" onclick="findSafeRoute()" style="padding:12px">
-      <i class="fa-solid fa-shield-halved"></i> Find Safe Route
-    </button>
+      <!-- Start -->
+      <div class="location-input-wrap">
+        <div class="location-dot dot-start"></div>
+        <input id="startInput" class="form-input" placeholder="Start (Click map or GPS)"/>
+        <button class="clear-input-btn" onclick="clearPoint('start')" title="Clear">✕</button>
+      </div>
 
-    <!-- Route Status (hidden until route calculated) -->
-    <div class="panel-card" id="routeStatus">
-      <h3><i class="fa-solid fa-chart-simple" style="color:var(--accent)"></i> Route Summary</h3>
-      <div class="status-row">
-        <span class="status-label">Safety Status</span>
-        <span class="status-value" id="safetyBadge">—</span>
+      <!-- End -->
+      <div class="location-input-wrap" style="margin-bottom: 16px;">
+        <div class="location-dot dot-end"></div>
+        <input id="endInput" class="form-input" placeholder="Destination (Click map)"/>
+        <button class="clear-input-btn" onclick="clearPoint('end')" title="Clear">✕</button>
       </div>
-      <div class="status-row">
-        <span class="status-label">Potholes on Route</span>
-        <span class="status-value" id="potholesOnPath">—</span>
-      </div>
-      <div class="status-row">
-        <span class="status-label">Risk Score</span>
-        <span class="status-value" id="riskValue">0%</span>
-      </div>
-      <div class="status-row">
-        <span class="status-label">Danger Zones Avoided</span>
-        <span class="status-value" id="avoidedCount">—</span>
-      </div>
-      <div id="routeWarningBox" style="display:none;margin-top:12px;padding:10px 12px;border-radius:8px;font-size:.8rem"></div>
-    </div>
 
-    <!-- Legend -->
-    <div class="panel-card">
-      <h3><i class="fa-solid fa-circle-info" style="color:var(--muted)"></i> Map Legend</h3>
-      <div class="legend-row"><div class="legend-dot" style="background:var(--danger)"></div> High Severity Pothole</div>
-      <div class="legend-row"><div class="legend-dot" style="background:var(--warning)"></div> Medium Severity Pothole</div>
-      <div class="legend-row"><div class="legend-dot" style="background:var(--success)"></div> Low Severity Pothole</div>
-      
-      <div class="legend-row" style="margin-top:10px"><div class="legend-line" style="background:var(--success)"></div> Safe Route (No potholes)</div>
-      <div class="legend-row"><div class="legend-line" style="background:var(--warning)"></div> Moderate Route (Small risks)</div>
-      <div class="legend-row"><div class="legend-line" style="background:var(--danger)"></div> Unsafe Route (High risks)</div>
-      
-      <div class="legend-row" style="margin-top:12px;color:var(--muted);font-size:.72rem">
-        <i class="fa-solid fa-rotate" style="margin-right:4px"></i>
-        Pothole data refreshes every 12 seconds
+      <div style="display:flex;gap:8px;margin-bottom: 16px;">
+        <button id="modeStart" class="btn btn-success btn-xs" style="flex:1" onclick="setClickMode('start')">
+          <i class="fa-solid fa-crosshairs"></i> Set Start
+        </button>
+        <button id="modeEnd" class="btn btn-danger btn-xs" style="flex:1" onclick="setClickMode('end')">
+          <i class="fa-solid fa-crosshairs"></i> Set End
+        </button>
+      </div>
+
+      <div id="routeActions" style="display:flex; gap:8px;">
+        <button id="findRouteBtn" class="route-btn" onclick="findSafeRoute()" style="flex:1;">
+          <i class="fa-solid fa-shield-halved"></i> Start Navigation
+        </button>
+        <button id="recalcRouteBtn" class="route-btn" onclick="findSafeRoute()" style="flex:1; display:none; background:#f59e0b;">
+          <i class="fa-solid fa-rotate-right"></i> Recalculate
+        </button>
+        <button id="clearRouteBtn" class="route-btn" onclick="stopNavigation()" style="flex:1; display:none; background:#ef4444;">
+          <i class="fa-solid fa-trash"></i> Clear
+        </button>
       </div>
     </div>
 
-  </div><!-- /left panel -->
 
-  <!-- ── MAP ──────────────────────────────────────────────────────────────── -->
-  <div style="position:relative">
-    <div id="navMap"></div>
-    <div id="routeBanner"></div>
+  </div>
+
+  <!-- ── TOP RIGHT PANEL: Filter ──────────────────────────────────────────── -->
+  <div class="nav-top-right">
+    <div style="position: relative;">
+      <button class="filter-btn" onclick="toggleHazardFilter()" id="filterBtnToggle">
+        <i class="fa-solid fa-filter"></i> Filter Hazards
+      </button>
+      <div class="filter-dropdown" id="hazardFilterDropdown">
+        <div class="filter-option active" onclick="setHazardFilter('all')">Show All</div>
+        <div class="filter-option" onclick="setHazardFilter('high')">🔴 Only High Risk</div>
+        <div class="filter-option" onclick="setHazardFilter('medium')">🟠 Only Medium Risk</div>
+        <div class="filter-option" onclick="setHazardFilter('low')">🟡 Only Low Risk</div>
+        <div class="filter-option" onclick="setHazardFilter('destination')">🎯 Only Assigned Destination</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── BOTTOM CENTER PANEL: Active Navigation Stats ─────────────────────── -->
+  <div class="floating-panel nav-card nav-bottom-center" id="navActiveCard">
+    <div class="nav-stats-grid">
+      <div class="stat-box">
+        <div class="stat-label">ETA</div>
+        <div class="stat-val"><span id="statEtaTime">--</span> <span>min</span></div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Arrival</div>
+        <div class="stat-val" id="statArrivalTime" style="font-size: 1.2rem;">--:--</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Distance Left</div>
+        <div class="stat-val"><span id="statDistLeft">--</span> <span>km</span></div>
+      </div>
+      <!-- Current speed removed -->
+      <div class="stat-box">
+        <div class="stat-label">Safety Score</div>
+        <div class="stat-val" style="color: #22c55e;"><span id="statSafety" style="color: inherit;">100</span></div>
+      </div>
+    </div>
+
+    <div class="progress-wrap" style="position: relative; margin-top: 24px;">
+      <div class="progress-bar-bg" id="navProgressBg" style="height: 12px; border-radius: 6px; background: #334155; position: relative;">
+        <!-- Vehicle Marker -->
+        <div id="navVehicleMarker" style="position: absolute; top: -14px; left: 0%; transform: translateX(-50%); font-size: 1.5rem; transition: left 0.3s ease; text-shadow: 0 2px 5px rgba(0,0,0,0.5); z-index: 10;">
+          🚗
+        </div>
+      </div>
+      <div class="progress-labels" style="display: flex; justify-content: space-between; margin-top: 16px; font-size: 1rem; font-weight: 700;">
+        <div style="text-align:left; flex:1; color: #94a3b8;"><div style="font-size: 0.7rem; font-weight:600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Travelled Distance</div><span id="navProgressTravelled" style="color:#fff;">0 km</span></div>
+        <div style="text-align:center; flex:1; color: #3b82f6;"><div style="font-size: 0.7rem; font-weight:600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Current Progress</div><span id="navProgressPct" style="color:#fff;">0%</span></div>
+        <div style="text-align:right; flex:1; color: #94a3b8;"><div style="font-size: 0.7rem; font-weight:600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Remaining Distance</div><span id="navProgressRemaining" style="color:#fff;">0 km</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── BOTTOM RIGHT PANEL: Controls & Legend ────────────────────────────── -->
+    <div class="nav-bottom-right">
+
+        <div class="legend-panel-wrap" style="position:relative; pointer-events:auto;">
+      <div class="legend-fab" id="legendFab" onclick="toggleLegend()" style="display:none;"><i class="fa-solid fa-list-ul"></i></div>
+      <div class="floating-panel legend-panel" id="legendPanel">
+
+      <div class="legend-item"><div class="leg-line" style="background: #22c55e;"></div> 🟢 Safe Road</div>
+      <div class="legend-item"><div class="leg-line" style="background: #eab308;"></div> 🟡 Medium Risk</div>
+      <div class="legend-item"><div class="leg-line" style="background: #ef4444;"></div> 🔴 High Risk</div>
+      <div class="legend-item"><div class="leg-color" style="background: #3b82f6;"></div> 🚶 Worker</div>
+      <div class="legend-item"><i class="fa-solid fa-bullseye" style="color: #ef4444;"></i> 🎯 Destination</div>
+    </div>
+
+    </div>
+        <!-- Upcoming Hazards List -->
+    <div style="pointer-events:auto;">
+      <button class="hazards-sheet-toggle" id="hazardsSheetToggle" onclick="toggleHazardsSheet()" style="display:none;">
+        <i class="fa-solid fa-triangle-exclamation"></i> Upcoming Hazards
+      </button>
+    </div>
+    <div id="upcomingHazardsList"></div>
+    
+    <div class="map-controls">
+      <button class="map-ctrl-btn" onclick="recenterMap()" title="Recenter"><i class="fa-solid fa-crosshairs"></i></button>
+      <button class="map-ctrl-btn" onclick="zoomInMap()" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
+      <button class="map-ctrl-btn" onclick="zoomOutMap()" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
+      <button class="map-ctrl-btn" onclick="toggleFullScreen()" title="Full Screen"><i class="fa-solid fa-expand"></i></button>
+    </div>
+
+  </div>
+
   </div>
 
 </div>
 
-<!-- Reports Viewer Modal -->
+<!-- ── Arrival Overlay ──────────────────────────────────────────────────── -->
+<div id="arrivalOverlay">
+  <div class="arrival-card">
+    <i class="fa-solid fa-flag-checkered arrival-icon"></i>
+    <div class="arrival-title">Destination Reached</div>
+    <div class="arrival-desc">You have successfully navigated to the target site.</div>
+    <button class="arrival-btn" onclick="markAsReached()">Mark As Reached Site</button>
+  </div>
+</div>
+
+<!-- Reports Viewer Modal (Preserved) -->
 <div id="reportsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:10000; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(6px)" onclick="if(event.target===this)closeReportsModal()">
   <div class="reports-modal-inner">
     <div class="reports-modal-header">
@@ -383,8 +683,110 @@
     </div>
   </div>
 </div>
+
+
+
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/leaflet-geometryutil@0.10.2/src/leaflet.geometryutil.min.js"></script>
 <script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
+<script>
+  function toggleHazardFilter() {
+    document.getElementById('hazardFilterDropdown').classList.toggle('show');
+  }
+</script>
+
+
+
+<script>
+  // Mobile UI Interaction Hooks
+  function checkMobileLayout() {
+    const isMobile = window.innerWidth < 768;
+    const legendFab = document.getElementById('legendFab');
+    const legendPanel = document.getElementById('legendPanel');
+    const hazardsToggle = document.getElementById('hazardsSheetToggle');
+    const hazardsList = document.getElementById('upcomingHazardsList');
+    
+    if(isMobile) {
+      if(legendFab) legendFab.style.display = 'flex';
+      if(legendPanel) legendPanel.classList.remove('show');
+      if(hazardsToggle) hazardsToggle.style.display = 'flex';
+      if(hazardsList) hazardsList.classList.remove('expanded');
+    } else {
+      if(legendFab) legendFab.style.display = 'none';
+      if(legendPanel) {
+        legendPanel.style.display = 'block';
+        legendPanel.classList.add('show');
+      }
+      if(hazardsToggle) hazardsToggle.style.display = 'none';
+      if(hazardsList) {
+        hazardsList.style.display = 'block';
+        hazardsList.classList.add('expanded');
+      }
+    }
+  }
+
+  function toggleLegend() {
+    const p = document.getElementById('legendPanel');
+    if(p) p.classList.toggle('show');
+  }
+
+  function toggleHazardsSheet() {
+    const l = document.getElementById('upcomingHazardsList');
+    if(l) {
+      l.classList.toggle('expanded');
+      setTimeout(() => { if(typeof map !== 'undefined') map.invalidateSize(); }, 350);
+    }
+  }
+
+  // Handle Sidebar Open from topbar
+  document.addEventListener('DOMContentLoaded', () => {
+    const toggleBtn = document.getElementById('sidebarToggle');
+    const overlay = document.getElementById('sidebarOverlay');
+    if(toggleBtn) {
+      toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelector('.sidebar').classList.add('open');
+        if(overlay) overlay.classList.add('show');
+        setTimeout(() => { if(typeof map !== 'undefined') map.invalidateSize(); }, 350);
+      });
+    }
+    if(overlay) {
+      overlay.addEventListener('click', () => {
+        document.querySelector('.sidebar').classList.remove('open');
+        overlay.classList.remove('show');
+        setTimeout(() => { if(typeof map !== 'undefined') map.invalidateSize(); }, 350);
+      });
+    }
+  });
+
+  window.addEventListener('resize', checkMobileLayout);
+  document.addEventListener('DOMContentLoaded', checkMobileLayout);
+
+  // Set Location Auto-Collapse Logic
+  document.addEventListener('DOMContentLoaded', () => {
+    const topCard = document.querySelector('.nav-top-left');
+    if(topCard) {
+      topCard.addEventListener('click', (e) => {
+        // Expand if it's currently collapsed and we are on mobile
+        if(window.innerWidth < 768 && !topCard.classList.contains('expanded')) {
+          topCard.classList.add('expanded');
+        }
+      });
+      
+      // We can also collapse it if they click outside or submit a route, but for now just let it toggle
+      const header = topCard.querySelector('.nav-card-header');
+      if(header) {
+        header.addEventListener('click', (e) => {
+           if(window.innerWidth < 768 && topCard.classList.contains('expanded')) {
+               e.stopPropagation();
+               topCard.classList.remove('expanded');
+           }
+        });
+      }
+    }
+  });
+
+</script>
 {% endblock %}

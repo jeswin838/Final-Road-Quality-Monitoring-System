@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Work History — Worker{% endblock %}
+{% block page_title %}Work History{% endblock %}
+
+{% block content %}
+<div class="wk-dash-grid wk-animate-fade-in-up">
+  <div class="wk-stat-card">
+    <i class="fa-solid fa-calendar-check bg-icon"></i>
+    <div class="wk-stat-label">Completed This Month</div>
+    <div class="wk-stat-val">42</div>
+    <div class="wk-stat-trend"><i class="fa-solid fa-arrow-trend-up"></i> +12% from last month</div>
+  </div>
+  <div class="wk-stat-card">
+    <i class="fa-solid fa-thumbs-up bg-icon"></i>
+    <div class="wk-stat-label">Verification Rate</div>
+    <div class="wk-stat-val">96%</div>
+    <div class="wk-stat-trend"><i class="fa-solid fa-check"></i> Excellent Quality</div>
+  </div>
+  <div class="wk-stat-card">
+    <i class="fa-solid fa-hourglass-end bg-icon"></i>
+    <div class="wk-stat-label">Avg Repair Time</div>
+    <div class="wk-stat-val">38<span style="font-size:1rem;">m</span></div>
+    <div class="wk-stat-trend"><i class="fa-solid fa-arrow-trend-down"></i> Faster than average</div>
+  </div>
+</div>
+
+<div class="wk-card worker-glass wk-animate-slide-up delay-100">
+  <div class="wk-card-header">
+    <div class="wk-card-title">
+      <div class="wk-card-icon"><i class="fa-solid fa-table-list"></i></div>
+      Recent Jobs Log
+    </div>
+    <div class="wk-flex-end wk-gap-4">
+      <div class="wk-input-group">
+        <i class="fa-solid fa-search"></i>
+        <input type="text" class="wk-input" placeholder="Search ID or Location" style="padding: 8px 12px 8px 36px;">
+      </div>
+      <button class="wk-btn wk-btn-outline" style="padding: 8px 16px;"><i class="fa-solid fa-download"></i> Export</button>
+    </div>
+  </div>
+  
+  <div class="wk-table-container">
+    <table class="wk-table">
+      <thead>
+        <tr>
+          <th>Job ID</th>
+          <th>Location</th>
+          <th>Completed Date</th>
+          <th>Duration</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="historyTableBody">
+        <tr>
+          <td colspan="6" style="text-align:center; padding:32px;">
+            <i class="fa-solid fa-spinner fa-spin"></i> Loading history...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  async function fetchHistory() {
+    try {
+      const res = await fetch('/api/worker/history');
+      let data = await res.json();
+      if (data && data.success !== undefined) data = data.data;
+      
+      const tbody = document.getElementById('historyTableBody');
+      if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:32px;">No verified or completed jobs found.</td></tr>`;
+        return;
+      }
+      
+      let html = '';
+      data.forEach(job => {
+        let h = job.hazard || {};
+        let statusBadge = '';
+        if (job.status === 'Verified' || job.status === 'Completed') {
+          statusBadge = `<span class="wk-badge wk-badge-status-completed">Completed</span>`;
+        } else if (job.status === 'Rejected' || job.status === 'Needs Rework') {
+          statusBadge = `<span class="wk-badge wk-badge-priority-high" style="background:rgba(239, 68, 68, 0.15); color:#fca5a5;">Rejected / Needs Rework</span>`;
+        } else {
+          statusBadge = `<span class="wk-badge wk-badge-priority-medium" style="background:rgba(245, 158, 11, 0.15); color:#fcd34d;">Pending Admin Verification</span>`;
+        }
+        
+        // Compute duration
+        let durationStr = "Unknown";
+        if (job.repair_started_at && job.repair_completed_at) {
+            let start = new Date(job.repair_started_at);
+            let end = new Date(job.repair_completed_at);
+            let diffMins = Math.round((end - start) / 60000);
+            durationStr = diffMins > 0 ? `${diffMins} mins` : "< 1 min";
+        }
+        
+        let completedDate = job.repair_completed_at ? new Date(job.repair_completed_at).toLocaleString() : 'N/A';
+        
+        let loc = `${h.latitude || 'Unknown'}, ${h.longitude || 'Unknown'}`;
+        if(h.severity) loc = `Lat: ${h.latitude} Lon: ${h.longitude}`; // fallback since we don't have exact geocoding address logic yet
+        
+        html += `
+        <tr>
+          <td style="font-family:monospace; font-weight:600;">JOB-${job.pothole_id || job.hazard_id}</td>
+          <td style="font-size:0.85rem;">${loc}</td>
+          <td>${completedDate}</td>
+          <td>${durationStr}</td>
+          <td>${statusBadge}</td>
+          <td>
+            ${(job.status === 'Rejected' || job.status === 'Needs Rework') ? 
+                `<button class="wk-btn wk-btn-outline" style="padding: 4px 12px; font-size:0.75rem; border-color:#fca5a5; color:#fca5a5;" onclick="window.showInfo('Admin Notes', '${job.admin_notes || 'No reason provided'}')">View Notes</button>` 
+                : `<button class="wk-btn wk-btn-outline" style="padding: 4px 12px; font-size:0.75rem;">View Notes</button>`
+            }
+          </td>
+        </tr>
+        `;
+      });
+      
+      tbody.innerHTML = html;
+      
+    } catch(e) {
+      console.error(e);
+      document.getElementById('historyTableBody').innerHTML = `<tr><td colspan="6" style="text-align:center; padding:32px;">Error loading history.</td></tr>`;
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    fetchHistory();
+    setInterval(fetchHistory, 5000);
+  });
+</script>
+{% endblock %}

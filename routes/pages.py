@@ -20,6 +20,8 @@ def get_settings():
 
 
 @pages_bp.route("/")
+@pages_bp.route("/dashboard")
+@pages_bp.route("/home")
 def dashboard():
     if "user_id" not in session: return redirect(url_for("pages.login"))
     settings = get_settings()
@@ -45,6 +47,13 @@ def maintenance():
     if "user_id" not in session: return redirect(url_for("pages.login"))
     if session.get("role") != "admin": return redirect(url_for("pages.dashboard"))
     return render_template("maintenance.html", page="maintenance")
+
+
+@pages_bp.route("/worker-verification")
+def admin_verification():
+    if "user_id" not in session: return redirect(url_for("pages.login"))
+    if session.get("role") != "admin": return redirect(url_for("pages.dashboard"))
+    return render_template("admin_verification.html", page="admin_verification")
 
 
 @pages_bp.route("/image-logs")
@@ -90,3 +99,51 @@ def user_reports():
 def login():
     if "user_id" in session: return redirect(url_for("pages.dashboard"))
     return render_template("login.html", page="login")
+
+@pages_bp.route("/worker/dashboard")
+def worker_dashboard():
+    if "user_id" not in session: return redirect(url_for("pages.login"))
+    if session.get("role") != "worker": return redirect(url_for("pages.dashboard"))
+    return render_template("worker_dashboard.html", page="worker_dashboard")
+
+@pages_bp.route("/worker/profile")
+def worker_profile():
+    if "user_id" not in session: return redirect(url_for("pages.login"))
+    if session.get("role") != "worker": return redirect(url_for("pages.dashboard"))
+    return render_template("worker_profile.html", page="worker_profile")
+
+@pages_bp.route("/worker/available-jobs")
+def worker_available_jobs():
+    if "user_id" not in session: return redirect(url_for("pages.login"))
+    if session.get("role") != "worker": return redirect(url_for("pages.dashboard"))
+    return render_template("worker_available_jobs.html", page="worker_available_jobs")
+
+@pages_bp.route("/worker/active-job")
+def worker_active_job():
+    if "user_id" not in session: return redirect(url_for("pages.login"))
+    if session.get("role") != "worker": return redirect(url_for("pages.dashboard"))
+    return render_template("worker_active_job.html", page="worker_active_job")
+
+@pages_bp.route("/worker/history")
+def worker_history():
+    if "user_id" not in session: return redirect(url_for("pages.login"))
+    if session.get("role") != "worker": return redirect(url_for("pages.dashboard"))
+    return render_template("worker_history.html", page="worker_history")
+
+@pages_bp.route("/worker/upload")
+def worker_upload():
+    if "user_id" not in session: return redirect(url_for("pages.login"))
+    if session.get("role") != "worker": return redirect(url_for("pages.dashboard"))
+    return render_template("worker_upload.html", page="worker_upload")
+
+@pages_bp.route("/worker/notifications")
+def worker_notifications():
+    if "user_id" not in session: return redirect(url_for("pages.login"))
+    if session.get("role") != "worker": return redirect(url_for("pages.dashboard"))
+    return render_template("worker_notifications.html", page="worker_notifications")
+
+@pages_bp.route("/admin/workers")
+def admin_workers():
+    if "user_id" not in session or session.get("role") != "admin":
+        return redirect(url_for("pages.dashboard"))
+    return render_template("admin_workers.html", page="admin_workers")

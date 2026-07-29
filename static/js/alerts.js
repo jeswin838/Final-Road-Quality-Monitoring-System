@@ -38,13 +38,16 @@ function renderAlertPanel(alerts) {
   const countEl = document.getElementById('alertCount');
   if (!panel) return;
 
-  panel.innerHTML = '';
   // Sort by last_reported_at desc
   const sorted = [...alerts].sort((a,b) => new Date(b.last_reported_at) - new Date(a.last_reported_at));
   
   const recent = sorted.slice(0, 15);
+  
+  const existingCards = Array.from(panel.children);
+  const existingMap = new Map(existingCards.map(el => [el.id, el]));
+  const newOrder = [];
+
   recent.forEach(r => {
-    const div = document.createElement('div');
     const stat = (r.status || '').toLowerCase();
     let sevDisplay = '';
     let sevColor = '';
@@ -57,14 +60,14 @@ function renderAlertPanel(alerts) {
         sevColor = sev === 'critical' ? '#DC2626' : sev === 'high' ? '#ef4444' : sev === 'medium' ? '#f97316' : '#22c55e';
     }
     
-    div.className = `alert-item severity-${sevDisplay.toLowerCase()}`;
-    div.innerHTML = `
+    const cardId = `live-alert-${r.id || r.marker_id}`;
+    const htmlContent = `
       <div class="alert-title" style="display:flex; justify-content:space-between; align-items:center">
         <span><b style="color:${sevColor}">#${r.id || r.marker_id}</b> pothole &bull; ${r.report_count} ${r.report_count === 1 ? 'Report' : 'Reports'}</span>
         <span class="badge" style="background:${sevColor}22; color:${sevColor}; font-size:0.6rem">${sevDisplay}</span>
       </div>
       <div style="display:flex; gap:10px; margin-top:8px;">
-        <img src="${r.latest_image || r.image || '/static/img/placeholder.jpg'}" style="width:48px;height:48px;border-radius:6px;object-fit:cover;" onerror="this.style.display='none'">
+        <img src="${r.latest_image || r.image || ''}" style="width:48px;height:48px;border-radius:6px;object-fit:cover;" onerror="this.style.display='none'">
         <div class="alert-meta" style="flex:1;">
           <div style="color:var(--text); font-size:0.75rem"><i class="fa-solid fa-clock"></i> Last seen: ${r.last_seen}</div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px">
@@ -73,8 +76,23 @@ function renderAlertPanel(alerts) {
           </div>
         </div>
       </div>`;
-    panel.appendChild(div);
+
+    let div = existingMap.get(cardId);
+    if (div) {
+        if (div.innerHTML !== htmlContent) div.innerHTML = htmlContent;
+        if (div.className !== `alert-item severity-${sevDisplay.toLowerCase()}`) div.className = `alert-item severity-${sevDisplay.toLowerCase()}`;
+        existingMap.delete(cardId);
+    } else {
+        div = document.createElement('div');
+        div.id = cardId;
+        div.className = `alert-item severity-${sevDisplay.toLowerCase()}`;
+        div.innerHTML = htmlContent;
+    }
+    newOrder.push(div);
   });
+
+  existingMap.forEach(el => el.remove());
+  newOrder.forEach(el => panel.appendChild(el));
 
   if (countEl) countEl.textContent = recent.length;
 
@@ -85,7 +103,7 @@ function renderAlertPanel(alerts) {
     const critical = alerts.filter(r => ["critical", "high"].includes((r.severity || '').toLowerCase()) && (r.report_count || 0) > 3);
     if (critical.length > 0) {
       emergencyPanel.style.display = 'block';
-      emergencyList.innerHTML = critical.map(r => `
+      const eHtml = critical.map(r => `
         <div style="padding:12px; background:rgba(239,68,68,0.12); border-radius:14px; border:1px solid rgba(239,68,68,0.2); display:flex; flex-direction:column; gap:4px; transition: all 0.2s">
             <div style="display:flex; justify-content:space-between; align-items:center">
                 <b style="color:#ef4444; font-size:0.85rem">🚨 Hazard #${r.id}</b>
@@ -99,6 +117,7 @@ function renderAlertPanel(alerts) {
             </div>
         </div>
       `).join('');
+      if (emergencyList.innerHTML !== eHtml) emergencyList.innerHTML = eHtml;
     } else {
       emergencyPanel.style.display = 'none';
     }
@@ -129,7 +148,7 @@ function detectNew(potholes) {
     const badge = document.getElementById('notifBadge');
     if (badge) {
       badge.style.display = 'flex';
-      badge.textContent   = notifBadge;
+      badge.textContent   = notifBadge > 99 ? '99+' : notifBadge;
     }
   });
 }
@@ -140,33 +159,54 @@ if ('Notification' in window && Notification.permission === 'default') {
 }
 
 // ── Main poll loop ───────────────────────────────────────────────────────────
+let alertsAbortController = null;
 async function pollAlerts(data = null) {
   try {
-    const alerts = data || await (await fetch('/api/alerts')).json();
+    let alerts = data;
+    if (!alerts) {
+      if (alertsAbortController) alertsAbortController.abort();
+      alertsAbortController = new AbortController();
+      const res = await fetch('/api/alerts', { signal: alertsAbortController.signal });
+      alerts = await res.json();
+    }
     detectNew(alerts);
     renderAlertPanel(alerts);
     updateDashboardUserReports();
   } catch (err) {
-    console.warn("Poll alerts error", err);
+    if (err.name !== 'AbortError') console.warn("Poll alerts error", err);
   }
 }
 
 // ── User Reports Dashboard Panel ──────────────────────────────────────────
+let userReportsAbortController = null;
 async function updateDashboardUserReports() {
   const panel = document.getElementById('dashboardUserReports');
   if (!panel) return;
 
   try {
-    const res = await fetch('/api/user-reports?status=pending');
+    if (userReportsAbortController) userReportsAbortController.abort();
+    userReportsAbortController = new AbortController();
+    const res = await fetch('/api/user-reports?status=pending', { signal: userReportsAbortController.signal });
     const reports = await res.json();
 
     if (reports.length === 0) {
-      panel.innerHTML = '<div style="text-align:center; padding:20px; color:var(--muted); font-size:0.8rem">No pending user reports.</div>';
+      const emptyHtml = '<div style="text-align:center; padding:20px; color:var(--muted); font-size:0.8rem">No pending user reports.</div>';
+      if (panel.innerHTML !== emptyHtml) panel.innerHTML = emptyHtml;
       return;
     }
 
-    panel.innerHTML = reports.slice(0, 10).map(r => `
-      <div class="alert-item" style="border-left: 4px solid #3b82f6; background: rgba(59, 130, 246, 0.05); padding: 10px; border-radius: 8px; margin-bottom: 8px;">
+    const existingCards = Array.from(panel.children);
+    if (existingCards.length === 1 && existingCards[0].textContent.includes('No pending')) {
+      panel.innerHTML = '';
+      existingCards.length = 0;
+    }
+    
+    const existingMap = new Map(existingCards.map((el, idx) => [el.id || `ur-${idx}`, el]));
+    const newOrder = [];
+
+    reports.slice(0, 10).forEach(r => {
+      const cardId = `ur-${r.id}`;
+      const htmlContent = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
            <span style="font-size:0.85rem; font-weight:600; color:#3b82f6">User Report</span>
            <span style="font-size:0.7rem; color:var(--muted)">${new Date(r.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
@@ -178,16 +218,32 @@ async function updateDashboardUserReports() {
            <span><i class="fa-solid fa-location-dot"></i> ${parseFloat(r.latitude).toFixed(4)}, ${parseFloat(r.longitude).toFixed(4)}</span>
            <a href="/admin/user-reports" style="color:#3b82f6; text-decoration:none; font-weight:600">Review →</a>
         </div>
-      </div>
-    `).join('');
+      `;
+      
+      let div = existingMap.get(cardId);
+      if (div) {
+        if (div.innerHTML !== htmlContent) div.innerHTML = htmlContent;
+        existingMap.delete(cardId);
+      } else {
+        div = document.createElement('div');
+        div.id = cardId;
+        div.className = "alert-item";
+        div.style.cssText = "border-left: 4px solid #3b82f6; background: rgba(59, 130, 246, 0.05); padding: 10px; border-radius: 8px; margin-bottom: 8px;";
+        div.innerHTML = htmlContent;
+      }
+      newOrder.push(div);
+    });
+    
+    existingMap.forEach(el => el.remove());
+    newOrder.forEach(el => panel.appendChild(el));
 
   } catch (err) {
-    console.warn("Failed to update user reports panel", err);
+    if (err.name !== 'AbortError') console.warn("Failed to update user reports panel", err);
   }
 }
 
-// ── Poll interval (uses MAP_SETTINGS if on dashboard, else 10s) ──────────────
-const pollInterval = (window.MAP_SETTINGS?.refresh || 10) * 1000;
+// ── Poll interval (uses MAP_SETTINGS if on dashboard, else 3s) ──────────────
+const pollInterval = (window.MAP_SETTINGS?.refresh || 3) * 1000;
 
 // Initial load (delayed to prioritise map init)
 setTimeout(() => {

@@ -77,31 +77,20 @@ def filter_by_confidence(records: list, threshold: float = 0.5) -> list:
         if sev is None or str(sev).lower() in ["none", "null", "n/a", ""]:
             continue
             
-        # 2. Reject 0.0 confidence (even if admin approved)
+        status = str(r.get("status") or "").lower()
+        source_report_id = r.get("source_report_id")
+        source = str(r.get("source") or "").lower()
+
+        # Bypass confidence filter if manually approved by admin
+        # Citizen reports are always valid if approved, regardless of AI status
+        if status == "approved" or source_report_id is not None:
+            valid.append(r)
+            continue
+            
+        # 2. Reject 0.0 confidence and values below threshold
         if conf is not None:
             c = float(conf)
-            if c == 0.0:
-                continue
-        else:
-            c = None
-            
-        status = str(r.get("status") or "").lower()
-        ai_status = str(r.get("ai_status") or "").lower()
-        source_report_id = r.get("source_report_id")
-
-        # Bypass confidence filter if manually approved by admin (potholes table)
-        # source_report_id is set to the real user_report id (positive int) when admin approves
-        if source_report_id is not None:
-            valid.append(r)
-            continue
-
-        # Bypass confidence filter if manually approved by admin (user_reports table)
-        if status == "approved" and ai_status in ["pending", "rejected"]:
-            valid.append(r)
-            continue
-            
-        if c is not None:
-            if c < threshold:
+            if c == 0.0 or c < threshold:
                 continue
             
         valid.append(r)
@@ -128,6 +117,24 @@ def majority_severity(severities: list) -> str:
         return "medium"
     # Return the severity with the highest vote count
     return max(counts, key=lambda k: counts[k])
+
+
+def resolve_severity(severities: list) -> str:
+    """
+    Resolve the highest severity level based on weighted priority.
+    Priority order: critical > high > medium > low.
+    Defaults to "unknown" if the list is empty or values are invalid.
+    """
+    priority = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+    highest_priority = 0
+    resolved = "unknown"
+    for s in severities:
+        sev = str(s or "").lower().strip()
+        if sev in priority:
+            if priority[sev] > highest_priority:
+                highest_priority = priority[sev]
+                resolved = sev
+    return resolved
 
 
 def calculate_risk_score(severity, report_count):

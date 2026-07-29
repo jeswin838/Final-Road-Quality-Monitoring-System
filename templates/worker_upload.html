@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block title %}Upload Evidence — Worker{% endblock %}
+{% block page_title %}Upload Evidence{% endblock %}
+
+{% block extra_head %}
+<!-- SweetAlert2 for modern popups -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+{% endblock %}
+
+{% block content %}
+<div class="wk-card worker-glass wk-animate-slide-up">
+  <div class="wk-card-header">
+    <div class="wk-card-title">
+      <div class="wk-card-icon"><i class="fa-solid fa-camera"></i></div>
+      Repair Evidence Documentation
+    </div>
+    <span class="wk-badge wk-badge-status-repairing" id="uploadJobId">Loading...</span>
+  </div>
+  <p class="worker-p wk-mb-6">Please upload clear photos of the hazard before starting work, during the repair process, and the final restored surface. All photos are automatically timestamped and geotagged for verification.</p>
+  
+  <div class="wk-upload-grid">
+    
+    <!-- Before Photo -->
+    <div class="wk-flex-column wk-gap-2" id="beforeBox">
+      <h4 class="worker-h4" style="font-size:1rem;">1. Before Repair</h4>
+      <div class="wk-upload-zone" id="dropBefore" onclick="triggerFile('fileBefore')">
+        <i class="fa-solid fa-cloud-arrow-up wk-upload-icon"></i>
+        <div style="font-weight:600; margin-bottom:4px;">Upload Before Photo</div>
+        <div class="worker-small">Drag & drop or click to browse</div>
+        <input type="file" id="fileBefore" hidden accept="image/*" onchange="handleFile(this, 'previewBefore', 'progBefore')">
+        <div class="wk-upload-preview" id="previewBefore">
+          <div class="wk-upload-overlay">
+            <div class="wk-upload-meta">
+              <div><i class="fa-solid fa-clock"></i> <span class="time-stamp"></span></div>
+              <div><i class="fa-solid fa-location-dot"></i> GPS Extracted</div>
+            </div>
+            <button class="wk-btn wk-btn-outline" style="padding:4px 8px; font-size:0.7rem; border-color:var(--worker-danger); color:var(--worker-danger);" onclick="event.stopPropagation(); removeFile('fileBefore', 'previewBefore', 'progBefore')"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="wk-progress-container wk-mt-2" style="opacity:0;" id="progBeforeCont">
+        <div class="wk-progress-bar" id="progBefore" style="width: 0%;"></div>
+      </div>
+    </div>
+    
+    <!-- During Photo -->
+    <div class="wk-flex-column wk-gap-2" id="duringBox">
+      <h4 class="worker-h4" style="font-size:1rem;">2. During Repair (Optional)</h4>
+      <div class="wk-upload-zone" id="dropDuring" onclick="triggerFile('fileDuring')">
+        <i class="fa-solid fa-cloud-arrow-up wk-upload-icon"></i>
+        <div style="font-weight:600; margin-bottom:4px;">Upload Progress Photo</div>
+        <div class="worker-small">Drag & drop or click to browse</div>
+        <input type="file" id="fileDuring" hidden accept="image/*" onchange="handleFile(this, 'previewDuring', 'progDuring')">
+        <div class="wk-upload-preview" id="previewDuring">
+          <div class="wk-upload-overlay">
+            <div class="wk-upload-meta">
+              <div><i class="fa-solid fa-clock"></i> <span class="time-stamp"></span></div>
+              <div><i class="fa-solid fa-location-dot"></i> GPS Extracted</div>
+            </div>
+            <button class="wk-btn wk-btn-outline" style="padding:4px 8px; font-size:0.7rem; border-color:var(--worker-danger); color:var(--worker-danger);" onclick="event.stopPropagation(); removeFile('fileDuring', 'previewDuring', 'progDuring')"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="wk-progress-container wk-mt-2" style="opacity:0;" id="progDuringCont">
+        <div class="wk-progress-bar" id="progDuring" style="width: 0%;"></div>
+      </div>
+    </div>
+    
+    <!-- After Photo -->
+    <div class="wk-flex-column wk-gap-2" id="afterBox">
+      <h4 class="worker-h4" style="font-size:1rem;">3. After Repair</h4>
+      <div class="wk-upload-zone" id="dropAfter" onclick="triggerFile('fileAfter')">
+        <i class="fa-solid fa-cloud-arrow-up wk-upload-icon"></i>
+        <div style="font-weight:600; margin-bottom:4px;">Upload After Photo</div>
+        <div class="worker-small">Drag & drop or click to browse</div>
+        <input type="file" id="fileAfter" hidden accept="image/*" onchange="handleFile(this, 'previewAfter', 'progAfter')">
+        <div class="wk-upload-preview" id="previewAfter">
+          <div class="wk-upload-overlay">
+            <div class="wk-upload-meta">
+              <div><i class="fa-solid fa-clock"></i> <span class="time-stamp"></span></div>
+              <div><i class="fa-solid fa-location-dot"></i> GPS Extracted</div>
+            </div>
+            <button class="wk-btn wk-btn-outline" style="padding:4px 8px; font-size:0.7rem; border-color:var(--worker-danger); color:var(--worker-danger);" onclick="event.stopPropagation(); removeFile('fileAfter', 'previewAfter', 'progAfter')"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="wk-progress-container wk-mt-2" style="opacity:0;" id="progAfterCont">
+        <div class="wk-progress-bar" id="progAfter" style="width: 0%;"></div>
+      </div>
+    </div>
+    
+  </div>
+  
+  <div class="wk-mt-8 wk-flex-between" style="border-top:1px solid rgba(255,255,255,0.1); padding-top:24px;">
+    <label class="wk-checkbox-container" style="margin-bottom:0; cursor:pointer;" id="certifyBox">
+      <input type="checkbox" id="certifyWork">
+      <span class="wk-checkmark"></span>
+      I certify that this repair was completed according to municipal standards.
+    </label>
+    <div style="flex-grow: 1; text-align: right;">
+        <button class="wk-btn wk-btn-primary" id="btnSubmit"><i class="fa-solid fa-paper-plane"></i> Submit Evidence</button>
+    </div>
+  </div>
+  
+</div>
+
+<script>
+  let activeJobId = null;
+  let currentStatus = null;
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const res = await fetch('/api/worker/active-job');
+      let data = await res.json();
+      if (data && data.success !== undefined) data = data.data;
+      
+      console.log("Worker Active Job Response:", data);
+      
+      if (data && data.hazard_id) {
+        activeJobId = data.hazard_id;
+        currentStatus = data.status;
+        document.getElementById('uploadJobId').textContent = `Active: ${data.display_id || 'JOB-' + activeJobId}`;
+        
+        const h = data.hazard || {};
+        const roadName = h.road_name || "Unknown Road";
+        const image = h.image_url || h.media_url || h.image || "";
+        const imgUrl = (image && !image.startsWith("http") && !image.startsWith("/static")) 
+            ? `https://yhghhawgcbftvnrjpuzs.supabase.co/storage/v1/object/public/pothole-images/${image}` 
+            : image;
+            
+        // Populate additional elements
+        const titleEl = document.querySelector('.wk-card-title');
+        titleEl.innerHTML += `<div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 5px; font-weight: normal;">
+            <i class="fa-solid fa-location-dot"></i> ${roadName} &nbsp;|&nbsp; 
+            <i class="fa-solid fa-bars-progress"></i> ${data.status}
+        </div>`;
+        
+        if(imgUrl) {
+            titleEl.innerHTML += `<div style="margin-top: 10px;"><img src="${imgUrl}" style="height: 60px; border-radius: 6px; object-fit: cover;" alt="Hazard Image"></div>`;
+        }
+        
+        // Hide/Show boxes based on status
+        if(currentStatus === 'Reached Site' || currentStatus === 'Travelling') {
+            document.getElementById('duringBox').style.display = 'none';
+            document.getElementById('afterBox').style.display = 'none';
+            document.getElementById('certifyBox').style.display = 'none';
+            document.getElementById('btnSubmit').innerHTML = `<i class="fa-solid fa-robot"></i> Verify Before Photo`;
+            document.getElementById('btnSubmit').onclick = () => submitBeforePhoto();
+        } else if (currentStatus === 'Repair Completed') {
+            document.getElementById('beforeBox').style.display = 'none';
+            document.getElementById('duringBox').style.display = 'none';
+            document.getElementById('btnSubmit').innerHTML = `<i class="fa-solid fa-paper-plane"></i> Verify After Photo & Complete Job`;
+            document.getElementById('btnSubmit').onclick = () => submitAfterPhoto();
+        } else {
+            await window.showWarning('Not Available', 'Upload evidence is not available at this stage.');
+            window.location.href = '/worker/active-job';
+        }
+        
+      } else {
+        await window.showInfo('No Job', 'No active job found.');
+        window.location.href = '/worker/dashboard';
+      }
+    } catch(e) {
+      console.error(e);
+    }
+  });
+
+  function triggerFile(id) { document.getElementById(id).click(); }
+  
+  function handleFile(input, previewId, progId) {
+    if(input.files && input.files[0]) {
+      const reader = new FileReader();
+      const preview = document.getElementById(previewId);
+      const prog = document.getElementById(progId);
+      const progCont = document.getElementById(progId + 'Cont');
+      
+      progCont.style.opacity = '1';
+      prog.style.width = '0%';
+      
+      let w = 0;
+      const intv = setInterval(() => {
+        w += 20;
+        prog.style.width = w + '%';
+        if(w >= 100) clearInterval(intv);
+      }, 100);
+      
+      reader.onload = function(e) {
+        setTimeout(() => {
+          preview.style.backgroundImage = `url(${e.target.result})`;
+          preview.classList.add('has-image');
+          const timeEls = preview.querySelectorAll('.time-stamp');
+          timeEls.forEach(el => el.textContent = new Date().toLocaleTimeString());
+        }, 500);
+      }
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+  
+  function removeFile(inputId, previewId, progId) {
+    document.getElementById(inputId).value = "";
+    document.getElementById(previewId).classList.remove('has-image');
+    document.getElementById(previewId).style.backgroundImage = 'none';
+    document.getElementById(progId + 'Cont').style.opacity = '0';
+  }
+  
+  async function submitBeforePhoto() {
+    const file = document.getElementById('fileBefore').files[0];
+    if(!file) {
+      await window.showError('Error', 'Please upload a BEFORE photo.');
+      return;
+    }
+    
+    const btn = document.getElementById('btnSubmit');
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Running AI Verification...`;
+    
+    try {
+      const fd = new FormData();
+      fd.append('photo', file);
+      fd.append('type', 'before');
+      
+      const res = await fetch(`/api/worker/jobs/${activeJobId}/upload-photo`, { method: 'POST', body: fd });
+      const data = await res.json();
+      
+      if(res.ok && data.verification && data.verification.verified) {
+          await window.showSuccess('AI Verified', data.verification.message + " (Score: " + data.verification.score + "%)");
+          
+          // No status change here, the Python backend already sets verification_status='Before Photo Verified'
+          window.location.href = '/worker/active-job';
+      } else {
+          await window.showError('AI Verification Failed', data.message || "Please upload a clearer image.");
+          btn.innerHTML = `<i class="fa-solid fa-robot"></i> Verify Before Photo`;
+      }
+    } catch(e) {
+        await window.showError('Error', 'Upload failed.');
+        btn.innerHTML = `<i class="fa-solid fa-robot"></i> Verify Before Photo`;
+    }
+  }
+
+  async function submitAfterPhoto() {
+    if(!document.getElementById('certifyWork').checked) {
+      await window.showWarning('Notice', 'Please certify the work before submitting.');
+      return;
+    }
+    
+    const file = document.getElementById('fileAfter').files[0];
+    if(!file) {
+      await window.showError('Error', 'Please upload an AFTER photo.');
+      return;
+    }
+    
+    const btn = document.getElementById('btnSubmit');
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Running AI Repair Verification...`;
+    
+    try {
+      const fd = new FormData();
+      fd.append('photo', file);
+      fd.append('type', 'after');
+      
+      const res = await fetch(`/api/worker/jobs/${activeJobId}/upload-photo`, { method: 'POST', body: fd });
+      const data = await res.json();
+      
+      if(res.ok && data.verification && data.verification.verified) {
+          await window.showSuccess('AI Verified', data.verification.message + " (Repair Score: " + data.verification.score + "%)");
+          
+          await fetch(`/api/worker/jobs/${activeJobId}/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'Waiting Verification' })
+          });
+          
+          window.location.href = '/worker/history';
+      } else {
+          await window.showError('AI Verification Failed', data.message || "Please upload a clearer image.");
+          btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Verify After Photo & Complete Job`;
+      }
+    } catch(e) {
+        await window.showError('Error', 'Upload failed.');
+        btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Verify After Photo & Complete Job`;
+    }
+  }
+</script>
+{% endblock %}

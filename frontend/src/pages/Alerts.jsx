@@ -1,159 +1,158 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useMemo } from 'react';
 import { useLiveData } from '../context/LiveDataContext';
-import GlassCard from '../components/GlassCard';
-import StatusBadge from '../components/StatusBadge';
-import { 
-  AlertTriangle, 
-  ShieldAlert, 
-  BellRing, 
-  Clock, 
-  MapPin, 
-  ChevronRight,
-  Filter,
-  Activity,
-  Zap,
-  ArrowUpRight,
-  CameraOff
-} from 'lucide-react';
+import AlertToolbar from '../components/alerts/AlertToolbar';
+import AlertList from '../components/alerts/AlertList';
+import HazardDetailPanel from '../components/alerts/HazardDetailPanel';
+import { useNavigate } from 'react-router-dom';
+import { BellRing, ChevronLeft, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Alerts() {
-  const { data, loading: contextLoading } = useLiveData();
+  const { data, loading, forceRefresh } = useLiveData();
   const alerts = data.alerts || [];
-  const loading = contextLoading && alerts.length === 0;
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedHazardId, setSelectedHazardId] = useState(null);
+  
+  const navigate = useNavigate();
+
+  // Sort logic: Emergency -> Critical -> High -> Medium -> Low
+  // Tie-breakers: Priority Score -> Waiting Days -> Report Count -> Created Time
+  const sortedAlerts = useMemo(() => {
+    const priorityWeights = { 'Emergency': 5, 'Critical': 4, 'High': 3, 'Medium': 2, 'Low': 1 };
+    
+    return [...alerts].sort((a, b) => {
+      const pA = priorityWeights[a.priority || 'Medium'] || 2;
+      const pB = priorityWeights[b.priority || 'Medium'] || 2;
+      
+      if (pA !== pB) return pB - pA;
+      
+      const scoreA = a.priority_score || 0;
+      const scoreB = b.priority_score || 0;
+      if (scoreA !== scoreB) return scoreB - scoreA;
+      
+      const waitA = a.waiting_days || 0;
+      const waitB = b.waiting_days || 0;
+      if (waitA !== waitB) return waitB - waitA;
+      
+      const rA = a.report_count || 1;
+      const rB = b.report_count || 1;
+      if (rA !== rB) return rB - rA;
+      
+      const timeA = new Date(a.created_at).getTime() || 0;
+      const timeB = new Date(b.created_at).getTime() || 0;
+      return timeB - timeA;
+    }).filter(a => {
+       if (!searchTerm) return true;
+       const term = searchTerm.toLowerCase();
+       return (
+          (a.road_name || '').toLowerCase().includes(term) ||
+          (a.landmark || '').toLowerCase().includes(term) ||
+          (a.village || '').toLowerCase().includes(term) ||
+          (a.district || '').toLowerCase().includes(term)
+       );
+    });
+  }, [alerts, searchTerm]);
+
+  const selectedHazard = sortedAlerts.find(a => a.id === selectedHazardId) || null;
+
+  const handleAssign = (hazard) => {
+     navigate('/maintenance'); // For now redirect to maintenance, could open modal if existed
+  };
+
+  const handleTrack = (hazard) => {
+     navigate('/maintenance');
+  };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-32">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 border-b border-white/5 pb-8">
-        <div className="flex items-center gap-5">
-          <div className="w-16 h-16 rounded-[24px] bg-danger/15 flex items-center justify-center border-2 border-danger/20 relative shadow-[0_0_30px_rgba(244,63,94,0.2)]">
-            <BellRing className="w-8 h-8 text-danger animate-bounce" />
-            <div className="absolute -top-1 -right-1 w-5 h-5 bg-danger rounded-full border-4 border-background flex items-center justify-center text-[8px] font-black text-white">!</div>
-          </div>
-          <div>
-            <h2 className="text-2xl font-black text-title tracking-tight">Active High-Priority Alerts</h2>
-            <div className="flex items-center gap-3 mt-1">
-              <p className="text-xs text-muted-text font-bold uppercase tracking-widest">Real-Time Threat Intelligence</p>
-              <div className="h-3 w-px bg-white/10" />
-              <div className="flex items-center gap-1.5">
-                 <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                 <span className="text-[10px] font-black text-success uppercase">System Live</span>
-              </div>
-            </div>
-          </div>
+    <div className="flex flex-col h-[calc(100vh-80px)] overflow-hidden p-2 md:p-6 pb-24 md:pb-6 relative">
+      
+      {/* Header section */}
+      <div className="flex items-center gap-4 mb-4 shrink-0">
+        <div className="w-12 h-12 rounded-xl bg-danger/15 flex items-center justify-center border border-danger/20 shadow-[0_0_20px_rgba(244,63,94,0.1)]">
+          <BellRing className="w-6 h-6 text-danger" />
         </div>
-        <div className="flex gap-3 w-full sm:w-auto">
-          <button className="flex-1 sm:flex-none btn btn-secondary px-6">
-            <Filter className="w-4 h-4" />
-            Priority
-          </button>
-          <button className="flex-1 sm:flex-none btn btn-secondary px-6">
-            <Zap className="w-4 h-4" />
-            History
-          </button>
+        <div>
+          <h2 className="text-2xl font-black text-white tracking-tight">Road Operations Center</h2>
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-0.5">Live Alert Decision Board</p>
         </div>
       </div>
 
-      {loading ? (
-        <div className="space-y-6">
-          {[1, 2, 3].map(i => <div key={i} className="h-32 bg-white/5 rounded-[24px] animate-pulse border border-white/5" />)}
+      <AlertToolbar 
+         searchTerm={searchTerm} 
+         setSearchTerm={setSearchTerm} 
+         onRefresh={forceRefresh} 
+      />
+
+      {/* Main Responsive Layout */}
+      {/*
+        Mobile (< 768px): List is full width. When item selected, Detail is full screen over it.
+        Tablet (768px - 1024px): List is full width. When item selected, Detail is Slide-over drawer on the right.
+        Laptop (1024px - 1280px): List is 30% left, Detail is 70% right.
+        Desktop (1280px+): List is 35% left, Detail is 65% right.
+      */}
+      <div className="flex-1 flex gap-6 min-h-0 relative">
+        
+        {/* Left Panel (List) - Hidden on Mobile if an item is selected */}
+        <div className={`
+           w-full 
+           lg:w-[30%] 
+           xl:w-[35%] 
+           flex flex-col min-h-0 bg-black/20 border border-white/5 rounded-2xl p-4 overflow-y-auto custom-scrollbar 
+           ${selectedHazardId ? 'hidden md:flex' : 'flex'}
+        `}>
+           <AlertList 
+              alerts={sortedAlerts} 
+              selectedId={selectedHazardId} 
+              onSelect={(hazard) => setSelectedHazardId(hazard.id)} 
+           />
         </div>
-      ) : (
-        <div className="space-y-6">
-          <AnimatePresence>
-          {alerts.length === 0 ? (
+
+        {/* Desktop / Laptop Right Panel */}
+        <div className="hidden lg:flex lg:w-[70%] xl:w-[65%] min-h-0 relative">
+           <HazardDetailPanel 
+              hazard={selectedHazard} 
+              onAssign={handleAssign}
+              onTrack={handleTrack}
+           />
+        </div>
+
+        {/* Mobile Full Screen OR Tablet Drawer Overlay */}
+        <AnimatePresence>
+          {selectedHazardId && (
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center py-40 bg-white/[0.02] rounded-[32px] border-2 border-dashed border-white/10"
+               initial={{ x: '100%' }}
+               animate={{ x: 0 }}
+               exit={{ x: '100%' }}
+               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+               className="absolute inset-0 z-50 lg:hidden flex justify-end"
             >
-              <ShieldAlert className="w-16 h-16 text-gray-700 mx-auto mb-6" />
-              <h3 className="text-xl font-black text-gray-400 tracking-tight uppercase">Operations Normal</h3>
-              <p className="text-xs text-gray-600 mt-2 font-bold uppercase tracking-widest">No Critical Hazards in Current Sector</p>
-            </motion.div>
-          ) : (
-            alerts.map((alert, idx) => (
-              <motion.div
-                key={alert.id}
-                initial={{ opacity: 0, x: -30 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 30 }}
-                transition={{ delay: idx * 0.1, type: 'spring', damping: 20 }}
-              >
-                <GlassCard className="p-0 overflow-hidden border-l-[8px] border-l-danger hover:bg-white/[0.07] transition-all cursor-pointer group shadow-[0_20px_40px_rgba(0,0,0,0.3)]">
-                  <div className="flex flex-col md:flex-row items-stretch">
-                    {/* Visual Preview */}
-                    <div className="w-full md:w-[240px] shrink-0 p-5">
-                      <div className="relative aspect-[16/10] rounded-2xl overflow-hidden border-2 border-white/10 group-hover:border-danger/40 transition-colors bg-black shadow-inner">
-                        {alert.image ? (
-                          <img src={alert.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Alert" />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center text-gray-700 bg-white/5">
-                            <CameraOff className="w-10 h-10 mb-2 opacity-20" />
-                            <span className="text-[10px] font-black uppercase tracking-widest opacity-40">No Signal</span>
-                          </div>
-                        )}
-                        <div className="absolute top-3 left-3">
-                           <StatusBadge status="approved" className="bg-danger/20 text-danger border-danger/30 font-black text-[9px] px-3" />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Intelligence Payload */}
-                    <div className="flex-1 p-6 flex flex-col min-w-0">
-                      <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
-                        <div className="flex items-center gap-6">
-                           <div className="flex flex-col">
-                             <span className="text-[10px] font-black text-muted-text uppercase tracking-widest mb-1">Threat Class</span>
-                             <h4 className="text-base font-black text-title truncate tracking-tight uppercase">Critical Road Surface Failure</h4>
-                           </div>
-                           <div className="w-px h-10 bg-white/10 hidden sm:block" />
-                           <div className="flex flex-col">
-                             <span className="text-[10px] font-black text-muted-text uppercase tracking-widest mb-1">Impact Radius</span>
-                             <span className="text-sm font-black text-danger uppercase tracking-tight">HIGH PRIORITY</span>
-                           </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-[11px] font-black text-muted-text uppercase tracking-widest">
-                          <Clock className="w-4 h-4 text-accent" />
-                          {alert.last_seen}
-                        </div>
-                      </div>
-
-                      <div className="mt-auto pt-5 border-t border-white/5 flex flex-wrap items-center justify-between gap-6">
-                        <div className="flex items-center gap-6">
-                          <span className="text-[11px] flex items-center gap-2 text-muted-text font-black uppercase tracking-tighter hover:text-accent transition-colors">
-                            <MapPin className="w-4 h-4 text-accent" />
-                            {alert.latitude.toFixed(6)}, {alert.longitude.toFixed(6)}
-                          </span>
-                          <div className="flex items-center gap-3">
-                             <span className="text-[11px] font-black text-muted-text uppercase">Risk Score</span>
-                             <div className="w-24 h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                               <motion.div 
-                                 initial={{ width: 0 }}
-                                 animate={{ width: '92%' }}
-                                 className="h-full bg-danger shadow-[0_0_10px_#F43F5E]" 
-                               />
-                             </div>
-                             <span className="text-[11px] font-black text-danger">92%</span>
-                          </div>
-                        </div>
-
-                        <button className="flex items-center gap-3 px-6 py-2.5 rounded-2xl bg-white/5 hover:bg-accent/10 border border-white/10 hover:border-accent/30 text-xs font-black text-muted-text hover:text-accent transition-all group/btn uppercase tracking-widest">
-                          Analyze
-                          <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-                        </button>
-                      </div>
-                    </div>
+               {/* Clickaway backdrop for Tablet */}
+               <div className="absolute inset-0 bg-black/40 backdrop-blur-sm hidden md:block" onClick={() => setSelectedHazardId(null)} />
+               
+               {/* Drawer / Full screen content */}
+               <div className="w-full md:w-3/4 h-full relative z-10">
+                  {/* Close button */}
+                  <button 
+                     onClick={() => setSelectedHazardId(null)}
+                     className="absolute top-4 left-4 md:-left-12 z-50 bg-black/80 p-2 rounded-full border border-white/10 text-white shadow-lg hover:bg-white/10 transition-colors"
+                  >
+                     <X className="w-6 h-6" />
+                  </button>
+                  
+                  <div className="w-full h-full">
+                     <HazardDetailPanel 
+                        hazard={selectedHazard} 
+                        onAssign={handleAssign}
+                        onTrack={handleTrack}
+                     />
                   </div>
-                </GlassCard>
-              </motion.div>
-            ))
+               </div>
+            </motion.div>
           )}
-          </AnimatePresence>
-        </div>
-      )}
+        </AnimatePresence>
+
+      </div>
     </div>
   );
 }

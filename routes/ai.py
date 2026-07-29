@@ -834,12 +834,17 @@ def analyze():
         _db_ms = (time.time() - _t_db_start) * 1000
         dlog.db_done(report_id=inserted_id)
         
-        if approval_status == "approved":
+        if inserted_id:
             try:
-                from routes.api import global_alerts_cache
-                global_alerts_cache["data"] = None
-            except Exception:
-                pass
+                from services.hazard_registry import recalculate_single_hazard_async
+                master_id = f"AI-{inserted_id}"
+                new_db_record = pothole_payload.copy()
+                new_db_record["id"] = inserted_id
+                
+                # Push the heavy lifting to the background
+                recalculate_single_hazard_async(master_id, new_db_record, "AI", "new_detection")
+            except Exception as ex:
+                print(f"[!] Error updating hazard registry cache: {ex}")
 
         # ----- 9. Background Image Upload -----
         base_name = f"fusion_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"

@@ -1,0 +1,274 @@
+/* Custom Modal System - Dark Glassmorphism */
+
+.custom-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(10, 15, 30, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 99999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+.custom-modal-backdrop.modal-show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.custom-modal {
+    background: rgba(20, 30, 50, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    padding: 30px;
+    width: 90%;
+    max-width: 450px;
+    color: #ffffff;
+    text-align: center;
+    transform: scale(0.9) translateY(20px);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: inherit;
+    position: relative;
+    animation: floating 6s ease-in-out infinite;
+}
+
+.custom-modal-backdrop.modal-show .custom-modal {
+    transform: scale(1) translateY(0);
+}
+
+@keyframes floating {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-5px); }
+    100% { transform: translateY(0px); }
+}
+
+.custom-modal-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.custom-modal-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0 0 10px;
+    color: #ffffff;
+}
+
+.custom-modal-desc {
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0 0 25px;
+    line-height: 1.5;
+}
+
+.custom-modal-buttons {
+    display: flex;
+    gap: 15px;
+    width: 100%;
+    justify-content: center;
+}
+
+.custom-modal-btn {
+    border: none;
+    border-radius: 12px;
+    padding: 12px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+.custom-modal-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease, height 0.3s ease;
+}
+
+.custom-modal-btn:active::after {
+    width: 200px;
+    height: 200px;
+}
+
+.custom-modal-btn-primary {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: white;
+    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+}
+
+.custom-modal-btn-primary:hover {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
+}
+
+.custom-modal-btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.custom-modal-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+.custom-modal-btn-danger {
+    background: linear-gradient(135deg, #ef4444, #b91c1c);
+    color: white;
+    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+}
+
+.custom-modal-btn-danger:hover {
+    background: linear-gradient(135deg, #f87171, #ef4444);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6);
+}
+
+/* Modifiers for different types */
+.custom-modal-success .custom-modal-icon {
+    color: #10b981;
+    animation: success-glow 2s infinite alternate;
+}
+
+.custom-modal-error .custom-modal-icon {
+    color: #ef4444;
+    animation: error-shake 0.5s ease;
+}
+
+.custom-modal-warning {
+    border-color: rgba(245, 158, 11, 0.4);
+    animation: warning-pulse-border 2s infinite;
+}
+
+.custom-modal-warning .custom-modal-icon {
+    color: #f59e0b;
+}
+
+.custom-modal-info .custom-modal-icon {
+    color: #3b82f6;
+}
+
+.custom-modal-confirm .custom-modal-icon {
+    color: #8b5cf6;
+}
+
+/* Animations */
+@keyframes success-glow {
+    from { filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.5)); }
+    to { filter: drop-shadow(0 0 20px rgba(16, 185, 129, 0.8)); }
+}
+
+@keyframes error-shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-5px); }
+    40%, 80% { transform: translateX(5px); }
+}
+
+@keyframes warning-pulse-border {
+    0% { box-shadow: 0 15px 35px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1), 0 0 0 0 rgba(245,158,11,0.4); }
+    70% { box-shadow: 0 15px 35px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1), 0 0 0 10px rgba(245,158,11,0); }
+    100% { box-shadow: 0 15px 35px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1), 0 0 0 0 rgba(245,158,11,0); }
+}
+
+/* Spinner for Loading */
+.custom-modal-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255,255,255,0.1);
+    border-left-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Input styles for prompt */
+.custom-modal-input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    padding: 12px;
+    color: white;
+    font-size: 1rem;
+    margin-bottom: 20px;
+    outline: none;
+    transition: all 0.25s ease;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.custom-modal-input:focus {
+    border-color: #3b82f6;
+    background: rgba(0, 0, 0, 0.4);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.custom-modal-textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* Details toggle for Error */
+.custom-modal-details-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.9rem;
+    cursor: pointer;
+    margin-bottom: 10px;
+    text-decoration: underline;
+    transition: color 0.25s;
+}
+
+.custom-modal-details-btn:hover {
+    color: white;
+}
+
+.custom-modal-details {
+    display: none;
+    background: rgba(0,0,0,0.3);
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    text-align: left;
+    margin-bottom: 20px;
+    width: 100%;
+    box-sizing: border-box;
+    word-break: break-all;
+    max-height: 150px;
+    overflow-y: auto;
+    font-family: monospace;
+}
+.custom-modal-details.show {
+    display: block;
+}

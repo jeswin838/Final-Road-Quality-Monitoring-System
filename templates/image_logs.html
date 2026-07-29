@@ -230,17 +230,9 @@ async function downloadImage(url) {
         window.URL.revokeObjectURL(urlBlob);
         document.body.removeChild(a);
         
-        if (typeof showToast === 'function') {
-            showToast('✓ Image saved successfully', 'success');
-        } else {
-            alert('✓ Image saved successfully');
-        }
+        showToast('✓ Image saved successfully', 'success');
     } catch (e) {
-        if (typeof showToast === 'function') {
-            showToast('✗ Failed to save image', 'error');
-        } else {
-            alert('✗ Failed to save image');
-        }
+        showToast('✗ Failed to save image', 'error');
     }
 }
 

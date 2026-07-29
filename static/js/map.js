@@ -96,7 +96,7 @@ function locateMe() {
 function makeIcon(severity, isUserReport = false) {
   const sev = (severity || '').toLowerCase();
   const colors = { critical: '#DC2626', high: '#ef4444', medium: '#f97316', low: '#22c55e' };
-  const color  = isUserReport ? '#3b82f6' : (colors[sev] || '#6366f1');
+  const color  = colors[sev] || '#6366f1';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 32" width="24" height="32">
     <path d="M12 0C5.4 0 0 5.4 0 12c0 8 12 20 12 20S24 20 24 12C24 5.4 18.6 0 12 0z" fill="${color}" stroke="#fff" stroke-width="1.5"/>
     <circle cx="12" cy="12" r="5" fill="#fff" opacity="0.9"/>
@@ -146,9 +146,9 @@ function buildPopup(r) {
           style="flex:1;padding:5px;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:6px;cursor:pointer;font-size:11px">
           ✓ Mark Fixed
         </button>
-        <button onclick="openAssignModal(${r.id})"
+        <button onclick="openAssignModal(\'${r.id}\', '${r.status || 'Pending Repair'}')"
           style="flex:1;padding:5px;background:rgba(99,102,241,.15);color:#6366f1;border:1px solid rgba(99,102,241,.3);border-radius:6px;cursor:pointer;font-size:11px">
-          + Assign
+          + Manage
         </button>
       </div>
     </div>
@@ -235,9 +235,10 @@ function buildPremiumPopup(r, lat, lon, isUserReport) {
     : '';
 
   // Action buttons
+  const assignText = (statusRaw === 'Pending Repair' || statusRaw === 'Pending') ? 'Assign Worker' : 'Update Status';
   const markFixedBtn = !isUserReport
-    ? `<button class="popup-btn popup-btn-success" onclick="markFixedFromMap(${r.id})">
-        <i class="fa-solid fa-circle-check"></i> Mark as Fixed
+    ? `<button class="popup-btn popup-btn-success" onclick="openAssignModal(\'${r.id}\', '${statusRaw}')">
+        <i class="fa-solid fa-clipboard-user"></i> ${assignText}
       </button>`
     : '';
 
@@ -268,8 +269,8 @@ function buildPremiumPopup(r, lat, lon, isUserReport) {
       </div>
 
       <div class="popup-actions">
-        <button class="popup-btn popup-btn-primary" onclick="showReports('${r.marker_id}')">
-          <i class="fa-solid fa-images"></i> View Reports
+        <button class="popup-btn popup-btn-primary" onclick="showReports(\'${r.marker_id || r.id}\')">
+          <i class="fa-solid fa-images"></i> View Report
         </button>
         ${markFixedBtn}
       </div>
@@ -322,60 +323,76 @@ async function loadMarkers() {
 }
 
 function focusTargetReport() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const targetReportId = urlParams.get('report_id');
-  const targetMarkerId = urlParams.get('marker_id');
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetReportId = urlParams.get('report_id');
+    const targetMarkerId = urlParams.get('marker_id');
+    const targetHazardId = urlParams.get('hazard');
+    
+    if (!targetReportId && !targetMarkerId && !targetHazardId) return;
+    if (!allData || allData.length === 0) return;
   
-  if (!targetReportId && !targetMarkerId) return;
-  if (!allData || allData.length === 0) return;
-
-  let targetGroup = null;
-
-  for (let group of allData) {
-     if (targetMarkerId && group.marker_id === targetMarkerId) {
-         targetGroup = group;
-         break;
-     }
-     if (targetReportId && group.reports) {
-         if (group.reports.some(r => String(r.id) === String(targetReportId))) {
-             targetGroup = group;
-             break;
-         }
-     }
-  }
-
-  if (targetGroup) {
-      const lat = parseFloat(targetGroup.latitude);
-      const lon = parseFloat(targetGroup.longitude);
-      
-      map.flyTo([lat, lon], 18, { animate: true, duration: 1.5 });
-      
-      setTimeout(() => {
-          let foundLayer = null;
-          markerClusterGroup.eachLayer(layer => {
-              if (layer.options && layer.options.marker_id === targetGroup.marker_id) {
-                  foundLayer = layer;
-              }
-          });
-          
-          if (foundLayer) {
-              markerClusterGroup.zoomToShowLayer(foundLayer, () => {
-                  foundLayer.openPopup();
-                  setTimeout(() => {
-                      if (typeof showReports === 'function') {
-                          showReports(targetGroup.marker_id, targetReportId);
-                      }
-                  }, 500);
-              });
-          }
-      }, 1600);
-  } else {
-      if (typeof showToast === 'function') {
-          showToast('Report location not found.', 'error');
-      } else {
-          alert('Report location not found.');
-      }
-  }
+    let targetGroup = null;
+  
+    for (let group of allData) {
+       if (targetMarkerId && group.marker_id === targetMarkerId) {
+           targetGroup = group;
+           break;
+       }
+       if (targetHazardId && String(group.id) === String(targetHazardId)) {
+           targetGroup = group;
+           break;
+       }
+       if ((targetReportId || targetHazardId) && group.reports) {
+           const searchId = targetReportId || targetHazardId;
+           if (group.reports.some(r => String(r.id) === String(searchId) || String(r.hazard_id) === String(searchId))) {
+               targetGroup = group;
+               break;
+           }
+       }
+    }
+  
+    if (targetGroup) {
+        const lat = parseFloat(targetGroup.latitude);
+        const lon = parseFloat(targetGroup.longitude);
+        
+        map.flyTo([lat, lon], 18, { animate: true, duration: 1.5 });
+        
+        setTimeout(() => {
+            let foundLayer = null;
+            markerClusterGroup.eachLayer(layer => {
+                if (layer.options && layer.options.marker_id === targetGroup.marker_id) {
+                    foundLayer = layer;
+                }
+            });
+            
+            if (foundLayer) {
+                markerClusterGroup.zoomToShowLayer(foundLayer, () => {
+                    foundLayer.openPopup();
+                    
+                    if (foundLayer._icon) {
+                        foundLayer._icon.classList.add('marker-pulse-highlight');
+                        setTimeout(() => {
+                            if (foundLayer._icon) {
+                                foundLayer._icon.classList.remove('marker-pulse-highlight');
+                            }
+                        }, 5000);
+                    }
+                    
+                    setTimeout(() => {
+                        if (typeof showReports === 'function') {
+                            showReports(targetGroup.marker_id, targetReportId || targetHazardId);
+                        }
+                    }, 500);
+                });
+            }
+        }, 1600);
+    } else {
+        if (typeof showToast === 'function') {
+            showToast('Report location not found.', 'error');
+        } else {
+            showToast('Report location not found.', 'error');
+        }
+    }
 }
 
 function renderMarkers() {
@@ -388,8 +405,7 @@ function renderMarkers() {
     
     if (showClusters) {
       const isUserReport = r.type === 'user_report';
-      const color = isUserReport ? '#3b82f6' : (r.severity === 'critical' ? '#DC2626' : r.severity === 'high' ? '#ef4444' : r.severity === 'medium' ? '#f97316' : '#22c55e');
-      const marker = L.marker([lat, lon], { icon: makeIcon(r.severity, isUserReport) });
+      const marker = L.marker([lat, lon], { icon: makeIcon(r.severity) });
       marker.options.marker_id = r.marker_id;
       
       const popupHtml = buildPremiumPopup(r, lat, lon, isUserReport);
@@ -474,143 +490,356 @@ window.markFixedFromMap = async function(id) {
 };
 
 // ── Reports Modal Logic ──────────────────────────────────────────────────────
-window.showReports = async function(marker_id, highlightReportId = null) {
-  const modal = document.getElementById('reportsModal');
-  const container = document.getElementById('reportsContainer');
-  const countBadge = document.getElementById('reportsCountBadge');
-  if (!modal || !container) return;
+window.showReports = async function(report_id) {
+    const modal = document.getElementById('reportsModal');
+    const inner = document.querySelector('.reports-modal-inner');
+    if (!modal || !inner) return;
+  
+    modal.style.display = 'flex';
+    
+    // Give it fixed dimensions for the new layout
+    inner.style.width = '90vw';
+    inner.style.maxWidth = '1200px';
+    inner.style.height = '85vh';
+    inner.style.padding = '0'; // Remove any default padding
+  
+    // Show loading state
+    inner.innerHTML = `
+      <div style="flex:1; display:flex; align-items:center; justify-content:center; flex-direction:column; color:#6366f1; height:100%;">
+        <i class="fa-solid fa-spinner fa-spin fa-3x"></i>
+        <div style="margin-top:20px; color:#cbd5e1; font-weight:600; letter-spacing:1px; text-transform:uppercase;">Locating Report History...</div>
+      </div>
+    `;
 
-  modal.style.display = 'flex';
-  if (countBadge) countBadge.style.display = 'none';
+    try {
+      // 1. Resolve coordinates from allData
+      let lat = null, lon = null;
+      let fallbackData = null;
+      let lookupStrategy = 'None';
+      
+      const search_id = String(report_id);
+      
+      console.log("-----------------------------------------");
+      console.log("History Lookup Initiated");
+      console.log("Clicked ID (Passed to function):", search_id);
 
-  try {
-    const group = allData.find(g => g.marker_id === marker_id);
-    if (!group) throw new Error("Marker not found in cache");
-    const reports = group.reports || [];
-    console.log(`[Reports] Found ${reports?.length || 0} reports.`);
+      if (typeof allData !== 'undefined' && allData && allData.length > 0) {
+          for (let r of allData) {
+              // Priority 1: marker_id
+              if (r.marker_id && String(r.marker_id) === search_id) {
+                  fallbackData = r;
+                  lookupStrategy = "marker_id";
+                  break;
+              }
+              // Priority 2: hazard_id
+              if (r.hazard_id && String(r.hazard_id) === search_id) {
+                  fallbackData = r;
+                  lookupStrategy = "hazard_id";
+                  break;
+              }
+              // Priority 3: id
+              if (r.id && (String(r.id) === search_id || String(r.id) === search_id.replace('AI-', ''))) {
+                  fallbackData = r;
+                  lookupStrategy = "id";
+                  break;
+              }
+              // Priority 4: reports[].id
+              if (r.reports && Array.isArray(r.reports)) {
+                  let foundInReports = false;
+                  for (let sub_r of r.reports) {
+                      if (String(sub_r.id) === search_id || String(sub_r.hazard_id) === search_id) {
+                          foundInReports = true;
+                          break;
+                      }
+                  }
+                  if (foundInReports) {
+                      fallbackData = r;
+                      lookupStrategy = "reports[].id";
+                      break;
+                  }
+              }
+          }
+      }
+      
+      if (fallbackData) {
+          lat = fallbackData.latitude || fallbackData.lat || (fallbackData.location && fallbackData.location.lat) || (fallbackData.location && fallbackData.location.latitude);
+          lon = fallbackData.longitude || fallbackData.lng || fallbackData.lon || (fallbackData.location && fallbackData.location.lon) || (fallbackData.location && fallbackData.location.longitude);
+          
+          console.log("Lookup Strategy Used:", lookupStrategy);
+          console.log("Matched Object:", fallbackData);
+          console.log("Extracted Latitude:", lat);
+          console.log("Extracted Longitude:", lon);
+          console.log("Grouped Marker ID:", fallbackData.marker_id);
+          console.log("Grouped Report Count:", fallbackData.reports ? fallbackData.reports.length : 0);
+          console.log("History API URL:", `/api/location-reports?lat=${lat}&lon=${lon}`);
+      } else {
+          console.error("Lookup failed. Could not find ID:", search_id, "in allData.");
+      }
+      
+      console.log("-----------------------------------------");
 
-    if (!Array.isArray(reports) || reports.length === 0) {
-      container.innerHTML = `
-        <div class="reports-gallery-empty">
-          <i class="fa-solid fa-image-slash"></i>
-          No verified pothole images available.
-        </div>`;
-      return;
-    }
+      if (!lat || !lon) {
+          throw new Error("Location coordinates not found in active map data.");
+      }
 
-    // Update count badge
-    if (countBadge) {
-      countBadge.textContent = reports.length;
-      countBadge.style.display = 'inline-block';
-    }
+      // 2. Fetch all reports at this location
+      const res = await fetch(`/api/location-reports?lat=${lat}&lon=${lon}`);
+      if (!res.ok) throw new Error("Failed to load historical reports");
+      const reports = await res.json();
+      
+      if (!reports || reports.length === 0) {
+          throw new Error("No reports found for this location");
+      }
 
-    // Helper: format date
-    function fmtDate(d) {
-      if (!d) return '—';
-      const dt = new Date(d);
-      return dt.toLocaleString(undefined, {
-        month: 'short', day: 'numeric', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
+      // Sort newest to oldest
+      reports.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      // Formatting helper
+      function fmtDate(d) {
+        if (!d) return 'N/A';
+        const dt = new Date(d);
+        return dt.toLocaleString(undefined, {
+          month: 'short', day: 'numeric', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+        });
+      }
+
+      // 3. Extract all images for the gallery
+      let allImages = [];
+      let total_images_extracted = 0;
+      reports.forEach(r => {
+          let imgArr = [];
+          if (r.image_url) imgArr.push(r.image_url);
+          if (r.media_url && r.media_url !== r.image_url) imgArr.push(r.media_url);
+          if (r.all_images && Array.isArray(r.all_images)) {
+              r.all_images.forEach(i => { if (!imgArr.includes(i)) imgArr.push(i); });
+          }
+          
+          total_images_extracted += imgArr.length;
+          
+          if (imgArr.length === 0) {
+              // Add fallback placeholder for reports with no image so it still shows in gallery
+              imgArr.push('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA0MDAgMzAwIiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJ4TWlkWU1pZCBtZWV0Ij48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMWUyOTNiIi8+PHBhdGggZD0iTTIwMCAxMTRMMTUwIDE4NEgyNTBMMjAwIDExNFoiIGZpbGw9IiM0NzU1NjkiLz48Y2lyY2xlIGN4PSIxNjAiIGN5PSIxMjAiIHI9IjE1IiBmaWxsPSIjNDc1NTY5Ii8+PHRleHQgeD0iMjAwIiB5PSIyMTAiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjE2IiBmb250LXdlaWdodD0iNjAwIiBmaWxsPSIjOTRhM2I4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5JbWFnZSBOb3QgQXZhaWxhYmxlPC90ZXh0Pjwvc3ZnPg==');
+          }
+          
+          imgArr.forEach(img => {
+              if (!allImages.find(x => x.src === img)) {
+                  allImages.push({ src: img, report: r });
+              }
+          });
       });
-    }
 
-    container.innerHTML = reports.map((r, idx) => {
-      const isVideo = r.type === 'video' || (r.image_url && r.image_url.toLowerCase().endsWith('.mp4'));
-      const displayMedia = r.image || r.media_url || r.image_url || '';
-      const sev = (r.severity || 'unknown').toLowerCase();
-      const sevColors = {
-        low:      { bg: 'rgba(34,197,94,.18)',  color: '#4ade80' },
-        medium:   { bg: 'rgba(245,158,11,.18)', color: '#fbbf24' },
-        high:     { bg: 'rgba(239,68,68,.18)',  color: '#f87171' },
-        critical: { bg: 'rgba(239,68,68,.28)',  color: '#fca5a5' }
+      console.log("Gallery Debug:");
+      console.log("- Total Reports Fetched:", reports.length);
+      console.log("- Total Images Extracted:", total_images_extracted);
+      console.log("- Gallery Item Count:", allImages.length);
+
+      window.galleryImages = allImages;
+      window.currentGalleryIndex = 0;
+      
+      window.setGalleryImage = function(index) {
+          if (index < 0 || index >= window.galleryImages.length) return;
+          window.currentGalleryIndex = index;
+          const item = window.galleryImages[index];
+          
+          const mainImg = document.getElementById('galleryMainImage');
+          const errDiv = document.getElementById('galleryImageError');
+          const errUrl = document.getElementById('galleryImageErrorUrl');
+          
+          console.log("=========================================");
+          console.log("[IMAGE VIEWER] Selected Image Index:", index);
+          console.log("[IMAGE VIEWER] Database ID:", item.report.id);
+          console.log("[IMAGE VIEWER] Source Table:", item.report.pothole ? "User Report / Pothole" : "Unknown");
+          console.log("[IMAGE VIEWER] Image URL:", item.src);
+          console.log("=========================================");
+
+          if (mainImg) {
+              mainImg.style.opacity = '0';
+              if (errDiv) errDiv.style.display = 'none';
+              
+              if (!item.src || item.src.trim() === '' || item.src === 'null' || item.src === 'undefined') {
+                  console.error("[IMAGE VIEWER] LOAD FAILURE! URL is null, empty, or undefined.");
+                  if (errDiv) {
+                      errDiv.style.display = 'block';
+                      errUrl.textContent = "URL is missing or undefined";
+                  }
+              } else {
+                  // Explicit Pre-loading
+                  const imgLoader = new Image();
+                  
+                  imgLoader.onload = function() {
+                      console.log(`[IMAGE VIEWER] LOAD SUCCESS: ${item.src}`);
+                      console.log(`[IMAGE VIEWER] Natural Width: ${imgLoader.naturalWidth}px`);
+                      console.log(`[IMAGE VIEWER] Natural Height: ${imgLoader.naturalHeight}px`);
+                      console.log(`[IMAGE VIEWER] HTTP Status: (Assumed 200 OK since onload fired)`);
+                      
+                      mainImg.src = item.src;
+                      mainImg.style.opacity = '1';
+                      if (errDiv) errDiv.style.display = 'none';
+                  };
+                  
+                  imgLoader.onerror = function() {
+                      console.error(`[IMAGE VIEWER] LOAD FAILURE! Image threw onerror during fetch.`);
+                      console.error(`[IMAGE VIEWER] Broken URL: ${item.src}`);
+                      console.error(`[IMAGE VIEWER] Possible Reasons: 404 Not Found, 403 Forbidden, CORS error, or invalid format.`);
+                      
+                      if (errDiv) {
+                          errDiv.style.display = 'block';
+                          errUrl.textContent = item.src;
+                      }
+                      // Keep mainImg opacity at 0 so it doesn't show broken icon
+                      mainImg.style.opacity = '0';
+                  };
+                  
+                  // Trigger load
+                  imgLoader.src = item.src;
+              }
+          }
+          
+          document.querySelectorAll('.gallery-thumb').forEach((th, i) => {
+              th.style.borderColor = (i === index) ? '#6366f1' : 'transparent';
+              th.style.opacity = (i === index) ? '1' : '0.5';
+          });
+          
+          const r = item.report;
+
+          
+          document.getElementById('meta-date').textContent = fmtDate(r.created_at);
+          
+          let sourceHtml = '';
+          if (r.source === 'Citizen Report' || r.source === 'Citizen') {
+              sourceHtml = '<i class="fa-solid fa-user" style="color:#60a5fa;margin-right:6px;"></i>Citizen Report';
+          } else {
+              sourceHtml = '<i class="fa-solid fa-robot" style="color:#a78bfa;margin-right:6px;"></i>AI Detection';
+          }
+          document.getElementById('meta-source').innerHTML = sourceHtml;
+          
+          if (r.confidence === null || r.confidence === undefined) {
+              document.getElementById('meta-conf').innerHTML = `<i class="fa-solid fa-percent" style="opacity:0.6;margin-right:6px;"></i>N/A`;
+          } else {
+              document.getElementById('meta-conf').innerHTML = `<i class="fa-solid fa-percent" style="opacity:0.6;margin-right:6px;"></i>${Math.round(r.confidence)}%`;
+          }
+          
+          document.getElementById('meta-sev').innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="opacity:0.6;margin-right:6px;"></i>${r.severity || 'Unknown'}`;
+          
+          document.getElementById('meta-road').textContent = r.road_name || 'Unknown';
+          document.getElementById('meta-landmark').textContent = r.landmark || r.village || r.town || 'Unknown';
+          document.getElementById('meta-desc').textContent = r.description || 'No description provided.';
+          
+          document.getElementById('meta-counter').textContent = `Image ${index + 1} of ${window.galleryImages.length}`;
+          
+          console.log("Viewing Image Index:", index);
+          console.log("- Source:", r.source);
+          console.log("- Confidence:", r.confidence);
+          console.log("- Severity:", r.severity);
+          console.log("- Road:", r.road_name);
+          console.log("- Image URL:", item.src);
       };
-      const chip = sevColors[sev] || { bg: 'rgba(255,255,255,.1)', color: 'var(--muted)' };
 
-      const mediaTag = isVideo
-        ? `<video src="${displayMedia}" controls style="width:100%;height:100%;object-fit:contain"></video>`
-        : `<img
-            src="${displayMedia}"
-            alt="Report ${idx + 1}"
-            style="width:100%;height:100%;object-fit:contain;cursor:zoom-in"
-            onclick="window.open('${displayMedia}','_blank')"
-            onerror="this.onerror=null;this.outerHTML='<div style=\\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35);color:#7d8590;\\'><i class=\\'fa-solid fa-image-slash fa-3x\\'></i></div>';"
-          >`;
+      let thumbsHtml = '';
+      if (allImages.length > 1) {
+          thumbsHtml = `
+          <div style="display:flex; gap:12px; overflow-x:auto; padding:15px; background:rgba(0,0,0,0.5); border-top:1px solid rgba(255,255,255,0.1);">
+              ${allImages.map((img, i) => `
+                  <img src="${img.src}" class="gallery-thumb" onclick="setGalleryImage(${i})" style="width:100px; height:70px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid transparent; opacity:0.5; transition:all 0.2s; flex-shrink:0;" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA0MDAgMzAwIiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJ4TWlkWU1pZCBtZWV0Ij48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMWUyOTNiIi8+PHBhdGggZD0iTTIwMCAxMTRMMTUwIDE4NEgyNTBMMjAwIDExNFoiIGZpbGw9IiM0NzU1NjkiLz48Y2lyY2xlIGN4PSIxNjAiIGN5PSIxMjAiIHI9IjE1IiBmaWxsPSIjNDc1NTY5Ii8+PHRleHQgeD0iMjAwIiB5PSIyMTAiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjE2IiBmb250LXdlaWdodD0iNjAwIiBmaWxsPSIjOTRhM2I4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5JbWFnZSBOb3QgQXZhaWxhYmxlPC90ZXh0Pjwvc3ZnPg==';">
+              `).join('')}
+          </div>`;
+      } else {
+          thumbsHtml = `<div style="padding:15px; text-align:center; color:#94a3b8; background:rgba(0,0,0,0.5); border-top:1px solid rgba(255,255,255,0.1);">No additional images available.</div>`;
+      }
 
-      const confPct = r.confidence ? Math.round(r.confidence * 100) : 0;
-      const formattedTime = fmtDate(r.created_at);
-
-      const srcRaw = (r.source || 'Unknown').toLowerCase();
-      let srcIcon = '❓';
-      let srcText = 'Unknown Report';
-      if (srcRaw.includes('citizen')) { srcIcon = '👤'; srcText = 'Citizen Report'; }
-      else if (srcRaw.includes('sensor')) { srcIcon = '📡'; srcText = 'Sensor Report'; }
-      else if (srcRaw.includes('ai')) { srcIcon = '🤖'; srcText = 'AI Report'; }
-      else if (srcRaw.includes('live')) { srcIcon = '📹'; srcText = 'Live Report'; }
-      else { srcIcon = '📄'; srcText = 'System Report'; }
-
-      const statLower = (r.status || 'Pending').toLowerCase();
-      const statColor = statLower === 'approved' ? '#4ade80' : 
-                        statLower === 'rejected' ? '#f87171' : '#fbbf24';
-
-      return `
-        <div class="report-gallery-card" id="reportCard_${r.id || ''}">
-          <div class="report-gallery-img-wrap">
-            ${displayMedia ? mediaTag : `<div class="reports-gallery-empty" style="padding:40px"><i class="fa-solid fa-image" style="opacity:.3"></i></div>`}
+      inner.innerHTML = `
+      <div style="display: flex; flex-direction: column; width: 100%; height: 100%; background: #0f172a; border-radius:inherit; overflow:hidden;">
+          
+          <!-- Header -->
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:20px 25px; background:rgba(255,255,255,0.03); border-bottom:1px solid rgba(255,255,255,0.1);">
+              <h3 style="margin:0; font-size:1.2rem; color:#fff; font-weight:800; display:flex; align-items:center; gap:10px;">
+                  <i class="fa-solid fa-images" style="color:#6366f1;"></i> Location Gallery
+              </h3>
+              <div style="display:flex; align-items:center; gap:20px;">
+                  <span id="meta-counter" style="color:#94a3b8; font-weight:600; font-size:0.9rem;"></span>
+                  <button onclick="closeReportsModal()" style="background:transparent; border:none; color:#cbd5e1; font-size:1.5rem; cursor:pointer; padding:0;">&times;</button>
+              </div>
           </div>
-          <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:1.1rem; font-weight:800; color:#fff;">#${r.id || 'N/A'}</span>
-              <span style="font-size:0.9rem; font-weight:600; color:var(--muted);">${srcIcon} ${srcText}</span>
-            </div>
-            
-            <div style="font-size:0.85rem; color:var(--muted); border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:14px; margin-bottom:2px;">
-              📅 ${formattedTime}
-            </div>
 
-            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; align-items:center;">
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <span style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Confidence</span>
-                <span style="font-size:0.9rem; font-weight:700; color:#fff;">${confPct}%</span>
+          <!-- Main Content -->
+          <div style="flex:1; display:flex; overflow:hidden;">
+              
+              <!-- Left: Main Image Viewer -->
+              <div style="flex: 3; display:flex; flex-direction:column; background:#000; position:relative;">
+                  <div style="flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; cursor:zoom-in;" onclick="openFullscreenGallery()">
+                      <img id="galleryMainImage" src="" style="max-width:100%; max-height:100%; object-fit:contain; transition:opacity 0.2s; opacity:0;" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA0MDAgMzAwIiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJ4TWlkWU1pZCBtZWV0Ij48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMWUyOTNiIi8+PHBhdGggZD0iTTIwMCAxMTRMMTUwIDE4NEgyNTBMMjAwIDExNFoiIGZpbGw9IiM0NzU1NjkiLz48Y2lyY2xlIGN4PSIxNjAiIGN5PSIxMjAiIHI9IjE1IiBmaWxsPSIjNDc1NTY5Ii8+PHRleHQgeD0iMjAwIiB5PSIyMTAiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjE2IiBmb250LXdlaWdodD0iNjAwIiBmaWxsPSIjOTRhM2I4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5JbWFnZSBOb3QgQXZhaWxhYmxlPC90ZXh0Pjwvc3ZnPg==';">
+                  </div>
+                  ${thumbsHtml}
               </div>
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <span style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Severity</span>
-                <span style="background:${chip.bg}; color:${chip.color}; border-radius:12px; font-size:0.75rem; font-weight:800; padding:4px 8px; text-transform:uppercase; display:inline-flex; justify-content:center; align-items:center;">${r.severity || 'UNKNOWN'}</span>
-              </div>
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <span style="font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Status</span>
-                <span style="background:${statColor}22; color:${statColor}; border-radius:12px; font-size:0.75rem; font-weight:800; padding:4px 8px; display:inline-flex; justify-content:center; align-items:center;">${r.status || 'Pending'}</span>
-              </div>
-            </div>
 
-            <button class="popup-btn popup-btn-primary" style="margin-top:8px; width:100%; justify-content:center;" onclick="window.open('${displayMedia}','_blank')">
-              View
-            </button>
+              <!-- Right: Metadata Panel -->
+              <div style="flex: 1; min-width:300px; background:rgba(255,255,255,0.02); border-left:1px solid rgba(255,255,255,0.1); padding:25px; display:flex; flex-direction:column; gap:20px; overflow-y:auto;">
+                  
+                  <div style="display:flex; gap:20px;">
+                      <div style="flex:1;">
+                          <div style="font-size:0.75rem; text-transform:uppercase; color:#94a3b8; font-weight:700; margin-bottom:6px;">Capture Date</div>
+                          <div id="meta-date" style="font-size:1.1rem; color:#fff; font-weight:600;"></div>
+                      </div>
+                      <div style="flex:1;">
+                          <div style="font-size:0.75rem; text-transform:uppercase; color:#94a3b8; font-weight:700; margin-bottom:6px;">Source</div>
+                          <div id="meta-source" style="font-size:1.1rem; color:#fff; font-weight:600; display:flex; align-items:center;"></div>
+                      </div>
+                  </div>
+                  
+                  <div style="display:flex; gap:20px;">
+                      <div style="flex:1;">
+                          <div style="font-size:0.75rem; text-transform:uppercase; color:#94a3b8; font-weight:700; margin-bottom:6px;">Average AI Confidence</div>
+                          <div id="meta-conf" style="font-size:1.1rem; color:#fff; font-weight:600;"></div>
+                            <div id="meta-conf-details" style="font-size:0.75rem; color:#94a3b8; margin-top:6px; line-height:1.4;"></div>
+                      </div>
+                      <div style="flex:1;">
+                          <div style="font-size:0.75rem; text-transform:uppercase; color:#94a3b8; font-weight:700; margin-bottom:6px;">Severity</div>
+                          <div id="meta-sev" style="font-size:1.1rem; color:#fff; font-weight:600;"></div>
+                      </div>
+                  </div>
+                  
+                  <hr style="border-color:rgba(255,255,255,0.1); border-top:none; margin:0;">
+                  
+                  <div>
+                      <div style="font-size:0.75rem; text-transform:uppercase; color:#94a3b8; font-weight:700; margin-bottom:6px;">Road Name</div>
+                      <div id="meta-road" style="font-size:1rem; color:#fff; font-weight:600;"></div>
+                  </div>
+                  
+                  <div>
+                      <div style="font-size:0.75rem; text-transform:uppercase; color:#94a3b8; font-weight:700; margin-bottom:6px;">Landmark / Area</div>
+                      <div id="meta-landmark" style="font-size:1rem; color:#fff; font-weight:600;"></div>
+                  </div>
+                  
+                  <div>
+                      <div style="font-size:0.75rem; text-transform:uppercase; color:#94a3b8; font-weight:700; margin-bottom:6px;">Description</div>
+                      <div id="meta-desc" style="font-size:0.9rem; color:#cbd5e1; font-weight:500; font-style:italic; padding:10px; background:rgba(0,0,0,0.2); border-radius:6px;"></div>
+                  </div>
+                  
+                  <hr style="border-color:rgba(255,255,255,0.1); border-top:none; margin:10px 0;">
+                  
+                  <div>
+                      <button onclick="openFullscreenGallery()" class="roc-btn" style="width:100%; background:rgba(99,102,241,0.15); color:#818cf8; border:1px solid rgba(99,102,241,0.3); padding:12px; border-radius:8px; cursor:pointer; font-weight:700; transition:all 0.2s;" onmouseover="this.style.background='rgba(99,102,241,0.25)'" onmouseout="this.style.background='rgba(99,102,241,0.15)'">
+                          <i class="fa-solid fa-expand" style="margin-right:8px;"></i> Open Fullscreen
+                      </button>
+                  </div>
+              </div>
           </div>
-        </div>
-      `;
-    }).join('');
-
-    if (highlightReportId) {
-      setTimeout(() => {
-        const el = document.getElementById(`reportCard_${highlightReportId}`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.style.border = '2px solid var(--accent)';
-          el.style.boxShadow = '0 0 20px rgba(99,102,241,0.5)';
-        }
-      }, 300);
-    }
-
-  } catch (err) {
-    console.error('[Reports] Modal Error:', err);
-    container.innerHTML = `
-      <div class="reports-gallery-empty">
-        <i class="fa-solid fa-circle-exclamation" style="color:var(--danger)"></i>
-        <div>Failed to load reports.<br><small>${err.message}</small></div>
       </div>`;
-  }
-};
 
+      // Init first image
+      setTimeout(() => { setGalleryImage(0); }, 50);
+
+    } catch (err) {
+      inner.innerHTML = `
+      <div style="display: flex; width: 100%; height: 100%; align-items:center; justify-content:center; flex-direction:column; padding:40px; text-align:center;">
+        <i class="fa-solid fa-circle-exclamation fa-4x" style="color:#ef4444; margin-bottom:25px;"></i>
+        <div style="font-size:1.5rem; color:#fff; font-weight:800; margin-bottom:12px;">Failed to Load Gallery</div>
+        <div style="font-size:1.05rem; color:#94a3b8; margin-bottom:30px;">${err.message}</div>
+        <button class="roc-btn" style="background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:12px 35px; border-radius:8px; cursor:pointer; font-weight:600; font-size:1.1rem;" onclick="closeReportsModal()">Close</button>
+      </div>`;
+    }
+}
 window.closeReportsModal = function() {
   const modal = document.getElementById('reportsModal');
   if (modal) {
@@ -636,3 +865,149 @@ function haversine(lat1, lon1, lat2, lon2) {
 
 initGeolocation();
 startAutoRefresh();
+
+
+// ── FULLSCREEN GALLERY LOGIC ──────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+    const fsHtml = `
+    <div id="fsGalleryModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:99999; backdrop-filter:blur(10px); opacity:0; transition:opacity 0.25s;">
+        <!-- Header -->
+        <div style="position:absolute; top:0; left:0; right:0; padding:20px 30px; display:flex; justify-content:space-between; align-items:center; z-index:100000; background:linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);">
+            <div style="color:#fff; font-size:1.2rem; font-weight:800; font-family:'Inter', sans-serif;" id="fsCounter"></div>
+            <div style="display:flex; gap:15px;">
+                <a id="fsDownload" href="#" download class="roc-btn" style="background:rgba(255,255,255,0.1); color:#fff; padding:10px 20px; border-radius:8px; text-decoration:none;"><i class="fa-solid fa-download"></i></a>
+                <button onclick="closeFullscreenGallery()" class="roc-btn" style="background:rgba(239,68,68,0.2); color:#f87171; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <button onclick="fsPrev(event)" style="position:absolute; left:30px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.1); border:none; color:#fff; width:60px; height:60px; border-radius:50%; cursor:pointer; z-index:100000; font-size:1.5rem; transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'"><i class="fa-solid fa-chevron-left"></i></button>
+        
+        <button onclick="fsNext(event)" style="position:absolute; right:30px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.1); border:none; color:#fff; width:60px; height:60px; border-radius:50%; cursor:pointer; z-index:100000; font-size:1.5rem; transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'"><i class="fa-solid fa-chevron-right"></i></button>
+
+        <!-- Image Container -->
+        <div id="fsImgContainer" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:grab;" onmousedown="fsPanStart(event)">
+            <img id="fsMainImg" src="" style="max-width:90%; max-height:90%; object-fit:contain; transition:transform 0.1s ease-out, opacity 0.2s;" draggable="false">
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', fsHtml);
+    
+    // Mouse wheel zoom
+    document.getElementById('fsImgContainer').addEventListener('wheel', (e) => {
+        e.preventDefault();
+        window.fsZoom += e.deltaY * -0.002;
+        window.fsZoom = Math.min(Math.max(1, window.fsZoom), 5); // clamped 1x - 5x
+        updateFsTransform();
+    }, {passive: false});
+});
+
+window.fsZoom = 1;
+window.fsPanX = 0;
+window.fsPanY = 0;
+window.fsDragging = false;
+window.fsStartX = 0;
+window.fsStartY = 0;
+
+function updateFsTransform() {
+    const img = document.getElementById('fsMainImg');
+    if(img) {
+        img.style.transform = `translate(${window.fsPanX}px, ${window.fsPanY}px) scale(${window.fsZoom})`;
+    }
+}
+
+function resetFsTransform() {
+    window.fsZoom = 1;
+    window.fsPanX = 0;
+    window.fsPanY = 0;
+    updateFsTransform();
+}
+
+window.fsPanStart = function(e) {
+    if (window.fsZoom <= 1) return;
+    window.fsDragging = true;
+    window.fsStartX = e.clientX - window.fsPanX;
+    window.fsStartY = e.clientY - window.fsPanY;
+    document.getElementById('fsImgContainer').style.cursor = 'grabbing';
+};
+
+window.addEventListener('mousemove', (e) => {
+    if(!window.fsDragging) return;
+    window.fsPanX = e.clientX - window.fsStartX;
+    window.fsPanY = e.clientY - window.fsStartY;
+    updateFsTransform();
+});
+
+window.addEventListener('mouseup', () => {
+    window.fsDragging = false;
+    const c = document.getElementById('fsImgContainer');
+    if(c) c.style.cursor = 'grab';
+});
+
+window.openFullscreenGallery = function() {
+    if(!window.galleryImages || window.galleryImages.length === 0) return;
+    const m = document.getElementById('fsGalleryModal');
+    if(m) {
+        m.style.display = 'block';
+        setTimeout(() => m.style.opacity = '1', 10);
+        updateFsImage();
+    }
+};
+
+window.closeFullscreenGallery = function() {
+    const m = document.getElementById('fsGalleryModal');
+    if(m) {
+        m.style.opacity = '0';
+        setTimeout(() => m.style.display = 'none', 250);
+    }
+};
+
+function updateFsImage() {
+    const item = window.galleryImages[window.currentGalleryIndex];
+    if(!item) return;
+    const img = document.getElementById('fsMainImg');
+    img.style.opacity = '0';
+    setTimeout(() => {
+        resetFsTransform();
+        img.src = item.src;
+        img.style.opacity = '1';
+    }, 150);
+    
+    document.getElementById('fsCounter').textContent = `Image ${window.currentGalleryIndex + 1} of ${window.galleryImages.length}`;
+    document.getElementById('fsDownload').href = item.src;
+}
+
+window.fsNext = function(e) {
+    if(e) e.stopPropagation();
+    if(window.currentGalleryIndex < window.galleryImages.length - 1) {
+        window.currentGalleryIndex++;
+    } else {
+        window.currentGalleryIndex = 0; // wrap around
+    }
+    updateFsImage();
+    
+    // Sync thumbnail in modal behind
+    if(window.setGalleryImage) window.setGalleryImage(window.currentGalleryIndex);
+};
+
+window.fsPrev = function(e) {
+    if(e) e.stopPropagation();
+    if(window.currentGalleryIndex > 0) {
+        window.currentGalleryIndex--;
+    } else {
+        window.currentGalleryIndex = window.galleryImages.length - 1; // wrap around
+    }
+    updateFsImage();
+    
+    // Sync thumbnail
+    if(window.setGalleryImage) window.setGalleryImage(window.currentGalleryIndex);
+};
+
+// Keyboard navigation
+window.addEventListener('keydown', (e) => {
+    const m = document.getElementById('fsGalleryModal');
+    if(m && m.style.display === 'block') {
+        if(e.key === 'ArrowRight') window.fsNext();
+        if(e.key === 'ArrowLeft') window.fsPrev();
+        if(e.key === 'Escape') window.closeFullscreenGallery();
+    }
+});

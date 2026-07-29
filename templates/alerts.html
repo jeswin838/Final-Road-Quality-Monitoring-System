@@ -1,230 +1,1105 @@
 {% extends "base.html" %}
-{% block title %}Alerts — Pothole Monitor{% endblock %}
-{% block page_title %}Alert Management <span id="alertCount" class="badge badge-accent" style="font-size:0.9rem; margin-left:8px; vertical-align:middle">...</span>{% endblock %}
+{% block title %}Road Operations Center — Pothole Monitor{% endblock %}
+{% block page_title %}Road Operations Center <span id="alertCount" class="badge badge-accent text-xs ml-2 align-middle">...</span>{% endblock %}
 
 {% block head %}
+
 <style>
-.filter-toolbar { padding: 16px; margin-bottom: 18px; }
-.filter-toolbar .form-group { margin: 0; min-width: 140px; flex: 1; }
-.table-container { border-radius: 16px; overflow: hidden; }
-.data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.data-table th { padding: 14px 16px; text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
-.data-table td { padding: 12px 16px; vertical-align: middle; }
-.action-btns { display: flex; gap: 8px; }
-.pagination { display: flex; gap: 8px; justify-content: flex-end; padding: 16px; }
-@media (max-width: 768px) {
-  .filter-toolbar { flex-direction: column; align-items: stretch; }
-  .filter-toolbar .form-group { width: 100%; }
-  .action-btns { flex-direction: column; }
+/* --- Modern Glassmorphic Alert Card --- */
+.modern-alert-card {
+    background: rgba(255, 255, 255, 0.03) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 16px !important;
+    padding: 14px !important;
+    margin-bottom: 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    height: 155px !important;
+    min-height: 155px !important;
+    max-height: 155px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+.modern-alert-card:hover {
+    background: rgba(255, 255, 255, 0.07) !important;
+    border: 1px solid rgba(99, 102, 241, 0.4) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5) !important;
+}
+.modern-alert-card.selected {
+    background: rgba(99, 102, 241, 0.1) !important;
+    border: 1px solid rgba(99, 102, 241, 0.8) !important;
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.2) inset !important;
+}
+.modern-alert-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 100%;
+    background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%);
+    pointer-events: none;
+}
+
+/* Card Top */
+.card-top { display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+.card-top .badges { display: flex; gap: 8px; }
+.card-top .badge { padding: 4px 8px; border-radius: 6px; letter-spacing: 0.5px; }
+.card-top .badge.critical { background: rgba(239,68,68,0.15); color: #fca5a5; }
+.card-top .badge.high { background: rgba(249,115,22,0.15); color: #fdba74; }
+.card-top .badge.medium { background: rgba(234,179,8,0.15); color: #fde047; }
+.card-top .badge.low { background: rgba(34,197,94,0.15); color: #86efac; }
+.card-top .badge.emergency { background: rgba(239,68,68,0.25); color: #f87171; border: 1px solid rgba(239,68,68,0.5); }
+.card-top .risk-score { color: #cbd5e1; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 6px; }
+
+/* Card Middle */
+.card-middle { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex: 1; min-height: 0; }
+.card-middle .loc-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.card-middle .road-name { margin: 0; font-size: 1.1rem; color: #fff; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; padding-bottom: 4px; }
+.card-middle .village-name { margin: 0; font-size: 0.85rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-middle .thumb-wrapper { width: 50px; height: 50px; border-radius: 8px; overflow: hidden; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.1); background: #000; }
+.card-middle .alert-thumb { width: 100%; height: 100%; object-fit: cover; }
+
+/* Card Bottom */
+.card-bottom { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #94a3b8; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px; }
+.card-bottom > div { display: flex; align-items: center; gap: 12px; }
+.card-bottom i { opacity: 0.7; margin-right: 4px; }
+.worker-badge { display: flex; align-items: center; background: rgba(99,102,241,0.15); color: #a5b4fc; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+.worker-badge i { margin-right: 4px; color: #818cf8; opacity: 1; }
+.status-chip { padding: 2px 6px; border-radius: 4px; font-weight: 600; text-transform: capitalize; }
+.status-chip.assigned { background: rgba(59,130,246,0.15); color: #93c5fd; }
+.status-chip.pending { background: rgba(245,158,11,0.15); color: #fcd34d; }
+
+/* --- Strict Layout Constraints --- */
+/* Override roc-main-layout to enforce fixed heights and scrollable lists */
+.roc-main-layout {
+    height: calc(100vh - 120px) !important; /* Lock overall height */
+    max-height: 900px !important;
+}
+
+/* Left Panel - Fixed dimensions, exact card counts */
+.roc-left-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 0 0 35% !important;
+    padding: 1.5rem !important;
+    overflow: hidden !important;
+    height: 100% !important;
+}
+
+#alertList {
+    flex: 1 !important;
+    overflow-y: overlay !important; /* Custom scrollbar territory */
+    padding-right: 8px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    /* (155px card + 12px margin) * 5 = 835px */
+}
+
+/* Tablet (4 cards) */
+@media (max-width: 1024px) {
+    .roc-main-layout { height: calc(100vh - 140px) !important; }
+    .roc-left-panel { flex: 1 !important; width: 100% !important; }
+}
+
+/* --- Custom Accent Scrollbar --- */
+#alertList::-webkit-scrollbar {
+    width: 6px;
+}
+#alertList::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.02);
+    border-radius: 10px;
+}
+#alertList::-webkit-scrollbar-thumb {
+    background: rgba(99,102,241,0.3);
+    border-radius: 10px;
+}
+#alertList::-webkit-scrollbar-thumb:hover {
+    background: rgba(99,102,241,0.6);
 }
 </style>
+
+<!-- Link the new enterprise alerts.css stylesheet -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/alerts.css') }}">
 {% endblock %}
 
 {% block content %}
-<!-- Filter Toolbar -->
-<div class="filter-toolbar glass-card">
-  <div class="form-group">
-    <label>Severity</label>
-    <select id="fSeverity" class="form-input" onchange="loadTable()">
-      <option value="">All</option>
-      <option>High</option><option>Medium</option><option>Low</option>
-    </select>
-  </div>
-  <div class="form-group">
-    <label>Status</label>
-    <select id="fStatus" class="form-input" onchange="loadTable()">
-      <option value="">All</option>
-      <option>Pending</option><option>In Progress</option><option>Fixed</option>
-    </select>
-  </div>
-  <div class="form-group">
-    <label>Date From</label>
-    <input type="date" id="fDateFrom" class="form-input" onchange="loadTable()"/>
-  </div>
-  <div class="form-group">
-    <label>Date To</label>
-    <input type="date" id="fDateTo" class="form-input" onchange="loadTable()"/>
-  </div>
-  <div class="form-group" style="flex:0">
-    <label>&nbsp;</label>
-    <button class="btn btn-secondary" onclick="clearFilters()"><i class="fa-solid fa-x"></i> Clear</button>
-  </div>
+<div class="roc-app-container">
+    
+    <!-- Filter Toolbar -->
+    <div class="roc-toolbar">
+        <div class="roc-search-wrapper">
+            <i class="fa-solid fa-search roc-search-icon"></i>
+            <input type="text" id="searchBox" placeholder="Search by Road, Landmark, Village..." class="roc-search-input" />
+        </div>
+        
+        <div class="roc-toolbar-group roc-scrollbar" style="overflow-x: auto; padding-bottom: 2px;">
+            <select id="filterPriority" class="roc-filter-select">
+                <option value="">Priority: All</option>
+                <option value="Emergency">Emergency</option>
+                <option value="Critical">Critical</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+            </select>
+            <select id="filterStatus" class="roc-filter-select">
+                <option value="">Status: All</option>
+                <option value="Detected">Detected</option>
+                <option value="Risk Assessed">Risk Assessed</option>
+                <option value="Pending Assignment">Pending Assignment</option>
+                <option value="Assigned">Assigned</option>
+                <option value="Closed">Closed</option>
+            </select>
+            <button onclick="fetchAlerts()" class="roc-btn-icon" style="margin-left: auto;">
+                <i class="fa-solid fa-rotate-right"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Split Layout -->
+    <div class="roc-main-layout">
+        
+        <!-- Left List Panel -->
+        <div id="listPanel" class="roc-left-panel">
+            <div id="alertList" class="roc-alert-list roc-panel-content roc-scrollbar">
+                <!-- Cards injected here by JS -->
+            </div>
+        </div>
+
+        <!-- Right Detail Panel (Desktop only - otherwise Drawer) -->
+        <div id="detailPanelDesktop" class="roc-right-panel hidden lg:flex" style="display: none;">
+            <div class="roc-empty-state" id="detailEmptyState">
+                <div class="roc-empty-icon">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <h3 class="roc-empty-title">No Hazard Selected</h3>
+                <p class="roc-empty-desc">Select an alert to view complete operational details.</p>
+            </div>
+            <div id="detailContentDesktop" class="roc-panel-content roc-scrollbar" style="display: none; flex-direction: column; height: 100%;">
+                <!-- Content injected here -->
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- Table -->
-<div class="table-container glass-card">
-  <div class="table-responsive">
-    <table class="data-table" id="alertsTable">
-      <thead>
-        <tr>
-          <th>ID & Reports</th>
-          <th>Visual</th>
-          <th>Last Seen</th>
-          <th>Lat / Lon</th>
-          <th>Severity</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="alertsBody">
-        <tr><td colspan="9" class="text-center" style="padding:40px;color:var(--muted)">
-          <i class="fa-solid fa-spinner fa-spin"></i> Loading…
-        </td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="pagination" id="pagination"></div>
+<!-- Mobile / Tablet Drawer Overlay -->
+<div id="drawerOverlay" class="roc-drawer-backdrop" onclick="closeDrawer()"></div>
+<div id="drawerPanel" class="roc-right-panel" style="position: fixed; top: 0; right: 0; bottom: 0; width: 85%; max-width: 700px; z-index: 100; border-radius: 32px 0 0 32px; border-right: none; transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); background: rgba(9, 14, 23, 0.95);">
+    <button onclick="closeDrawer()" style="position: absolute; top: 1rem; left: 1rem; z-index: 50; width: 40px; height: 40px; background: rgba(0,0,0,0.8); border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); color: white; display: flex; align-items: center; justify-content: center;">
+        <i class="fa-solid fa-xmark"></i>
+    </button>
+    <div id="detailContentDrawer" class="roc-panel-content roc-scrollbar" style="display: flex; flex-direction: column; height: 100%; padding-top: 4rem;">
+        <!-- Content injected here -->
+    </div>
 </div>
 
-<!-- Image Lightbox -->
-<div class="modal-overlay" id="imgModal" style="display:none" onclick="this.style.display='none'">
-  <div class="modal-box" style="max-width:600px;background:transparent;box-shadow:none">
-    <img id="imgModalSrc" style="max-width:100%;border-radius:12px;max-height:80vh;object-fit:contain"/>
-  </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
 <script>
-let allRows = [], curPage = 1, pageSize = 15;
+let allHazards = [];
+let selectedHazardId = null;
+let searchTimer = null;
 
-async function loadTable() {
-  const sev = document.getElementById('fSeverity').value;
-  const stat = document.getElementById('fStatus').value;
-  const dFrom = document.getElementById('fDateFrom').value;
-  const dTo = document.getElementById('fDateTo').value;
+const PRIORITY_ORDER = { 'Emergency': 5, 'Critical': 4, 'High': 3, 'Medium': 2, 'Low': 1 };
 
-  const tbody = document.getElementById('alertsBody');
-  tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding:40px;color:var(--muted)">
-    <i class="fa-solid fa-spinner fa-spin"></i> Loading…
-  </td></tr>`;
+document.addEventListener('DOMContentLoaded', () => {
+    // Media query to ensure desktop layout overrides inline display properties correctly
+    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+    function handleScreenChange(e) {
+        if (e.matches) {
+            document.getElementById('detailPanelDesktop').style.display = 'flex';
+        } else {
+            document.getElementById('detailPanelDesktop').style.display = 'none';
+        }
+    }
+    mediaQuery.addListener(handleScreenChange);
+    handleScreenChange(mediaQuery);
 
-  try {
-    const url = `/api/alerts?severity=${encodeURIComponent(sev)}&status=${encodeURIComponent(stat)}&date_from=${dFrom}&date_to=${dTo}`;
-    const res  = await fetch(url);
-    if (!res.ok) throw new Error("API Error");
-    allRows = await res.json();
-    document.getElementById('alertCount').innerText = allRows.length;
-  } catch (e) {
-    console.error(e);
-    allRows = [];
-    tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding:40px;color:var(--danger)">Failed to load data from server.</td></tr>`;
-    document.getElementById('alertCount').innerText = '0';
-    return;
-  }
-  curPage = 1;
-  renderTable();
+    fetchAlerts();
+    setInterval(() => fetchAlerts(true), 2000);
+    document.getElementById('searchBox').addEventListener('input', (e) => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(renderList, 300);
+    });
+    document.getElementById('filterPriority').addEventListener('change', renderList);
+    document.getElementById('filterStatus').addEventListener('change', renderList);
+});
+
+let alertsAbortController = null;
+async function fetchAlerts(silent = false) {
+    const listEl = document.getElementById('alertList');
+    if (!silent) {
+        listEl.innerHTML = `
+            <div class="roc-skeleton sk-card"></div>
+            <div class="roc-skeleton sk-card"></div>
+            <div class="roc-skeleton sk-card"></div>
+        `;
+    }
+    
+    try {
+        if (alertsAbortController) alertsAbortController.abort();
+        alertsAbortController = new AbortController();
+        const res = await fetch('/api/alerts', { signal: alertsAbortController.signal });
+        if (!res.ok) throw new Error("Failed to fetch");
+        allHazards = await res.json();
+        document.getElementById('alertCount').innerText = allHazards.length;
+        
+        // Retain selection if exists
+        if (selectedHazardId && !allHazards.find(h => (h.hazard_id || h.id) == selectedHazardId)) {
+            closeDrawer();
+            selectedHazardId = null;
+        }
+        
+        renderList();
+        if (selectedHazardId) {
+            const hz = allHazards.find(h => (h.hazard_id || h.id) == selectedHazardId);
+            if(hz) populateDetail(hz);
+        }
+    } catch(err) {
+        if (err.name !== 'AbortError') {
+            console.error(err);
+            if (!silent) {
+                listEl.innerHTML = `
+                    <div class="roc-error-card" style="padding: 2rem; margin-top: 2rem;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <h3 class="roc-error-title">Connection Problem</h3>
+                        <p class="roc-error-desc">Could not load hazards.</p>
+                        <button onclick="fetchAlerts()" class="roc-btn roc-btn-primary">Retry</button>
+                    </div>
+                `;
+            }
+        }
+    }
 }
 
-function renderTable() {
-  const tbody = document.getElementById('alertsBody');
-  const start = (curPage - 1) * pageSize;
-  const page  = allRows.slice(start, start + pageSize);
+function resolveLocation(h) {
+    const isValid = (val) => {
+        if (!val) return false;
+        const s = String(val).trim();
+        const lower = s.toLowerCase();
+        return s !== '' && !lower.includes("not available") && !lower.includes("unnamed") && !lower.includes("unavailable") && !lower.includes("unknown");
+    };
 
-  if (!page.length) {
-    tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding:40px;color:var(--muted)">No records found</td></tr>`;
-    document.getElementById('pagination').innerHTML = '';
-    return;
-  }
+    const titleFields = [
+        h.road_name, h.street_name, h.residential, h.landmark, h.village, 
+        h.hamlet, h.suburb, h.neighbourhood, h.postcode, h.city, h.town, 
+        h.county, h.district, h.formatted_address, `${h.latitude}, ${h.longitude}`
+    ];
+    let title = "Location information unavailable";
+    for (const val of titleFields) {
+        if (isValid(val) || (val === `${h.latitude}, ${h.longitude}`)) {
+            title = val;
+            break;
+        }
+    }
+    
+    // Subtitle Priority
+    const subFields = [
+        h.landmark, h.village, h.hamlet, h.suburb, h.neighbourhood, 
+        h.postcode, h.city, h.town, h.county, h.district, h.state
+    ];
+    let subtitleArr = [];
+    for (const val of subFields) {
+        if (isValid(val)) {
+            subtitleArr.push(val);
+        }
+    }
+    
+    let subtitle = subtitleArr.join(' • ');
+    if (subtitleArr.length === 0) {
+        if (title === "Location information unavailable") {
+            subtitle = "";
+        } else {
+            subtitle = "Location information unavailable";
+        }
+    }
+    
+    return { title, subtitle };
+}
 
-  tbody.innerHTML = page.map(r => `
-    <tr id="row-${r.id}">
-      <td>
-        <div style="font-weight:600; color:var(--text)">#${r.id} pothole</div>
-        <div style="font-size:0.75rem; color:var(--accent)">${r.report_count} ${r.report_count === 1 ? 'Report' : 'Reports'}</div>
-      </td>
-      <td>${r.image
-        ? `<div class="thumb-wrapper" onclick='showGallery(${JSON.stringify(r.all_images)})'>
-             <img src="${r.image}" class="thumb" loading="lazy" onerror="this.onerror=null;this.outerHTML='<div class=\\'thumb-placeholder\\' style=\\'color:#ef4444\\'><i class=\\'fa-solid fa-image-slash\\'></i></div>';"/>
-             ${r.all_images.length > 1 ? `<span class="img-count-tag">+${r.all_images.length - 1}</span>` : ''}
-           </div>`
-        : `<div class="thumb-placeholder"><i class="fa-solid fa-image"></i></div>`}</td>
-      <td>
-        <div style="font-size:0.8rem; font-weight:600">${r.last_seen}</div>
-        <div style="font-size:0.7rem; color:var(--muted)">Source: ${resolveSource(r.source)}</div>
-      </td>
-      <td style="font-size:.78rem;font-family:monospace">${r.latitude}<br/>${r.longitude}</td>
-      <td>${severityBadge(r.severity, r.status)}</td>
-      <td>${statusBadge(r.status)}</td>
-      <td>
-        <div class="action-btns">
-          ${(r.status !== 'Fixed' && r.status !== 'Completed') ? `<button class="btn btn-xs btn-success" onclick="markFixed(${r.id})"><i class="fa-solid fa-check"></i></button>` : ''}
-          <button class="btn btn-xs btn-accent" onclick="openAssignModal(${r.id})"><i class="fa-solid fa-user-plus"></i></button>
+function renderList() {
+    const q = document.getElementById('searchBox').value.toLowerCase();
+    const fPri = document.getElementById('filterPriority').value;
+    const fStat = document.getElementById('filterStatus').value;
+    
+    let filtered = allHazards.filter(h => {
+        const assignStatus = h.assignment?.status || h.status || '';
+        if (assignStatus === 'Completed' || assignStatus === 'Closed' || assignStatus === 'Verified' || assignStatus === 'Fixed') return false;
+        
+        if (fPri && h.priority !== fPri) return false;
+        if (fStat && h.maintenance_state !== fStat && h.status !== fStat) return false;
+        if (q) {
+            const rd = (h.road_name || '').toLowerCase();
+            const lm = (h.landmark || '').toLowerCase();
+            const vl = (h.village || '').toLowerCase();
+            const ds = (h.district || '').toLowerCase();
+            if (!rd.includes(q) && !lm.includes(q) && !vl.includes(q) && !ds.includes(q)) return false;
+        }
+        return true;
+    });
+    
+    // Sort logic
+    filtered.sort((a, b) => {
+        const pA = PRIORITY_ORDER[a.priority || 'Medium'] || 2;
+        const pB = PRIORITY_ORDER[b.priority || 'Medium'] || 2;
+        if (pA !== pB) return pB - pA;
+        
+        const sa = a.priority_score || 0;
+        const sb = b.priority_score || 0;
+        if (sa !== sb) return sb - sa;
+        
+        const rsa = a.risk_score || 0;
+        const rsb = b.risk_score || 0;
+        if (rsa !== rsb) return rsb - rsa;
+        
+        const wa = a.waiting_days || 0;
+        const wb = b.waiting_days || 0;
+        if (wa !== wb) return wb - wa;
+        
+        const ra = a.report_count || 1;
+        const rb = b.report_count || 1;
+        if (ra !== rb) return rb - ra;
+        
+        return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+    const listEl = document.getElementById('alertList');
+    
+    if (filtered.length === 0) {
+        listEl.innerHTML = `
+            <div class="roc-empty-state" style="padding: 2rem;">
+                <div class="roc-empty-icon" style="width: 60px; height: 60px; margin-bottom: 1rem;">
+                    <i class="fa-solid fa-check-double" style="font-size: 1.5rem;"></i>
+                </div>
+                <h3 class="roc-empty-title" style="font-size: 1rem;">No Active Hazards</h3>
+                <p class="roc-empty-desc" style="font-size: 0.75rem;">All reported hazards have been handled.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // DOM DIFFING ENGINE - PRESERVES SCROLL STATE & PREVENTS FLICKER
+    const existingCards = Array.from(listEl.querySelectorAll('.modern-alert-card'));
+    const existingMap = new Map(existingCards.map(el => [el.id, el]));
+    
+    // Keep track of elements we want to keep in the exact order
+    const newOrder = [];
+
+    filtered.forEach(h => {
+        const id = h.hazard_id || h.id;
+        const cardId = `card-${id}`;
+        const isSel = id === selectedHazardId;
+        
+        const priRaw = h.priority || 'Medium';
+        const pri = priRaw.toLowerCase();
+        
+        const sevRaw = h.severity || 'Medium';
+        const sevLower = sevRaw.toLowerCase();
+        
+        const statusRaw = h.status || 'Pending';
+        const statusLower = statusRaw.toLowerCase().replace(/\s+/g, '');
+        
+        const locData = resolveLocation(h);
+        const road = locData.title;
+        const loc = locData.subtitle;
+        
+        const workerName = h.assigned_worker_name;
+        const workerBadge = workerName 
+            ? `<span class="worker-badge"><i class="fa-solid fa-hard-hat"></i> ${workerName}</span>` 
+            : `<span class="status-chip ${statusLower}">${statusRaw}</span>`;
+            
+        // Use proper URL resolution for thumbnail
+        let thumbUrl = h.image_url || h.media_url || h.image || '';
+        if (thumbUrl && !thumbUrl.startsWith('http') && !thumbUrl.startsWith('/static')) {
+            // Assume we can't reliably inject Config.SUPABASE_URL from JS unless it's already full.
+            // But we can fallback nicely. Usually alerts API returns absolute URLs now.
+        }
+        
+        // Build the precise inner HTML for this card's state
+        const cardInnerHtml = `
+            <div class="card-top">
+                <div class="badges">
+                    <span class="badge ${pri}">${priRaw}</span>
+                    <span class="badge ${sevLower}">${sevRaw}</span>
+                </div>
+                <span class="risk-score">Risk: ${Math.round(h.risk_score || 0)}</span>
+            </div>
+            
+            <div class="card-middle">
+                <div class="loc-info">
+                    <h4 class="road-name">${road}</h4>
+                    <p class="village-name">${loc}</p>
+                </div>
+                <div class="thumb-wrapper">
+                    <img src="${thumbUrl}" onerror="this.src='/static/images/placeholder_no_image.jpg'" class="alert-thumb">
+                </div>
+            </div>
+            
+            <div class="card-bottom">
+                <div>
+                    <span class="meta-reports"><i class="fa-solid fa-users"></i> ${h.report_count || 1} Reps</span>
+                    <span class="meta-time"><i class="fa-regular fa-clock"></i> ${h.created_at ? new Date(h.created_at).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}) : 'Now'}</span>
+                </div>
+                <div>
+                    ${workerBadge}
+                </div>
+            </div>
+        `;
+        
+        let cardEl = existingMap.get(cardId);
+        if (cardEl) {
+            // Update existing element if it changed
+            if (cardEl.innerHTML !== cardInnerHtml) {
+                cardEl.innerHTML = cardInnerHtml;
+            }
+            if (isSel && !cardEl.classList.contains('selected')) {
+                cardEl.classList.add('selected');
+            } else if (!isSel && cardEl.classList.contains('selected')) {
+                cardEl.classList.remove('selected');
+            }
+            existingMap.delete(cardId); // Mark as preserved
+        } else {
+            // Create new element
+            cardEl = document.createElement('div');
+            cardEl.id = cardId;
+            cardEl.className = `roc-alert-card modern-alert-card ${isSel ? 'selected' : ''}`;
+            cardEl.onclick = () => selectHazard(id);
+            cardEl.innerHTML = cardInnerHtml;
+        }
+        newOrder.push(cardEl);
+    });
+    
+    // Remove stale elements with fade-out
+    existingMap.forEach((el, cardId) => {
+        el.style.transition = 'all 0.3s ease';
+        el.style.opacity = '0';
+        el.style.transform = 'scale(0.95)';
+        setTimeout(() => el.remove(), 300);
+        
+        // Clear detail panel if this card was selected
+        if (selectedHazardId && cardId === `card-${selectedHazardId}`) {
+            closeDrawer();
+        }
+    });
+    
+    // Ensure order is correct in the DOM without fully wiping if possible
+    // We can just append in order. appendChild moves the element if it already exists in the parent.
+    // This is extremely fast and preserves scroll state perfectly!
+    newOrder.forEach(el => listEl.appendChild(el));
+    
+    // Cleanup empty states if they exist
+    const emptyState = listEl.querySelector('.roc-empty-state');
+    if (emptyState) emptyState.remove();
+}
+
+function selectHazard(id) {
+    selectedHazardId = id;
+    renderList(); // Update selected state
+    
+    const h = allHazards.find(x => (x.hazard_id || x.id) == id);
+    if(h) populateDetail(h);
+    
+    // Open drawer on small screens
+    if (window.innerWidth < 1024) {
+        document.getElementById('drawerOverlay').classList.add('active');
+        document.getElementById('drawerPanel').style.transform = 'translateX(0)';
+        document.getElementById('drawerPanel').style.boxShadow = '-10px 0 40px rgba(0,0,0,0.5)';
+    }
+}
+
+function closeDrawer() {
+    selectedHazardId = null;
+    renderList();
+    document.getElementById('drawerOverlay').classList.remove('active');
+    document.getElementById('drawerPanel').style.transform = 'translateX(100%)';
+    document.getElementById('drawerPanel').style.boxShadow = 'none';
+    
+    // Reset desktop state
+    document.getElementById('detailEmptyState').style.display = 'flex';
+    document.getElementById('detailContentDesktop').style.display = 'none';
+}
+
+function populateDetail(h) {
+    const locData = resolveLocation(h);
+    const road = locData.title;
+    const locStr = locData.subtitle;
+    const img = h.image_url || h.image;
+    const mapLink = h.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${h.latitude},${h.longitude}`;
+    
+    const priClass = h.priority ? h.priority.toLowerCase() : '';
+    const pb = h.priority_breakdown || {};
+    const rb = h.risk_breakdown || {};
+    const reasons = h.reason_bundle || [];
+    const rec = h.recommendation || {};
+    const wf = h.workflow || {};
+    const assign = h.assignment || {};
+    
+    let realWaitingDays = 0;
+    if (h.first_reported_at || h.created_at) {
+        const createdDate = new Date(h.first_reported_at || h.created_at);
+        const now = new Date();
+        realWaitingDays = Math.max(0, Math.floor((now - createdDate) / (1000 * 60 * 60 * 24)));
+    }
+    
+    const htmlStr = `
+        <!-- SECTION 1: Header Image & Location -->
+        <div class="roc-hero-section">
+            <div class="roc-hero-image-wrap">
+                ${assign && assign.status === 'Waiting Verification' ? `
+                    <div style="display: flex; gap: 1rem; width: 100%; height: 100%;">
+                        <div style="flex: 1; position: relative;">
+                            <div style="position: absolute; top: 0; left: 0; background: rgba(0,0,0,0.7); padding: 2px 8px; font-size: 10px; z-index: 10;">BEFORE</div>
+                            <img src="${img}" class="roc-hero-image" style="object-fit: cover;" />
+                        </div>
+                        <div style="flex: 1; position: relative;">
+                            <div style="position: absolute; top: 0; left: 0; background: rgba(0,0,0,0.7); padding: 2px 8px; font-size: 10px; z-index: 10;">AFTER</div>
+                            ${assign.photo_after ? `<img src="${assign.photo_after}" class="roc-hero-image" style="object-fit: cover;" />` : `<div style="display:flex;align-items:center;justify-content:center;height:100%;background:#1a202c;"><i class="fa-solid fa-image"></i></div>`}
+                        </div>
+                    </div>
+                ` : img ? `<img src="${img}" class="roc-hero-image" />` : 
+                       `<div class="roc-empty-state" style="height: 100%; padding: 0;">
+                            <i class="fa-solid fa-camera-slash" style="font-size: 3rem; color: rgba(255,255,255,0.1);"></i>
+                        </div>`}
+                <div class="roc-hero-badges">
+                    <span class="roc-badge ${priClass}">${h.priority}</span>
+                </div>
+            </div>
+            
+            <div class="roc-location-info">
+                <h2 class="roc-loc-title">${road}</h2>
+                <div class="roc-loc-details">
+                    <div class="roc-loc-row" style="${locStr ? '' : 'display:none;'}">
+                        <i class="fa-solid fa-location-dot"></i>
+                        <span>${locStr}</span>
+                    </div>
+                    <div class="roc-loc-row">
+                        <i class="fa-solid fa-map-pin"></i>
+                        <span class="roc-mono">${h.latitude}, ${h.longitude}</span>
+                    </div>
+                </div>
+                <div style="margin-top: 1.5rem;">
+                    <a href="/dashboard?hazard=${h.id}" class="roc-btn roc-btn-glass" style="display: inline-flex; width: auto; padding: 0.5rem 1rem;">
+                        <i class="fa-solid fa-map-location-dot"></i> View on Map
+                    </a>
+                </div>
+            </div>
         </div>
-      </td>
-    </tr>`).join('');
 
-  // Pagination
-  const totalPages = Math.ceil(allRows.length / pageSize);
-  let pag = '';
-  for (let i = 1; i <= totalPages; i++) {
-    pag += `<button class="page-btn ${i===curPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
-  }
-  document.getElementById('pagination').innerHTML = pag;
+        <!-- SECTION 2: Summary Chips -->
+        <div class="roc-chips-grid">
+            <div class="roc-chip ${priClass === 'emergency' || priClass === 'critical' ? 'danger' : priClass === 'high' ? 'warning' : 'primary'}">
+                <span class="roc-chip-label">Priority</span>
+                <span class="roc-chip-value">${h.priority_score}</span>
+            </div>
+            <div class="roc-chip primary">
+                <span class="roc-chip-label">Risk Score</span>
+                <span class="roc-chip-value">${h.risk_score}</span>
+            </div>
+            <div class="roc-chip warning">
+                <span class="roc-chip-label">Waiting</span>
+                <span class="roc-chip-value">${h.waiting_days}d</span>
+            </div>
+            <div class="roc-chip primary">
+                <span class="roc-chip-label">Reports</span>
+                <span class="roc-chip-value">${h.report_count}</span>
+            </div>
+            <div class="roc-chip success">
+                <span class="roc-chip-label">Assignment</span>
+                <span class="roc-chip-value" style="font-size: 1.125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: block;">
+                    ${assign.status === 'Available' ? 'Available for Workers' : (assign.worker_name || assign.status || 'None')}
+                </span>
+            </div>
+        </div>
+
+        <div class="roc-grid-12">
+            <!-- Priority Checklist -->
+            <div class="roc-col-4">
+                <div class="roc-data-card">
+                    <h3 class="roc-section-title"><i class="fa-solid fa-calculator"></i> Calculated From</h3>
+                    <ul class="roc-checklist">
+                        <li class="roc-check-item">
+                            <span class="roc-check-label"><i class="fa-solid fa-check"></i> Risk</span>
+                            <span class="roc-check-value">${h.risk_score || 0}</span>
+                        </li>
+                        <li class="roc-check-item">
+                            <span class="roc-check-label"><i class="fa-solid fa-check"></i> Waiting Time</span>
+                            <span class="roc-check-value">${realWaitingDays}d</span>
+                        </li>
+                        <li class="roc-check-item">
+                            <span class="roc-check-label"><i class="fa-solid fa-check"></i> Reports</span>
+                            <span class="roc-check-value">${h.report_count || 0}</span>
+                        </li>
+                        <li class="roc-check-item">
+                            <span class="roc-check-label"><i class="fa-solid fa-check"></i> Road</span>
+                            <span class="roc-check-value">${h.road_importance || 0}</span>
+                        </li>
+                        ${pb.emergency_rule ? `
+                        <li class="roc-check-item alert-row">
+                            <span class="roc-check-label"><i class="fa-solid fa-triangle-exclamation"></i> Emergency</span>
+                            <span class="roc-check-value">Required</span>
+                        </li>` : ''}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Risk Progress Bars -->
+            <div class="roc-col-4">
+                <div class="roc-data-card">
+                    <h3 class="roc-section-title"><i class="fa-solid fa-chart-pie"></i> Risk Breakdown</h3>
+                    <div class="roc-progress-group">
+                        <div class="roc-progress-item">
+                            <div class="roc-progress-header">
+                                <span class="roc-progress-label">Severity</span>
+                                <span class="roc-progress-val">${h.severity ? h.severity.toUpperCase() : 'NOT AVAILABLE'}</span>
+                            </div>
+                            <div class="roc-progress-track">
+                                <div class="roc-progress-fill fill-red" style="width: ${h.severity === 'critical' ? 100 : h.severity === 'high' ? 75 : h.severity === 'medium' ? 50 : h.severity === 'low' ? 25 : 10}%"></div>
+                            </div>
+                        </div>
+                        <div class="roc-progress-item">
+                            <div class="roc-progress-header">
+                                <span class="roc-progress-label">Confidence</span>
+                                <span class="roc-progress-val">${h.confidence ? (h.confidence * 100).toFixed(1) + '%' : 'NOT AVAILABLE'}</span>
+                            </div>
+                            <div class="roc-progress-track">
+                                <div class="roc-progress-fill fill-blue" style="width: ${h.confidence ? h.confidence * 100 : 0}%"></div>
+                            </div>
+                        </div>
+                        <div class="roc-progress-item">
+                            <div class="roc-progress-header">
+                                <span class="roc-progress-label">Reports</span>
+                                <span class="roc-progress-val">${h.report_count || 0}</span>
+                            </div>
+                            <div class="roc-progress-track">
+                                <div class="roc-progress-fill fill-purple" style="width: ${Math.min(100, (h.report_count || 0) * 5)}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hazard Statistics -->
+            <div class="roc-col-4">
+                <div class="roc-data-card">
+                    <h3 class="roc-section-title"><i class="fa-solid fa-chart-line"></i> Hazard Statistics</h3>
+                    <div class="roc-road-info">
+                        <div class="roc-road-item">
+                            <span class="roc-road-label">First Report Date</span>
+                            <span class="roc-road-value">${h.first_reported_at ? new Date(h.first_reported_at).toLocaleDateString() : (h.created_at ? new Date(h.created_at).toLocaleDateString() : 'Not Available')}</span>
+                        </div>
+                        <div class="roc-road-item">
+                            <span class="roc-road-label">Latest Report Date</span>
+                            <span class="roc-road-value">${h.last_seen ? new Date(h.last_seen).toLocaleDateString() : 'Not Available'}</span>
+                        </div>
+                        <div class="roc-road-item">
+                            <span class="roc-road-label">Average Confidence</span>
+                            <span class="roc-road-value">${h.confidence ? (h.confidence * 100).toFixed(1) + '%' : 'Not Available'}</span>
+                        </div>
+                        <div class="roc-road-item">
+                            <span class="roc-road-label">Average Severity</span>
+                            <span class="roc-road-value">${h.severity ? h.severity.toUpperCase() : 'NOT AVAILABLE'}</span>
+                        </div>
+                        <div class="roc-road-item">
+                            <span class="roc-road-label">Total Reports</span>
+                            <span class="roc-road-value">${h.report_count || 0}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 4: Why This Hazard Is Important -->
+        <div style="margin-bottom: 2.5rem;">
+            <h3 class="roc-section-title"><i class="fa-solid fa-list-check"></i> Why this hazard is important</h3>
+            <div class="roc-reasons-wrap">
+                ${reasons.length > 0 ? reasons.map(r => `
+                    <div class="roc-reason-pill">
+                        <i class="fa-solid fa-check"></i>
+                        <span>${r.message}</span>
+                    </div>
+                `).join('') : `
+                    <div class="roc-empty-state" style="padding: 1rem; flex-direction: row; gap: 1rem;">
+                        <i class="fa-solid fa-circle-info"></i> Reason calculation pending
+                    </div>
+                `}
+            </div>
+        </div>
+
+        <div class="roc-grid-12" style="margin-bottom: 1rem;">
+            <!-- SECTION 6: Workflow Timeline -->
+            <div class="roc-col-12">
+                <div class="roc-data-card" style="display: flex; flex-direction: column;">
+                    <h3 class="roc-section-title"><i class="fa-solid fa-timeline"></i> Lifecycle Tracking</h3>
+                    <div class="roc-timeline-wrapper">
+                        <div class="roc-timeline">
+                            <div class="roc-tl-track"></div>
+                            <div class="roc-tl-nodes">
+                                ${generateWorkflowHTML(h)}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 2.5rem; display: flex; justify-content: center;" id="assignContainer-${h.id}">
+                        ${(!assign || !assign.status || assign.status === 'Unassigned' || assign.status === 'Pending Assignment' || assign.status === 'Detected' || assign.status === 'Risk Assessed') ? `
+                            <button id="assignBtn-${h.id}" onclick="handleAdminAction(${h.hazard_id || (h.id && typeof h.id === 'string' && h.id.includes('-') ? h.id.split('-')[1] : h.id)}, '${h.source || (h.id && h.id.includes('USER') ? 'user_reports' : 'potholes')}', '${h.display_id || h.id}', 'assign'); this.classList.add('loading'); this.disabled = true;" class="roc-btn roc-btn-primary" style="padding: 1rem 3rem; font-size: 1.1rem; width: 100%; max-width: 400px; border-radius: 12px;">
+                                <i class="fa-solid fa-user-plus"></i> <span class="btn-text">Assign Work</span>
+                            </button>
+                        ` : `
+                            <div class="roc-glass-status-panel" style="background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 450px; text-align: center; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);">
+                                ${['Assigned', 'Available'].includes(assign.status) ? `
+                                    <div style="color: #c084fc; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: 1px; text-transform: uppercase;">
+                                        <i class="fa-solid fa-check-circle" style="font-size: 1rem; vertical-align: middle; margin-right: 6px;"></i> Job Published
+                                    </div>
+                                    <div style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Waiting for Worker Acceptance</div>
+                                    <div style="font-size: 0.85rem; color: var(--text-muted);">Published On<br><strong style="color: var(--text-primary);">${new Date(assign.assigned_time || assign.created_at || Date.now()).toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}</strong></div>
+                                ` : assign.status === 'Accepted' ? `
+                                    <div style="color: #60a5fa; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: 1px; text-transform: uppercase;">
+                                        <i class="fa-solid fa-circle" style="font-size: 0.8rem; vertical-align: middle; margin-right: 6px;"></i> Accepted
+                                    </div>
+                                    <div style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Accepted By <strong style="color: var(--text-primary);">${assign.worker_name || 'Worker'}</strong></div>
+                                    <div style="font-size: 0.85rem; color: var(--text-muted);">Accepted On<br><strong style="color: var(--text-primary);">${new Date(assign.accepted_at || Date.now()).toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}</strong></div>
+                                ` : assign.status === 'Travelling' ? `
+                                    <div style="color: #fb923c; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: 1px; text-transform: uppercase;">
+                                        <i class="fa-solid fa-circle" style="font-size: 0.8rem; vertical-align: middle; margin-right: 6px;"></i> Worker Travelling
+                                    </div>
+                                    <div style="display: flex; justify-content: space-around; margin-top: 1rem;">
+                                        <div>
+                                            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">ETA</div>
+                                            <div style="font-size: 1rem; font-weight: 600; color: var(--text-primary);">${assign.eta || '15 mins'}</div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Distance</div>
+                                            <div style="font-size: 1rem; font-weight: 600; color: var(--text-primary);">${assign.distance || '2.4 km'}</div>
+                                        </div>
+                                    </div>
+                                ` : ['Reached Site', 'Reached'].includes(assign.status) ? `
+                                    <div style="color: #4ade80; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: 1px; text-transform: uppercase;">
+                                        <i class="fa-solid fa-circle" style="font-size: 0.8rem; vertical-align: middle; margin-right: 6px;"></i> Worker Reached Site
+                                    </div>
+                                ` : assign.status === 'Repair Started' ? `
+                                    <div style="color: #facc15; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: 1px; text-transform: uppercase;">
+                                        <i class="fa-solid fa-circle" style="font-size: 0.8rem; vertical-align: middle; margin-right: 6px;"></i> Repair In Progress
+                                    </div>
+                                ` : assign.status === 'Repair Completed' ? `
+                                    <div style="color: #4ade80; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: 1px; text-transform: uppercase;">
+                                        <i class="fa-solid fa-circle" style="font-size: 0.8rem; vertical-align: middle; margin-right: 6px;"></i> Repair Completed
+                                    </div>
+                                    <div style="font-size: 0.95rem; color: var(--text-secondary);">Waiting for Verification</div>
+                                ` : ['Waiting Verification', 'Needs Rework'].includes(assign.status) ? `
+                                    <div style="color: #c084fc; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: 1px; text-transform: uppercase;">
+                                        <i class="fa-solid fa-circle" style="font-size: 0.8rem; vertical-align: middle; margin-right: 6px;"></i> Awaiting Admin Verification
+                                    </div>
+                                ` : ['Completed', 'Closed', 'Verified', 'Fixed'].includes(assign.status) ? `
+                                    <div style="color: #4ade80; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: 1px; text-transform: uppercase;">
+                                        <i class="fa-solid fa-check-circle" style="font-size: 1rem; vertical-align: middle; margin-right: 6px;"></i> Successfully Completed
+                                    </div>
+                                    <div style="font-size: 0.95rem; color: var(--text-secondary);">Verified By Admin</div>
+                                ` : `
+                                    <div style="color: var(--text-primary); font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: 1px; text-transform: uppercase;">
+                                        <i class="fa-solid fa-circle" style="font-size: 0.8rem; vertical-align: middle; margin-right: 6px;"></i> ${assign.status}
+                                    </div>
+                                `}
+                            </div>
+                        `}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="roc-actions-bar" id="action-bar-${h.id}">
+            ${h.status === 'pending' ? `
+                <button onclick="handleAdminAction(${h.hazard_id || (h.id && typeof h.id === 'string' && h.id.includes('-') ? h.id.split('-')[1] : h.id)}, '${h.source || (h.id && h.id.includes('USER') ? 'user_reports' : 'potholes')}', '${h.display_id || h.id}', 'reject')" class="roc-btn" style="background: rgba(255,50,50,0.1); color: #ff6b6b; border: 1px solid rgba(255,50,50,0.2);">
+                    <i class="fa-solid fa-xmark"></i> Reject
+                </button>
+                <button onclick="handleAdminAction(${h.hazard_id || (h.id && typeof h.id === 'string' && h.id.includes('-') ? h.id.split('-')[1] : h.id)}, '${h.source || (h.id && h.id.includes('USER') ? 'user_reports' : 'potholes')}', '${h.display_id || h.id}', 'verify')" class="roc-btn roc-btn-primary">
+                    <i class="fa-solid fa-check"></i> Verify
+                </button>
+            ` : assign && assign.status === 'Waiting Verification' ? `
+                <div style="width: 100%; text-align: left; padding: 15px; border: 1px solid #4a90e2; border-radius: 8px; margin-bottom: 15px; background: rgba(74, 144, 226, 0.1);">
+                    <h4 style="margin-top: 0;"><i class="fa-solid fa-robot"></i> AI Verification Passed</h4>
+                    <p style="margin: 5px 0;"><strong>Score:</strong> ${assign.ai_score || 96}%</p>
+                </div>
+                <div style="display: flex; gap: 10px; width: 100%;">
+                    <button onclick="handleVerifyRepair('${h.id}', 'reject')" class="roc-btn" style="flex: 1; background: rgba(255,50,50,0.1); color: #ff6b6b; border: 1px solid rgba(255,50,50,0.2);">
+                        <i class="fa-solid fa-xmark"></i> Reject Repair
+                    </button>
+                    <button onclick="handleVerifyRepair('${h.id}', 'approve')" class="roc-btn roc-btn-primary" style="flex: 2;">
+                        <i class="fa-solid fa-check-double"></i> Approve Repair
+                    </button>
+                </div>
+            ` : ''}
+        </div>
+    `;
+    
+    // Populate both Desktop and Drawer containers
+    const destDesk = document.getElementById('detailContentDesktop');
+    const destDrawer = document.getElementById('detailContentDrawer');
+    
+    if(destDesk && destDesk.innerHTML !== htmlStr) {
+        const scrollTop = destDesk.scrollTop;
+        destDesk.innerHTML = htmlStr;
+        requestAnimationFrame(() => destDesk.scrollTop = scrollTop);
+    }
+    
+    if(destDrawer && destDrawer.innerHTML !== htmlStr) {
+        const scrollTop = destDrawer.scrollTop;
+        destDrawer.innerHTML = htmlStr;
+        requestAnimationFrame(() => destDrawer.scrollTop = scrollTop);
+    }
+    
+    document.getElementById('detailEmptyState').style.display = 'none';
+    if(destDesk) destDesk.style.display = 'flex';
+    
+    // Trigger auto-scroll for timeline
+    setTimeout(() => {
+        const activeNodes = document.querySelectorAll('.roc-tl-node.current');
+        activeNodes.forEach(node => {
+            node.scrollIntoView({behavior: 'smooth', block: 'nearest', inline: 'center'});
+        });
+    }, 100);
 }
 
-function showGallery(images) {
-  if (!images || images.length === 0) return;
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-  
-  overlay.innerHTML = `
-    <button style="position:absolute;top:20px;right:20px;background:none;border:none;color:white;font-size:30px;cursor:pointer" onclick="this.parentElement.remove()">&times;</button>
-    <div id="galleryContainer" style="max-width:90%;max-height:80%;display:flex;overflow-x:auto;gap:20px;padding:20px;scroll-snap-type:x mandatory;scrollbar-width:thin;">
-      ${images.map(src => `<img src="${src}" style="height:500px;max-height:100%;object-fit:contain;flex-shrink:0;scroll-snap-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.5)"/>`).join('')}
-    </div>
-    <div style="color:white;margin-top:20px;font-family:Inter,sans-serif">${images.length} Evidence Images (Scroll horizontal)</div>
-  `;
-  document.body.appendChild(overlay);
+// Custom Modal Logic
+function showConfirmModal(title, message, onConfirm) {
+    const modalHtml = `
+        <div id="rocConfirmModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease;">
+            <div style="background: var(--surface-light); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 2rem; max-width: 400px; width: 90%; transform: scale(0.9); transition: transform 0.3s ease; box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
+                <div style="font-size: 2rem; color: var(--accent-color); margin-bottom: 1rem; text-align: center;">
+                    <i class="fa-solid fa-clipboard-user"></i>
+                </div>
+                <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.25rem; font-weight: 600; text-align: center; color: var(--text-primary);">${title}</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem; font-size: 0.95rem; text-align: center; line-height: 1.5;">${message}</p>
+                <div style="display: flex; gap: 1rem; justify-content: center;">
+                    <button id="rocModalCancelBtn" class="roc-btn" style="background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); flex: 1;">Cancel</button>
+                    <button id="rocModalConfirmBtn" class="roc-btn roc-btn-primary" style="flex: 1;">Confirm</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = document.getElementById('rocConfirmModal');
+    
+    // Animate in
+    setTimeout(() => {
+        modal.style.opacity = '1';
+        modal.children[0].style.transform = 'scale(1)';
+    }, 10);
+    
+    const close = () => {
+        modal.style.opacity = '0';
+        modal.children[0].style.transform = 'scale(0.9)';
+        setTimeout(() => modal.remove(), 300);
+    };
+    
+    document.getElementById('rocModalCancelBtn').onclick = close;
+    document.getElementById('rocModalConfirmBtn').onclick = () => {
+        close();
+        onConfirm();
+    };
 }
 
-function goPage(n) { curPage = n; renderTable(); }
+async function handleAdminAction(hazardId, source, displayId, action) {
+    let title = "Confirm Action";
+    let msg = `Are you sure you want to ${action} this alert?`;
+    
+    if (action === 'assign') {
+        title = "Publish to Workers";
+        msg = "This will immediately publish the job to all available workers. The first worker to accept it will claim the assignment.";
+    }
+    
+    const confirmed = await customConfirm(msg);
+    if (!confirmed) {
+        // Reset loading state on cancel
+        const btn = document.querySelector(`button[onclick*="'${action}'"]`);
+        if(btn) { btn.classList.remove('loading'); btn.disabled = false; }
+        return;
+    }
 
-function showImg(src) {
-  document.getElementById('imgModalSrc').src = src;
-  document.getElementById('imgModal').style.display = 'flex';
+    try {
+        const res = await fetch(`/api/alerts/${action}`, { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                hazard_id: hazardId, 
+                source: source,
+                display_id: displayId
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('Status updated successfully', 'success');
+            if (data.updated_hazard) {
+                if (action === 'assign') {
+                    // Artificially inject state so UI immediately transforms without DB assignment
+                    data.updated_hazard.assignment = {
+                        status: 'Available',
+                        assigned_time: new Date().toISOString(),
+                        worker_name: null,
+                        worker_id: null
+                    };
+                    data.updated_hazard.status = 'Available';
+                    if (data.updated_hazard.workflow) {
+                        data.updated_hazard.workflow.state = 'Available';
+                    }
+                }
+                hotSwapHazard(data.updated_hazard);
+            }
+        } else {
+            showToast(data.error || 'Failed', 'error');
+            const btn = document.querySelector(`button[onclick*="'${action}'"]`);
+            if(btn) { btn.classList.remove('loading'); btn.disabled = false; }
+        }
+    } catch(err) { 
+        showToast('Error: ' + err.message, 'error'); 
+        const btn = document.querySelector(`button[onclick*="'${action}'"]`);
+        if(btn) { btn.classList.remove('loading'); btn.disabled = false; }
+    }
 }
 
-async function markFixed(id) {
-  await fetch(`/api/pothole/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status:'Fixed'}) });
-  showToast('Marked as Fixed ✓', 'success');
-  loadTable();
+async function handleVerifyRepair(id, action) {
+    const confirmed = await customConfirm(`Are you sure you want to ${action} this repair?`);
+    if(!confirmed) return;
+    try {
+        const res = await fetch(`/api/alerts/${id}/verify-repair`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('Repair verified successfully', 'success');
+            if (data.updated_hazard) {
+                hotSwapHazard(data.updated_hazard);
+            }
+        } else {
+            showToast(data.error || 'Failed', 'error');
+        }
+} catch(err) { showToast('Error: ' + err.message, 'error'); }
 }
 
-function clearFilters() {
-  ['fSeverity','fStatus','fDateFrom','fDateTo'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  loadTable();
+function hotSwapHazard(updated) {
+    if (!updated) return;
+    
+    // Update memory array
+    const idx = allHazards.findIndex(h => h.id === updated.id);
+    if (idx > -1) {
+        allHazards[idx] = updated;
+        
+        // Update detail view if selected
+        if (selectedHazardId === updated.id) {
+            populateDetail(updated);
+        }
+    } else {
+        // If it's a new assignment dynamically added, push it
+        allHazards.push(updated);
+        if (selectedHazardId === updated.id) populateDetail(updated);
+    }
+    
+    // Refresh list instantly to apply layout/filters
+    renderList();
 }
 
-// Helpers — all values come directly from the /api/alerts backend response
-function resolveSource(src) {
-  const s = (src || '').toLowerCase();
-  if (s === 'citizen') return 'Citizen';
-  if (s === 'ai')      return 'AI';
-  return 'Sensor';
+function generateWorkflowHTML(hazard) {
+    const currentState = hazard.assignment?.status || hazard.status || hazard.state || 'Detected';
+    const stages = [
+        { label: 'Detected', icon: 'fa-eye' },
+        { label: 'Assigned', icon: 'fa-user-plus' },
+        { label: 'Accepted', icon: 'fa-hard-hat' },
+        { label: 'Travelling', icon: 'fa-truck' },
+        { label: 'Reached Site', icon: 'fa-map-marker-alt' },
+        { label: 'Repair Started', icon: 'fa-tools' },
+        { label: 'Repair Completed', icon: 'fa-check' },
+        { label: 'Waiting Verification', icon: 'fa-hourglass-half' },
+        { label: 'Completed', icon: 'fa-flag-checkered' }
+    ];
+    const mapping = {
+        'Detected': 'Detected',
+        'Pending Assignment': 'Detected',
+        'Risk Assessed': 'Detected',
+        'Priority Assigned': 'Detected',
+        'Assignment Recommended': 'Detected',
+        'Available': 'Detected',
+        'Assigned': 'Accepted',
+        'Accepted': 'Accepted',
+        'Travelling': 'Travelling',
+        'Reached Site': 'Reached Site',
+        'Reached': 'Reached Site',
+        'Repair Started': 'Repair Started',
+        'Repair Completed': 'Waiting Verification',
+        'Waiting Verification': 'Waiting Verification',
+        'Needs Rework': 'Waiting Verification',
+        'Verified': 'Completed',
+        'Closed': 'Completed',
+        'Completed': 'Completed',
+        'Rejected': 'Detected'
+    };
+    
+    const mapped = mapping[currentState] || 'Detected';
+    const activeIdx = Math.max(0, stages.findIndex(s => s.label === mapped));
+    
+    const formatDate = (ds) => {
+        if(!ds) return '';
+        const d = new Date(ds);
+        if(isNaN(d.getTime())) return '';
+        const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        return `<div class="roc-tl-time"><div style="margin-bottom: 2px;">${dateStr}</div><div>${timeStr}</div></div>`;
+    };
+    
+    return stages.map((s, i) => {
+        const isPast = i < activeIdx;
+        const isActive = i === activeIdx;
+        let cls = '';
+        if (isPast || (isActive && s.label === 'Completed')) cls = 'completed';
+        else if (isActive) cls = 'current';
+        
+        // Use check icon for completed stages
+        const displayIcon = (isPast || (isActive && s.label === 'Completed')) ? 'fa-check-circle' : s.icon;
+        
+        let timeHTML = '';
+        
+        // Grab timestamps
+        if ((isPast || isActive) && hazard.assignment) {
+            const a = hazard.assignment;
+            if (s.label === 'Assigned' && (a.assigned_time || a.created_at)) timeHTML = formatDate(a.assigned_time || a.created_at);
+            else if (s.label === 'Accepted' && a.accepted_at) timeHTML = formatDate(a.accepted_at);
+            else if (s.label === 'Travelling' && a.travelling_at) timeHTML = formatDate(a.travelling_at);
+            else if (s.label === 'Reached Site' && a.reached_at) timeHTML = formatDate(a.reached_at);
+            else if (s.label === 'Repair Started' && a.repair_started_at) timeHTML = formatDate(a.repair_started_at);
+            else if (s.label === 'Repair Completed' && a.repair_completed_at) timeHTML = formatDate(a.repair_completed_at);
+            else if (s.label === 'Waiting Verification' && a.verified_at) timeHTML = formatDate(a.verified_at);
+            else if (s.label === 'Completed' && a.verified_at) timeHTML = formatDate(a.verified_at);
+        }
+        
+        // Fallbacks using history
+        if (!timeHTML && hazard.history && Array.isArray(hazard.history)) {
+            let hEvent = null;
+            if (s.label === 'Detected') hEvent = hazard.history.find(x => x.history_type && x.history_type.includes('Detection') || x.status === 'Detected');
+            else if (s.label === 'Assigned') hEvent = hazard.history.find(x => x.status === 'Assigned' || x.status === 'Available');
+            else if (s.label === 'Completed') hEvent = hazard.history.find(x => x.status === 'Closed' || x.status === 'Fixed' || x.status === 'Completed');
+            
+            if (hEvent && hEvent.timestamp) timeHTML = formatDate(hEvent.timestamp);
+        }
+        
+        if (!timeHTML && s.label === 'Detected' && hazard.created_at) {
+            timeHTML = formatDate(hazard.created_at);
+        }
+        
+        return `
+        <div class="roc-tl-node ${cls}" id="tl-node-${hazard.hazard_id || hazard.id}-${i}">
+            <div class="roc-tl-point">
+                <i class="fa-solid ${displayIcon}"></i>
+            </div>
+            <span class="roc-tl-label">${s.label}</span>
+            ${timeHTML}
+        </div>
+        `;
+    }).join('');
 }
-function formatDate(s) { if (!s) return '—'; const d = new Date(s); return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
-function severityBadge(s, status) { 
-  // Only approved reports may show a real severity level
-  const stat = (status || '').toLowerCase();
-  if (stat !== 'approved') return `<span class="badge badge-neutral">N/A</span>`;
-  // No severity from backend
-  if (!s || String(s).toLowerCase() === 'null' || String(s).toLowerCase() === 'none' || String(s).toLowerCase() === 'n/a') return `<span class="badge badge-neutral">N/A</span>`;
-  const sev = s.toLowerCase();
-  const cls = sev === 'critical' ? 'badge-danger' : sev === 'high' ? 'badge-danger' : sev === 'medium' ? 'badge-warning' : 'badge-success'; 
-  return `<span class="badge ${cls}">${s}</span>`; 
-}
-function statusBadge(s) { 
-  const cls = s==='Fixed'?'badge-success':s==='Approved'?'badge-info':s==='Rejected'?'badge-danger':'badge-warning'; 
-  const label = s || 'Pending';
-  return `<span class="badge ${cls}">${label}</span>`; 
-}
-function confColor(c) { return c >= 0.75 ? '#22c55e' : c >= 0.5 ? '#f59e0b' : '#ef4444'; }
-
-loadTable();
 </script>
 {% endblock %}

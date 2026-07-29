@@ -82,10 +82,29 @@ def create_app():
     os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
 
     # Register blueprints
-    from routes.api   import api_bp
+    from routes.api import api_bp
     from routes.pages import pages_bp
+    from routes.assignment_api import assignment_api
+    from routes.workflow_api import workflow_api
+    from routes.verification_api import verification_api
+    from routes.worker_api import worker_api
+    from routes.worker_dispatch_api import worker_dispatch_api
     app.register_blueprint(api_bp)
     app.register_blueprint(pages_bp)
+    app.register_blueprint(assignment_api)
+    app.register_blueprint(workflow_api)
+    app.register_blueprint(verification_api)
+    app.register_blueprint(worker_api)
+    app.register_blueprint(worker_dispatch_api)
+
+    # Phase 7: Ensure workflow tables exist
+    try:
+        from utils.workflow_db_setup import setup_workflow_db
+        setup_workflow_db()
+        from utils.verification_db_setup import setup_verification_db
+        setup_verification_db()
+    except Exception as _e:
+        import traceback; traceback.print_exc()
     
     try:
         from routes.ai import ai_bp

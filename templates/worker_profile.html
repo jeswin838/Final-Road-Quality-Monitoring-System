@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Worker Profile — PotholePro{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="wk-profile-header wk-animate-fade-in-up">
+  <div class="wk-profile-avatar">
+    <i class="fa-solid fa-user-astronaut"></i>
+  </div>
+  <div class="wk-profile-info">
+    <h1 id="pName" class="worker-gradient-text">Loading...</h1>
+    <p id="pDesig">Loading...</p>
+    <div class="wk-mt-4 wk-flex-start wk-gap-4">
+      <span class="wk-badge wk-badge-status-accepted"><i class="fa-solid fa-star"></i> 4.8 Avg Rating</span>
+      <span class="wk-badge" style="background:rgba(255,255,255,0.1);"><i class="fa-solid fa-hammer"></i> 42 Jobs Completed</span>
+    </div>
+  </div>
+</div>
+
+<div class="wk-active-layout wk-animate-slide-up delay-100">
+  
+  <div class="wk-flex-column wk-gap-6">
+    <div class="wk-card worker-glass">
+      <div class="wk-card-header">
+        <div class="wk-card-title">
+          <div class="wk-card-icon"><i class="fa-solid fa-address-card"></i></div>
+          Account Details
+        </div>
+      </div>
+      <div class="wk-dash-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:0;">
+        <div class="wk-flex-column wk-gap-1">
+          <label class="worker-small">Worker ID</label>
+          <div class="worker-h4" id="pEmpId">---</div>
+        </div>
+        <div class="wk-flex-column wk-gap-1">
+          <label class="worker-small">Team</label>
+          <div class="worker-h4" id="pTeam">---</div>
+        </div>
+        <div class="wk-flex-column wk-gap-1">
+          <label class="worker-small">Email Address</label>
+          <div class="worker-h4" id="pEmail">---</div>
+        </div>
+        <div class="wk-flex-column wk-gap-1">
+          <label class="worker-small">Phone Number</label>
+          <div class="worker-h4" id="pPhone">---</div>
+        </div>
+        <div class="wk-flex-column wk-gap-1">
+          <label class="worker-small">Current Status</label>
+          <div class="worker-h4"><span class="wk-badge wk-badge-status-completed" id="pStatus">---</span></div>
+        </div>
+        <div class="wk-flex-column wk-gap-1">
+          <label class="worker-small">Joined Date</label>
+          <div class="worker-h4" id="pCreated">---</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="wk-flex-column wk-gap-6">
+    <div class="wk-card worker-glass">
+      <div class="wk-card-header">
+        <div class="wk-card-title">
+          <div class="wk-card-icon"><i class="fa-solid fa-chart-line"></i></div>
+          Performance Summary
+        </div>
+      </div>
+      <div class="wk-flex-column wk-gap-4">
+        <div>
+          <div class="wk-flex-between worker-small wk-mb-2"><span>Response Time</span><span>Top 10%</span></div>
+          <div class="wk-progress-container"><div class="wk-progress-bar" style="width: 90%;"></div></div>
+        </div>
+        <div>
+          <div class="wk-flex-between worker-small wk-mb-2"><span>Repair Quality</span><span>Excellent</span></div>
+          <div class="wk-progress-container"><div class="wk-progress-bar wk-progress-success" style="width: 95%;"></div></div>
+        </div>
+        <div>
+          <div class="wk-flex-between worker-small wk-mb-2"><span>Completion Rate</span><span>Good</span></div>
+          <div class="wk-progress-container"><div class="wk-progress-bar wk-progress-warning" style="width: 85%;"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const res = await fetch('/api/worker/profile');
+      if (res.ok) {
+        let data = await res.json();
+      if (data && data.success !== undefined) data = data.data;
+        document.getElementById('pName').textContent = data.name || 'N/A';
+        document.getElementById('pDesig').textContent = data.designation || 'N/A';
+        document.getElementById('pEmpId').textContent = data.id || 'N/A';
+        document.getElementById('pTeam').textContent = data.team_name || 'N/A';
+        document.getElementById('pEmail').textContent = data.email || 'N/A';
+        document.getElementById('pPhone').textContent = data.phone || 'N/A';
+        document.getElementById('pStatus').textContent = data.worker_status || 'N/A';
+        document.getElementById('pCreated').textContent = data.created_at ? new Date(data.created_at).toLocaleDateString() : 'N/A';
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  });
+</script>
+{% endblock %}

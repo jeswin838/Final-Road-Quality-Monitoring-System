@@ -17,6 +17,20 @@ class Config:
     BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
     UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
     ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+    
+    # ── Geocoder ─────────────────────────────────────────────────────────────
+    GEOCODER_PROVIDER       = os.environ.get("GEOCODER_PROVIDER", "NOMINATIM")
+    NOMINATIM_URL           = os.environ.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org/reverse")
+    PHOTON_URL              = os.environ.get("PHOTON_URL", "https://photon.komoot.io/reverse")
+    GEOAPIFY_URL            = os.environ.get("GEOAPIFY_URL", "https://api.geoapify.com/v1/geocode/reverse")
+    GOOGLE_MAPS_URL         = "https://www.google.com/maps?q={lat},{lon}"
+    GEOCODER_TIMEOUT        = int(os.environ.get("GEOCODER_TIMEOUT", 10))
+    GEOCODER_CACHE_RADIUS   = float(os.environ.get("GEOCODER_CACHE_RADIUS", 20.0))
+    GEOCODER_MAX_RETRIES    = int(os.environ.get("GEOCODER_MAX_RETRIES", 3))
+    GEOCODER_RETRY_DELAY    = float(os.environ.get("GEOCODER_RETRY_DELAY", 2.0))
+    GEOCODER_USER_AGENT     = os.environ.get("GEOCODER_USER_AGENT", "VisionaryRoad/2.0 (municipal.admin@visionaryroad.local)")
+    GEOCODER_CACHE_TTL_DAYS = int(os.environ.get("GEOCODER_CACHE_TTL_DAYS", 30))
+    GEOCODER_WORKERS        = int(os.environ.get("GEOCODER_WORKERS", 3))
 
     # ── Defaults ──────────────────────────────────────────────────────────────
     DEFAULT_CONFIDENCE_THRESHOLD = 0.5

@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+{% block title %}Worker Management — PotholePro{% endblock %}
+{% block page_title %}Worker Management{% endblock %}
+
+{% block head %}
+<style>
+  .worker-table { width: 100%; border-collapse: collapse; }
+  .worker-table th, .worker-table td { padding: 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .worker-table th { background: rgba(0,0,0,0.2); font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px; }
+  .action-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; font-size: 1rem; transition: color 0.2s; }
+  .action-btn:hover { color: var(--text-primary); }
+  .action-btn.delete:hover { color: var(--danger); }
+  
+  .filter-bar { display: flex; gap: 16px; margin-bottom: 24px; align-items: center; }
+  .filter-input { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px 16px; border-radius: 8px; outline: none; min-width: 250px; }
+  
+  .stats-row { display: flex; gap: 16px; margin-bottom: 24px; }
+  .stat-pill { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 12px 20px; border-radius: 12px; display: flex; flex-direction: column; flex: 1; }
+  .stat-pill .label { font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 4px; }
+  .stat-pill .val { font-size: 1.5rem; font-weight: 700; }
+  
+  .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(5px); }
+  .modal-box { background: var(--bg-surface); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 24px; width: 100%; max-width: 500px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .modal-close { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
+  
+  .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+  .status-available { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+  .status-busy { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+  .status-offline { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
+  .status-on-leave { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stats-row" id="workerStats">
+  <div class="stat-pill"><span class="label">Total Workers</span><span class="val" id="st-total">0</span></div>
+  <div class="stat-pill"><span class="label">Available</span><span class="val" id="st-avail" style="color: #34d399;">0</span></div>
+  <div class="stat-pill"><span class="label">Busy</span><span class="val" id="st-busy" style="color: #fbbf24;">0</span></div>
+  <div class="stat-pill"><span class="label">Offline</span><span class="val" id="st-off" style="color: #9ca3af;">0</span></div>
+  <div class="stat-pill"><span class="label">On Leave</span><span class="val" id="st-leave" style="color: #f87171;">0</span></div>
+</div>
+
+<div class="glass-card" style="padding: 24px;">
+  <div class="filter-bar">
+    <input type="text" id="searchInput" class="filter-input" placeholder="Search by name, ID or team..." oninput="filterTable()">
+    <select id="statusFilter" class="filter-input" style="min-width: 150px;" onchange="filterTable()">
+      <option value="">All Statuses</option>
+      <option value="Available">Available</option>
+      <option value="Busy">Busy</option>
+      <option value="Offline">Offline</option>
+      <option value="On Leave">On Leave</option>
+    </select>
+    <button class="btn btn-primary" style="margin-left: auto;" onclick="openAddModal()">
+      <i class="fa-solid fa-plus"></i> Add Worker
+    </button>
+  </div>
+
+  <div style="overflow-x: auto;">
+    <table class="worker-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Contact</th>
+          <th>Team / Desig</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="workerTableBody">
+        <tr><td colspan="6" style="text-align:center; padding: 20px;">Loading workers...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="workerModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modalTitle">Add New Worker</h3>
+      <button class="modal-close" onclick="closeModal('workerModal')">&times;</button>
+    </div>
+    <form id="workerForm">
+      <input type="hidden" id="editWorkerId">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div class="form-group">
+          <label>Full Name *</label>
+          <input type="text" id="fName" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="fEmail" class="form-input">
+        </div>
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input type="text" id="fPhone" class="form-input">
+        </div>
+        <div class="form-group">
+          <label>Team</label>
+          <input type="text" id="fTeam" class="form-input">
+        </div>
+        <div class="form-group">
+          <label>Designation</label>
+          <input type="text" id="fDesig" class="form-input">
+        </div>
+        <div class="form-group" id="pwdGroup">
+          <label>Password *</label>
+          <input type="password" id="fPwd" class="form-input">
+        </div>
+        <div class="form-group" id="statusGroup" style="display: none;">
+          <label>Status</label>
+          <select id="fStatus" class="form-input">
+            <option value="Available">Available</option>
+            <option value="Busy">Busy</option>
+            <option value="Offline">Offline</option>
+            <option value="On Leave">On Leave</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('workerModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="saveBtn">Save Worker</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal-overlay" id="resetModal">
+  <div class="modal-box" style="max-width: 400px;">
+    <div class="modal-header">
+      <h3>Reset Password</h3>
+      <button class="modal-close" onclick="closeModal('resetModal')">&times;</button>
+    </div>
+    <form id="resetForm">
+      <input type="hidden" id="resetWorkerId">
+      <div class="form-group">
+        <label>New Password *</label>
+        <input type="password" id="rPwd" class="form-input" required minlength="6">
+      </div>
+      <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('resetModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Reset</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  let workers = [];
+
+  document.addEventListener('DOMContentLoaded', fetchWorkers);
+
+  async function fetchWorkers() {
+    try {
+      const res = await fetch('/api/worker/admin/manage');
+      if (res.ok) {
+        workers = await res.json();
+        renderTable();
+        updateStats();
+      }
+    } catch (e) {
+      console.error(e);
+      document.getElementById('workerTableBody').innerHTML = '<tr><td colspan="6">Failed to load workers</td></tr>';
+    }
+  }
+
+  function getStatusClass(status) {
+    if(!status) return 'status-offline';
+    const s = status.toLowerCase().replace(' ', '-');
+    return `status-${s}`;
+  }
+
+  function renderTable() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    const fStatus = document.getElementById('statusFilter').value;
+    
+    const filtered = workers.filter(w => {
+      const matchesQ = !q || (w.name||'').toLowerCase().includes(q) || (w.team_name||'').toLowerCase().includes(q);
+      const matchesS = !fStatus || w.worker_status === fStatus;
+      return matchesQ && matchesS;
+    });
+
+    const tbody = document.getElementById('workerTableBody');
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">No workers found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(w => `
+      <tr>
+        <td>
+          <div style="font-weight: 600;">${w.name || '-'}</div>
+          <div style="font-size: 0.8rem; color: var(--text-secondary);">${w.email || '-'}</div>
+        </td>
+        <td>${w.phone || '-'}</td>
+        <td>
+          <div>${w.team_name || '-'}</div>
+          <div style="font-size: 0.8rem; color: var(--text-secondary);">${w.designation || '-'}</div>
+        </td>
+        <td>
+          <span class="status-badge ${getStatusClass(w.worker_status)}">${w.worker_status || 'Offline'}</span>
+        </td>
+        <td>
+          <button class="action-btn" title="Edit" onclick="openEditModal('${w.id}')"><i class="fa-solid fa-pen"></i></button>
+          <button class="action-btn" title="Reset Password" onclick="openResetModal('${w.id}')"><i class="fa-solid fa-key"></i></button>
+          <button class="action-btn delete" title="Delete" onclick="deleteWorker('${w.id}')"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function updateStats() {
+    document.getElementById('st-total').textContent = workers.length;
+    document.getElementById('st-avail').textContent = workers.filter(w => w.worker_status === 'Available').length;
+    document.getElementById('st-busy').textContent = workers.filter(w => w.worker_status === 'Busy').length;
+    document.getElementById('st-off').textContent = workers.filter(w => w.worker_status === 'Offline' || !w.worker_status).length;
+    document.getElementById('st-leave').textContent = workers.filter(w => w.worker_status === 'On Leave').length;
+  }
+
+  function filterTable() {
+    renderTable();
+  }
+
+  function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+  function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+  function openAddModal() {
+    document.getElementById('workerForm').reset();
+    document.getElementById('editWorkerId').value = '';
+    document.getElementById('modalTitle').textContent = 'Add New Worker';
+    document.getElementById('pwdGroup').style.display = 'block';
+    document.getElementById('fPwd').required = true;
+    document.getElementById('statusGroup').style.display = 'none';
+    openModal('workerModal');
+  }
+
+  function openEditModal(id) {
+    const w = workers.find(x => x.id === parseInt(id));
+    if(!w) return;
+    
+    document.getElementById('editWorkerId').value = w.id;
+    document.getElementById('fName').value = w.name || '';
+    document.getElementById('fEmail').value = w.email || '';
+    document.getElementById('fPhone').value = w.phone || '';
+    document.getElementById('fTeam').value = w.team_name || '';
+    document.getElementById('fDesig').value = w.designation || '';
+    document.getElementById('fStatus').value = w.worker_status || 'Offline';
+    
+    document.getElementById('modalTitle').textContent = 'Edit Worker';
+    document.getElementById('pwdGroup').style.display = 'none';
+    document.getElementById('fPwd').required = false;
+    document.getElementById('statusGroup').style.display = 'block';
+    openModal('workerModal');
+  }
+
+  document.getElementById('workerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('editWorkerId').value;
+    const isEdit = !!id;
+    
+    const payload = {
+      name: document.getElementById('fName').value,
+      email: document.getElementById('fEmail').value,
+      phone: document.getElementById('fPhone').value,
+      team: document.getElementById('fTeam').value,
+      designation: document.getElementById('fDesig').value,
+    };
+    
+    if (isEdit) {
+      payload.status = document.getElementById('fStatus').value;
+    } else {
+      payload.password = document.getElementById('fPwd').value;
+    }
+
+    const url = isEdit ? `/api/worker/admin/manage/${id}` : '/api/worker/admin/manage';
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method, headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if(res.ok) {
+        closeModal('workerModal');
+        showToast('Worker saved successfully', 'success');
+        fetchWorkers();
+      } else {
+        const d = await res.json();
+        showToast(d.error || 'Operation failed', 'error');
+      }
+    } catch(e) {
+      console.error(e);
+      showToast('Network error', 'error');
+    }
+  });
+
+  function openResetModal(id) {
+    document.getElementById('resetWorkerId').value = id;
+    document.getElementById('resetForm').reset();
+    openModal('resetModal');
+  }
+
+  document.getElementById('resetForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('resetWorkerId').value;
+    const pwd = document.getElementById('rPwd').value;
+    
+    try {
+      const res = await fetch(`/api/worker/admin/manage/${id}/reset-password`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_password: pwd })
+      });
+      if(res.ok) {
+        closeModal('resetModal');
+        showToast('Password reset successful', 'success');
+      } else {
+        showToast('Failed to reset password', 'error');
+      }
+    } catch(e) {
+      console.error(e);
+      showToast('Network error', 'error');
+    }
+  });
+
+  async function deleteWorker(id) {
+    const confirmed = await customConfirm('Are you sure you want to delete this worker?');
+    if(!confirmed) return;
+    try {
+      const res = await fetch(`/api/worker/admin/manage/${id}`, { method: 'DELETE' });
+      if(res.ok) {
+        showToast('Worker deleted successfully', 'success');
+        fetchWorkers();
+      } else {
+        showToast('Failed to delete worker', 'error');
+      }
+    } catch(e) {
+      console.error(e);
+      showToast('Network error', 'error');
+    }
+  }
+</script>
+{% endblock %}
