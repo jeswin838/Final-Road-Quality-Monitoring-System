@@ -914,6 +914,92 @@ def analyze():
         gc.collect()
 
 
+def _diag_log(step_name, start_time, req_file, file_bytes, img_arr, mem_before=None):
+    import sys, os, psutil, time, threading, platform
+    from datetime import datetime, timezone
+    from flask import request
+    try:
+        import torch
+        import cv2
+    except:
+        pass
+    
+    caller = sys._getframe(1)
+    func_name = caller.f_code.co_name
+    file_name = caller.f_code.co_filename
+    line_no = caller.f_lineno
+    curr_time = datetime.now(timezone.utc).isoformat()
+    exec_time = f"{(time.time() - start_time):.4f}s" if start_time else "N/A"
+    worker_pid = os.getpid()
+    thread_id = threading.get_ident()
+    is_railway = "RAILWAY_ENVIRONMENT" in os.environ or "RAILWAY_PROJECT_ID" in os.environ
+    
+    try:
+        mem_info = psutil.Process(worker_pid).memory_info().rss / (1024 * 1024)
+        cpu_usage = psutil.cpu_percent()
+    except:
+        mem_info = 0.0
+        cpu_usage = 0.0
+        
+    py_ver = platform.python_version()
+    try:
+        torch_ver = torch.__version__
+        cuda_avail = torch.cuda.is_available()
+        curr_dev = "cuda:0" if cuda_avail else "cpu"
+    except:
+        torch_ver = "N/A"
+        cuda_avail = "N/A"
+        curr_dev = "N/A"
+    
+    try:
+        cv2_ver = cv2.__version__
+    except:
+        cv2_ver = "N/A"
+        
+    fname = req_file.filename if req_file and hasattr(req_file, 'filename') else "N/A"
+    ctype = request.headers.get("Content-Type", "N/A") if request else "N/A"
+    clen = request.headers.get("Content-Length", "N/A") if request else "N/A"
+    
+    img_w, img_h, img_c, img_dtype, num_shape = "N/A", "N/A", "N/A", "N/A", "N/A"
+    if img_arr is not None and hasattr(img_arr, "shape"):
+        num_shape = str(img_arr.shape)
+        img_h = img_arr.shape[0] if len(img_arr.shape) > 0 else "N/A"
+        img_w = img_arr.shape[1] if len(img_arr.shape) > 1 else "N/A"
+        img_c = img_arr.shape[2] if len(img_arr.shape) > 2 else 1
+        img_dtype = str(img_arr.dtype)
+        
+    fsize = len(file_bytes) if file_bytes is not None else "N/A"
+    if mem_before is None:
+        mem_before = mem_info
+    
+    print(f"\n========== {step_name} ==========")
+    print(f"Current Function: {func_name}")
+    print(f"Current File: {file_name}")
+    print(f"Current Line Number: {line_no}")
+    print(f"Current Time: {curr_time}")
+    print(f"Execution Time: {exec_time}")
+    print(f"Memory Before: {mem_before:.2f} MB")
+    print(f"Memory After: {mem_info:.2f} MB")
+    print(f"CPU Usage: {cpu_usage}%")
+    print(f"Worker PID: {worker_pid}")
+    print(f"Thread ID: {thread_id}")
+    print(f"Railway Environment: {is_railway}")
+    print(f"Python Version: {py_ver}")
+    print(f"Torch Version: {torch_ver}")
+    print(f"OpenCV Version: {cv2_ver}")
+    print(f"CUDA Available: {cuda_avail}")
+    print(f"Current Device: {curr_dev}")
+    print(f"Filename: {fname}")
+    print(f"Content Type: {ctype}")
+    print(f"Content Length: {clen}")
+    print(f"Image Width: {img_w}")
+    print(f"Image Height: {img_h}")
+    print(f"Image Channels: {img_c}")
+    print(f"Image dtype: {img_dtype}")
+    print(f"Image Size: {fsize}")
+    print(f"NumPy Shape: {num_shape}")
+    print("==================================================\n")
+
 # ================= USER REPORT ENDPOINT =================
 @ai_bp.route("/user-report", methods=["POST"])
 def user_report():
@@ -923,9 +1009,16 @@ def user_report():
     import psutil
 
     _t_total_start = time.time()
+    _mem_start = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024) if 'psutil' in globals() else 0.0
+    _diag_log("STEP 1: Request received", _t_total_start, None, None, None, _mem_start)
+    
     dlog = DetectionLogger()
 
     file = request.files.get("image")
+    _diag_log("STEP 2: Headers", _t_total_start, file, None, None, _mem_start)
+    
+    _diag_log("STEP 3: Multipart parsing", _t_total_start, file, None, None, _mem_start)
+    
     lat = request.form.get("lat") or request.form.get("latitude")
     lon = request.form.get("lon") or request.form.get("longitude")
 
@@ -942,6 +1035,7 @@ def user_report():
     # Decode image once. AI uses this frame; upload uses annotated or original.
     try:
         file_bytes = file.read()  # Preserve original bytes from upload
+        _diag_log("STEP 4: Image read", _t_total_start, file, file_bytes, None, _mem_start)
         byte_size = len(file_bytes or b"")
         if byte_size == 0:
             return jsonify({"error": "Empty image data"}), 400
@@ -988,6 +1082,7 @@ def user_report():
             import io
             pil_img = Image.open(io.BytesIO(file_bytes))
             
+            _diag_log("STEP 7: EXIF processing", _t_total_start, file, file_bytes, None, _mem_start)
             try:
                 exif = pil_img.getexif()
                 if exif is not None:
@@ -1012,12 +1107,14 @@ def user_report():
                 img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) # Grayscale to 3 channels
             else:
                 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) # Fallback
+            _diag_log("STEP 5: PIL decode", _t_total_start, file, file_bytes, img, _mem_start)
         except Exception as pil_e:
             log_info["decode_exception"] = str(pil_e)
             log_info["cv2_fallback"] = True
             print(f"[DEBUG] PIL processing failed, falling back to OpenCV: {pil_e}")
             np_arr = np.frombuffer(file_bytes, np.uint8)
             img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            _diag_log("STEP 6: OpenCV decode", _t_total_start, file, file_bytes, img, _mem_start)
 
         # --- Robust Image Validation ---
         # Verify image exists, decoded successfully, not None, valid dimensions
@@ -1041,6 +1138,8 @@ def user_report():
         if img.dtype != np.uint8:
             img = img.astype(np.uint8)
             
+        _diag_log("STEP 8: Image validation", _t_total_start, file, file_bytes, img, _mem_start)
+            
         # --- Large Image Protection (ROOT CAUSE FIX) ---
         # Mobile uploads are often 12MP (4000x3000). A 4096 MAX_DIM allows 36MB+ numpy arrays.
         # When passed to PyTorch on CPU, memory can peak at 150MB+, causing a RuntimeError (OOM)
@@ -1053,6 +1152,8 @@ def user_report():
             scale = MAX_DIM / max(img_h, img_w)
             new_w, new_h = int(img_w * scale), int(img_h * scale)
             img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+            
+        _diag_log("STEP 9: Image resize", _t_total_start, file, file_bytes, img, _mem_start)
 
         _decode_ms = (time.time() - _t_decode_start) * 1000
         
@@ -1133,6 +1234,7 @@ def user_report():
     image_hash = hashlib.sha256(file_bytes).hexdigest()
 
     m = load_model(dlog)
+    _diag_log("STEP 10: YOLO model loading", _t_total_start, file, file_bytes, img, _mem_start)
     ai_available = m is not None
     results = None
     allowed_detections = []
@@ -1152,6 +1254,8 @@ def user_report():
                 mem_before_ai = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
             except Exception:
                 mem_before_ai = 0.0
+                
+            _diag_log("STEP 11: YOLO inference start", _t_total_start, file, file_bytes, img, mem_before_ai)
 
             logger.info("4. AI Stage (Before):")
             logger.info(f"   - Model Path: {getattr(m, 'model_name', 'N/A')}")
@@ -1178,6 +1282,8 @@ def user_report():
                 mem_after_ai = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
             except Exception:
                 mem_after_ai = 0.0
+                
+            _diag_log("STEP 12: YOLO inference finished", _t_total_start, file, file_bytes, img, mem_after_ai)
 
             # Calculate post-inference metrics
             peak_conf = max([float(box.conf[0]) for r in (results or []) if getattr(r, 'boxes', None) is not None for box in r.boxes] + [0.0])
@@ -1189,6 +1295,7 @@ def user_report():
             logger.info(f"   - Memory after inference: {mem_after_ai:.2f} MB")
             logger.info(f"   - Memory spiked during inference by: {(mem_after_ai - mem_before_ai):.2f} MB")
             
+            _diag_log("STEP 13: Detection parsing", _t_total_start, file, file_bytes, img, mem_after_ai)
             for r in (results or []):
                 if r.boxes is None:
                     continue
@@ -1224,64 +1331,51 @@ def user_report():
                         top_detection = det
             print("DETECTIONS:", allowed_detections)
         except Exception as e:
-            import traceback
-            import sys
-            import platform
-
-            # --- Exception Logging ---
-            current_time = datetime.now(timezone.utc).isoformat()
-            
-            try:
-                process = psutil.Process()
-                mem_usage = f"{process.memory_info().rss / 1024 / 1024:.2f} MB"
-                cpu_usage = f"{psutil.cpu_percent()}%"
-            except Exception:
-                mem_usage = "N/A"
-                cpu_usage = "N/A"
-
-            img_h, img_w, img_c = img.shape if 'img' in locals() and img is not None and len(img.shape) == 3 else ("N/A", "N/A", "N/A")
-            img_dtype = str(img.dtype) if 'img' in locals() and img is not None else "N/A"
-            img_size = byte_size if 'byte_size' in locals() else "N/A"
-            dev_str = "cuda:0" if torch.cuda.is_available() else "cpu"
-            model_path_val = getattr(m, "model_name", "N/A") if 'm' in locals() and m else "N/A"
-            filename_val = getattr(file, 'filename', 'N/A') if 'file' in locals() and file else "N/A"
-            content_type_val = request.headers.get("Content-Type", "N/A")
+            import traceback, sys, os, psutil, threading
+            from flask import request
+            try: import torch; dev = "cuda:0" if torch.cuda.is_available() else "cpu"
+            except: dev = "N/A"
+            try: mem = psutil.Process().memory_info().rss/(1024*1024); cpu = psutil.cpu_percent()
+            except: mem = 0.0; cpu = 0.0
             
             tb = sys.exc_info()[2]
-            if tb is not None:
-                while tb.tb_next is not None:
-                    tb = tb.tb_next
-                err_line = tb.tb_lineno
-                err_func = tb.tb_frame.f_code.co_name
-                err_file = tb.tb_frame.f_code.co_filename
-            else:
-                err_line, err_func, err_file = "N/A", "N/A", "N/A"
-
-            print("\n" + "="*50)
-            print("AI INFERENCE ERROR")
-            print("="*50)
-            print(f"Timestamp: {current_time}")
-            print(f"Python version: {platform.python_version()}")
-            print(f"OS: {platform.system()} {platform.release()}")
-            print(f"Memory usage: {mem_usage}")
-            print(f"CPU usage: {cpu_usage}")
-            print(f"GPU available: {torch.cuda.is_available()}")
-            print(f"Device used: {dev_str}")
-            print(f"Model path: {model_path_val}")
-            print(f"Filename: {filename_val}")
-            print(f"Content-Type: {content_type_val}")
-            print(f"Image Width: {img_w}")
-            print(f"Image Height: {img_h}")
-            print(f"Channels: {img_c}")
-            print(f"dtype: {img_dtype}")
-            print(f"Image Size: {img_size}")
-            print(f"Current line number: {err_line}")
-            print(f"Current function: {err_func}")
-            print(f"Current file: {err_file}")
-            print(f"Complete traceback:\n{traceback.format_exc()}")
-            print("="*50 + "\n")
+            tb_last = tb
+            while tb_last and tb_last.tb_next: tb_last = tb_last.tb_next
+            err_line = tb_last.tb_lineno if tb_last else "N/A"
+            err_func = tb_last.tb_frame.f_code.co_name if tb_last else "N/A"
+            err_file = tb_last.tb_frame.f_code.co_filename if tb_last else "N/A"
             
-            logger.exception("AI INFERENCE ERROR: Full traceback for cloud logs:")
+            print("\n==================================================")
+            print("AI INFERENCE FAILURE")
+            print("==================================================")
+            print(f"Current Function: {err_func}")
+            print(f"Current File: {err_file}")
+            print(f"Current Line: {err_line}")
+            print(f"Current Module: {__name__}")
+            print(f"Exact Python Exception: {repr(e)}")
+            print(f"Exception Type: {type(e)}")
+            print(f"Exception Message: {str(e)}")
+            print("Complete Traceback")
+            print(traceback.format_exc())
+            print(f"Memory Usage: {mem:.2f} MB")
+            print(f"Peak Memory: N/A")
+            print(f"CPU Usage: {cpu}%")
+            print(f"Current Worker PID: {os.getpid()}")
+            print(f"Current Thread: {threading.get_ident() if 'threading' in sys.modules else 'N/A'}")
+            print("Image Information")
+            img_shape = img.shape if 'img' in locals() and hasattr(img, 'shape') else 'N/A'
+            img_dtype = img.dtype if 'img' in locals() and hasattr(img, 'dtype') else 'N/A'
+            print(f"Image Shape: {img_shape}")
+            print(f"Image dtype: {img_dtype}")
+            print(f"YOLO Device: {dev}")
+            print(f"Model Path: {getattr(m, 'model_name', 'N/A') if 'm' in locals() and m else 'N/A'}")
+            print(f"Model Loaded or Not: {'Yes' if 'm' in locals() and m else 'No'}")
+            print(f"Current Request Headers: {dict(request.headers)}")
+            print(f"Current Form Fields: {dict(request.form)}")
+            print(f"Current Environment Variables Related To Railway: { {k:v for k,v in os.environ.items() if 'RAILWAY' in k} }")
+            print("==================================================\n")
+            
+            logger.exception("AI INFERENCE FAILURE: Full traceback for cloud logs:")
             dlog.error(e)
             
             # Do NOT replace the existing API response format
@@ -1365,6 +1459,8 @@ def user_report():
             bbox_ratio = float(primary_valid.get("bbox_ratio", bbox_ratio) or bbox_ratio)
         dlog.log_accepted(file.filename or "N/A", confidence)
 
+    _diag_log("STEP 14: Database", _t_total_start, file, file_bytes, img, _mem_start)
+
     # Security and anti-fake validations
     live_capture_verified = capture_type == "live" or capture_source in ("live_camera", "live")
     gps_verified = (gps_accuracy is not None and gps_accuracy <= 120.0) or (lat_f is not None and lon_f is not None)
@@ -1413,6 +1509,8 @@ def user_report():
         trust_level = "untrusted"
 
     print(f"[USER REPORT] status={status} conf={confidence:.4f}")
+
+    _diag_log("STEP 15: Upload", _t_total_start, file, file_bytes, img, _mem_start)
 
     # Upload resized annotated image only (raw image is NOT stored)
     dlog.upload_start()
