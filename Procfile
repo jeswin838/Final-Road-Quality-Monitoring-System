@@ -1,1 +1,1 @@
-web: gunicorn app:app --timeout 300
+web: gunicorn -c gunicorn.conf.py app:app

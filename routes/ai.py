@@ -937,18 +937,21 @@ def user_report():
     _t_total_start = time.time()
     dlog = DetectionLogger()
 
-    file = request.files.get("image")
     lat = request.form.get("lat") or request.form.get("latitude")
     lon = request.form.get("lon") or request.form.get("longitude")
 
-    if not file or not lat or not lon:
-        return jsonify({"error": "Missing image or location"}), 400
+    if not lat or not lon:
+        return jsonify({"error": "Missing location"}), 400
 
     try:
         lat_f = float(lat)
         lon_f = float(lon)
     except ValueError:
         return jsonify({"error": "Invalid coordinates"}), 400
+        
+    file = request.files.get("image")
+    if not file:
+        return jsonify({"error": "Missing image"}), 400
 
     # --- Preprocessing & Validation ---
     # Decode image once. AI uses this frame; upload uses annotated or original.
@@ -1529,11 +1532,13 @@ def user_report():
             # --- Memory Safety Cleanup ---
             # Release variables explicitly inside the background thread once upload is complete
             if 'ai_results' in locals():
-                ai_results = None
+                del ai_results
             if 'img_to_process' in locals():
-                img_to_process = None
+                del img_to_process
             if 'annotated_or_raw' in locals():
-                annotated_or_raw = None
+                del annotated_or_raw
+            if 'annotated_buffer' in locals():
+                del annotated_buffer
             
             import gc
             gc.collect()

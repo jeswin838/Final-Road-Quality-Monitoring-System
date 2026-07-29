@@ -43,52 +43,25 @@ async function startCamera() {
   }
 }
 
-function captureImage() {
-  const track = stream && stream.getVideoTracks ? stream.getVideoTracks()[0] : null;
-
-  // Prefer ImageCapture to keep original camera quality.
-  if (track && 'ImageCapture' in window) {
-    const imageCapture = new ImageCapture(track);
-    imageCapture.takePhoto()
-      .then((blob) => {
-        if (blob.type.includes('heic') || blob.type.includes('heif')) {
-            throw new Error("Unsupported HEIC/HEIF format returned by ImageCapture");
-        }
-        capturedBlob = blob; // original-quality capture blob
-        captureSource = 'live_camera';
-        const url = URL.createObjectURL(blob);
-        preview.src = url;
-        preview.style.display = 'block';
-        video.style.display = 'none';
-        captureBtn.style.display = 'none';
-        retakeBtn.style.display = 'flex';
-        checkSubmitReady();
-      })
-      .catch(() => {
-        // Fallback only if ImageCapture fails or returns unsupported format.
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-        // Automatically convert to standard JPEG before upload. Preserve quality (0.95).
-        canvas.toBlob((blob) => {
-          capturedBlob = blob;
-          captureSource = 'live_camera';
-          const url = URL.createObjectURL(blob);
-          preview.src = url;
-          preview.style.display = 'block';
-          video.style.display = 'none';
-          captureBtn.style.display = 'none';
-          retakeBtn.style.display = 'flex';
-          checkSubmitReady();
-        }, 'image/jpeg', 0.95);
-      });
-    return;
+function processAndSetBlob(imgSource, originalWidth, originalHeight) {
+  const MAX_DIM = 1920;
+  let targetWidth = originalWidth;
+  let targetHeight = originalHeight;
+  
+  if (targetWidth > MAX_DIM || targetHeight > MAX_DIM) {
+    const scale = MAX_DIM / Math.max(targetWidth, targetHeight);
+    targetWidth = Math.round(targetWidth * scale);
+    targetHeight = Math.round(targetHeight * scale);
   }
 
-  // Legacy fallback to standard JPEG with high quality
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0);
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext('2d');
+  // Fill white background to prevent transparent PNG to JPEG black-background artifacts
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, targetWidth, targetHeight);
+  ctx.drawImage(imgSource, 0, 0, targetWidth, targetHeight);
+  
   canvas.toBlob((blob) => {
     capturedBlob = blob;
     captureSource = 'live_camera';
@@ -99,7 +72,33 @@ function captureImage() {
     captureBtn.style.display = 'none';
     retakeBtn.style.display = 'flex';
     checkSubmitReady();
-  }, 'image/jpeg', 0.95);
+  }, 'image/jpeg', 0.92); // 0.92 is optimal for quality/size ratio (1-3MB)
+}
+
+function captureImage() {
+  const track = stream && stream.getVideoTracks ? stream.getVideoTracks()[0] : null;
+
+  if (track && 'ImageCapture' in window) {
+    const imageCapture = new ImageCapture(track);
+    imageCapture.takePhoto()
+      .then((blob) => {
+        if (blob.type.includes('heic') || blob.type.includes('heif')) {
+            throw new Error("Unsupported HEIC/HEIF");
+        }
+        const img = new Image();
+        img.onload = () => {
+          processAndSetBlob(img, img.width, img.height);
+          URL.revokeObjectURL(img.src);
+        };
+        img.src = URL.createObjectURL(blob);
+      })
+      .catch(() => {
+        processAndSetBlob(video, video.videoWidth, video.videoHeight);
+      });
+    return;
+  }
+
+  processAndSetBlob(video, video.videoWidth, video.videoHeight);
 }
 
 function retake() {

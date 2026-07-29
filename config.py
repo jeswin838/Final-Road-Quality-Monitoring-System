@@ -12,6 +12,7 @@ class Config:
     # ── Flask ─────────────────────────────────────────────────────────────────
     SECRET_KEY  = os.environ.get("SECRET_KEY",  "pothole_secret_prod_2024")
     DEBUG       = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB max payload size limit
 
     # ── File uploads ─────────────────────────────────────────────────────────
     BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
