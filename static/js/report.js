@@ -51,6 +51,9 @@ function captureImage() {
     const imageCapture = new ImageCapture(track);
     imageCapture.takePhoto()
       .then((blob) => {
+        if (blob.type.includes('heic') || blob.type.includes('heif')) {
+            throw new Error("Unsupported HEIC/HEIF format returned by ImageCapture");
+        }
         capturedBlob = blob; // original-quality capture blob
         captureSource = 'live_camera';
         const url = URL.createObjectURL(blob);
@@ -62,10 +65,11 @@ function captureImage() {
         checkSubmitReady();
       })
       .catch(() => {
-        // Fallback only if ImageCapture fails.
+        // Fallback only if ImageCapture fails or returns unsupported format.
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas.getContext('2d').drawImage(video, 0, 0);
+        // Automatically convert to standard JPEG before upload. Preserve quality (0.95).
         canvas.toBlob((blob) => {
           capturedBlob = blob;
           captureSource = 'live_camera';
@@ -76,12 +80,12 @@ function captureImage() {
           captureBtn.style.display = 'none';
           retakeBtn.style.display = 'flex';
           checkSubmitReady();
-        }, 'image/png');
+        }, 'image/jpeg', 0.95);
       });
     return;
   }
 
-  // Legacy fallback (avoid lossy JPEG recompression).
+  // Legacy fallback to standard JPEG with high quality
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video, 0, 0);
@@ -95,7 +99,7 @@ function captureImage() {
     captureBtn.style.display = 'none';
     retakeBtn.style.display = 'flex';
     checkSubmitReady();
-  }, 'image/png');
+  }, 'image/jpeg', 0.95);
 }
 
 function retake() {
@@ -158,6 +162,20 @@ function checkSubmitReady() {
 async function handleAnalyze() {
   if (!capturedBlob || !currentCoords) return;
 
+  console.log("=== FRONTEND UPLOAD LOG ===");
+  console.log(`Blob MIME type: ${capturedBlob.type}`);
+  console.log(`Blob size: ${(capturedBlob.size / 1024 / 1024).toFixed(2)} MB`);
+  console.log(`File name: capture.jpg`);
+  if (capturedBlob instanceof Blob) {
+     const tempImg = new Image();
+     tempImg.src = URL.createObjectURL(capturedBlob);
+     await new Promise(r => { tempImg.onload = r; });
+     console.log(`Image width: ${tempImg.width}`);
+     console.log(`Image height: ${tempImg.height}`);
+  }
+  console.log(`Capture source: ${captureSource}`);
+  console.log("===========================");
+
   if (watchId !== null) {
     navigator.geolocation.clearWatch(watchId);
     watchId = null;
@@ -179,13 +197,26 @@ async function handleAnalyze() {
   if (gpsAccuracy !== null) formData.append('gps_accuracy', gpsAccuracy);
 
   try {
-    const res = await fetch('/user-report', {
-      method: 'POST',
-      body: formData
-    });
-    const data = await res.json();
+    let res;
+    let data;
+    let attempt = 0;
+    while (attempt < 2) {
+      try {
+        res = await fetch('/user-report', {
+          method: 'POST',
+          body: formData
+        });
+        data = await res.json();
+        break; // Success
+      } catch (networkErr) {
+        attempt++;
+        if (attempt >= 2) throw networkErr;
+        console.warn("Upload network failed, retrying in 1s...");
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
 
-    if (res.ok) {
+    if (res && res.ok) {
       analysisResult = data;
       renderAnalyzeResult(data);
       showToast(`Analysis complete: ${formatStatus(data.status)}`, data.status === 'approved' ? 'success' : data.status === 'rejected' ? 'error' : 'warning');
