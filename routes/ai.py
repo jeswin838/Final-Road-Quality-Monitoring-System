@@ -1332,8 +1332,7 @@ def user_report():
             print("DETECTIONS:", allowed_detections)
         except Exception as e:
             import traceback, sys, os, psutil, threading
-            from flask import request
-            try: import torch; dev = "cuda:0" if torch.cuda.is_available() else "cpu"
+            try: dev = "cuda:0" if torch.cuda.is_available() else "cpu"
             except: dev = "N/A"
             try: mem = psutil.Process().memory_info().rss/(1024*1024); cpu = psutil.cpu_percent()
             except: mem = 0.0; cpu = 0.0
