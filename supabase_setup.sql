@@ -70,3 +70,6 @@ ALTER TABLE public.assignments ADD COLUMN IF NOT EXISTS after_photo_lat DOUBLE P
 ALTER TABLE public.assignments ADD COLUMN IF NOT EXISTS after_photo_lon DOUBLE PRECISION;
 ALTER TABLE public.assignments ADD COLUMN IF NOT EXISTS after_photo_accuracy DOUBLE PRECISION;
 ALTER TABLE public.assignments ADD COLUMN IF NOT EXISTS after_photo_timestamp TIMESTAMPTZ;
+
+-- Add quality score column for intelligent duplicate consolidation
+ALTER TABLE public.potholes ADD COLUMN IF NOT EXISTS quality_score DOUBLE PRECISION DEFAULT NULL;

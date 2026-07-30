@@ -508,6 +508,15 @@ def decide_ai_severity(detections: list) -> str:
 
 
 
+from utils.duplicate_consolidation import (
+    calculate_quality_score,
+    find_duplicate_pothole,
+    compare_quality,
+    insert_new_pothole,
+    update_existing_pothole,
+    refresh_duplicate_timestamp
+)
+
 # ================= /analyze ENDPOINT =================
 @ai_bp.route("/analyze", methods=["POST"])
 def analyze():
@@ -574,6 +583,26 @@ def analyze():
                 qualities_str = [single_q] if single_q else []
 
         raw_files = [f for f in raw_files if f is not None]
+
+        # ----- DEBUG: SAVE RAW UPLOADS -----
+        now_dt = datetime.now()
+        req_folder = f"request_{now_dt.strftime('%Y%m%d_%H%M%S')}_{now_dt.microsecond // 1000:03d}"
+        debug_dir = os.path.join("debug_uploads", req_folder)
+        os.makedirs(debug_dir, exist_ok=True)
+        
+        print("==================================================")
+        print("NEW REQUEST")
+        print(f"Timestamp: {now_dt.isoformat()}")
+        print(f"Request Folder: {req_folder}")
+        print(f"Number of Images: {len(raw_files)}")
+        print(f"Client IP: {request.headers.get('X-Forwarded-For', request.remote_addr)}")
+        print(f"User Agent: {request.headers.get('User-Agent', '')}")
+        print("==================================================")
+
+        for i, f in enumerate(raw_files):
+            save_path = os.path.join(debug_dir, f"frame_{i}.jpg")
+            f.save(save_path)
+            f.stream.seek(0)
 
         # SAFE GPS PARSING
         try:
@@ -662,6 +691,18 @@ def analyze():
             mem_ad = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
             print(f"[MEM] After decode: {mem_ad:.1f}MB")
             
+            decode_success = img is not None
+            img_h, img_w, img_c = img.shape if decode_success else (0, 0, 0)
+            
+            print(f"Frame Index: {idx}")
+            print(f"Filename: {f.filename if hasattr(f, 'filename') else 'unknown'}")
+            print(f"Byte Size: {len(file_bytes)}")
+            print(f"Image Width: {img_w}")
+            print(f"Image Height: {img_h}")
+            print(f"Image Channels: {img_c}")
+            print(f"JPEG Decode Success: {decode_success}")
+            print("--------------------------------------------------")
+            
             del np_arr
 
             if img is None:
@@ -680,6 +721,12 @@ def analyze():
                 mem_ai = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
                 print(f"[MEM] After YOLO inference: {mem_ai:.1f}MB")
 
+                print(f"Frame Index: {idx}")
+                print(f"Number of detections: {len(detections)}")
+                for d in detections:
+                    print(f"Confidence: {d.get('confidence')}")
+                    print(f"Bounding Box: {d.get('box')}")
+
                 strong_detections = [
                     d for d in detections
                     if d["confidence"] >= 0.20
@@ -690,12 +737,12 @@ def analyze():
                     # Calculate score manually instead of storing all frames
                     primary = max(strong_detections, key=lambda d: d.get("bbox_ratio", 0.0))
                     
+                    print(f"Best Detection: {primary}")
+                    
                     yolo_conf = primary.get("confidence", 0.0)
                     bbox_ratio = primary.get("bbox_ratio", 0.0)
                     center_x_ratio = primary.get("center_x_ratio", 0.5)
-                    center_pos = 1.0 - abs(center_x_ratio - 0.5) * 2.0
-                    
-                    score = (0.40 * yolo_conf * 100) + (0.30 * bbox_ratio * 100) + (0.20 * q_val) + (0.10 * center_pos * 100)
+                    score = calculate_quality_score(yolo_conf, bbox_ratio, q_val, center_x_ratio)
                     
                     if score > best_score:
                         if best_img is not None:
@@ -798,9 +845,10 @@ def analyze():
         # ----- 7. Select Primary Detection -----
         primary = max(best_detections, key=lambda d: d.get("bbox_ratio", 0.0))
 
-        # ----- 8. Immediate Database Insert -----
+        # ----- 8. Intelligent Duplicate Consolidation or Insert -----
         now_iso = datetime.now(timezone.utc).isoformat()
         inserted_id = None
+        action_taken = "INSERT"
         
         _t_db_start = time.time()
         dlog.db_saving()
@@ -811,6 +859,7 @@ def analyze():
                 "longitude":        float(lon),
                 "severity":         str(decision),
                 "confidence":       float(primary["confidence"]),
+                "quality_score":    float(best_score),
                 "image_url":        None,   # To be updated by background upload
                 "type":             "pothole",
                 "pothole":          True,
@@ -820,11 +869,33 @@ def analyze():
                 "created_at":       now_iso,
                 "last_reported_at": now_iso,
             }
-            # Use insert returning data
-            new_p = supabase.table("potholes").insert(pothole_payload).execute()
-            inserted_id = new_p.data[0].get("id") if getattr(new_p, "data", []) else None
-
+            
+            duplicate = find_duplicate_pothole(supabase, float(lat), float(lon), "pothole", 10.0, 10)
+            
+            if duplicate is None:
+                action_taken = "INSERT"
+                inserted_id = insert_new_pothole(supabase, pothole_payload)
+            else:
+                inserted_id = duplicate["id"]
+                if compare_quality(best_score, duplicate.get("quality_score")):
+                    action_taken = "UPDATE"
+                    update_existing_pothole(supabase, inserted_id, duplicate, pothole_payload)
+                else:
+                    action_taken = "NO_ACTION"
                 
+                # Always refresh duplicate timestamp and increment count
+                refresh_duplicate_timestamp(supabase, inserted_id, now_iso)
+                
+            print("==================================================")
+            print("DATABASE INSERT LOG")
+            print(f"Best Frame Index: {best_idx}")
+            print(f"Best Confidence: {primary['confidence']}")
+            print(f"Latitude: {lat}")
+            print(f"Longitude: {lon}")
+            print(f"Duplicate Found: {duplicate is not None}")
+            print(f"Action: {action_taken}")
+            print("==================================================")
+
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -838,11 +909,20 @@ def analyze():
             try:
                 from services.hazard_registry import recalculate_single_hazard_async
                 master_id = f"AI-{inserted_id}"
-                new_db_record = pothole_payload.copy()
-                new_db_record["id"] = inserted_id
+                
+                if action_taken == "INSERT" or action_taken == "UPDATE":
+                    new_db_record = pothole_payload.copy()
+                    new_db_record["id"] = inserted_id
+                else:
+                    # For NO_ACTION, we must still pass the duplicate record to the hazard registry
+                    # but updated with the incremented report_count and new last_reported_at
+                    new_db_record = duplicate.copy()
+                    new_db_record["report_count"] = new_db_record.get("report_count", 0) + 1
+                    new_db_record["last_reported_at"] = now_iso
                 
                 # Push the heavy lifting to the background
-                recalculate_single_hazard_async(master_id, new_db_record, "AI", "new_detection")
+                event_type = "new_detection" if action_taken == "INSERT" else "update_detection"
+                recalculate_single_hazard_async(master_id, new_db_record, "AI", event_type)
             except Exception as ex:
                 print(f"[!] Error updating hazard registry cache: {ex}")
 
@@ -853,7 +933,7 @@ def analyze():
         else:
             annotated = best_img
             
-        def background_upload(supabase_client, pid, b_name, img_array):
+        def background_upload(supabase_client, pid, b_name, img_array, expected_timestamp):
             _t_bg_start = time.time()
             try:
                 # Encode to JPEG with default high quality. Do NOT resize.
@@ -864,14 +944,14 @@ def analyze():
                 
                 if ann_filename:
                     final_url = f"{Config.SUPABASE_URL}/storage/v1/object/public/pothole-images/{ann_filename}"
-                    supabase_client.table("potholes").update({"image_url": final_url}).eq("id", pid).execute()
+                    supabase_client.table("potholes").update({"image_url": final_url}).eq("id", pid).eq("last_reported_at", expected_timestamp).execute()
             except Exception as e:
                 pass
             _t_bg_ms = (time.time() - _t_bg_start) * 1000
             print(f"[PERFORMANCE] Background Upload Time: {_t_bg_ms:.2f}ms")
 
-        if inserted_id:
-            executor.submit(background_upload, supabase, inserted_id, base_name, annotated)
+        if inserted_id and action_taken in ("INSERT", "UPDATE"):
+            executor.submit(background_upload, supabase, inserted_id, base_name, annotated, now_iso)
 
         # ----- 10. Immediate API Response -----
         _total_s = time.time() - _t_total_start
@@ -889,6 +969,10 @@ def analyze():
 
         dlog.timings(yolo_ms=_yolo_ms, upload_ms=0.0, db_ms=_db_ms, total_s=_total_s)
         dlog.request_end()
+        
+        print("Request Finished")
+        print(f"Folder Location: {debug_dir}")
+        print("==================================================")
         
         return jsonify({
             "status":     "success",
