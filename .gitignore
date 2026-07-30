@@ -21,3 +21,5 @@ received_*.jpg
 # Databases
 *.db
 *.sqlite
+
+debug_uploads/
