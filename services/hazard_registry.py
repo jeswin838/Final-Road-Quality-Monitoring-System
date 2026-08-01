@@ -31,14 +31,20 @@ class HazardRegistryCache:
         self._global_json_cache = None
         self.lock = threading.Lock()
         
-    def invalidate(self):
-        """Clear the cache entirely."""
+    def invalidate(self, rebuild: bool = False):
+        """Clear the cache entirely or mark as stale and trigger a background rebuild."""
         with self.lock:
             self.data.clear()
             self.sorted_keys.clear()
             self.initialized = False
             self._global_json_cache = None
-        logger.info("Hazard registry cache explicitly invalidated.")
+            logger.info("Hazard registry cache explicitly invalidated.")
+            if rebuild:
+                logger.info("[HazardRegistryCache] Triggering rebuild")
+                
+        if rebuild:
+            from services.hazard_registry import load_all_hazards, background_executor
+            background_executor.submit(load_all_hazards)
         
     def is_stale(self) -> bool:
         """Check if the cache has never been initialized."""
@@ -139,15 +145,7 @@ class HazardRegistryCache:
             self._global_json_cache = cached_list
             self.initialized = True
 
-    def invalidate(self):
-        """Mark cache as stale and trigger a background rebuild to prevent race conditions."""
-        with self.lock:
-            self._global_json_cache = None
-            print("[HazardRegistryCache] Invalidated - triggering rebuild")
-            
-        # Import here to avoid circular imports
-        from services.hazard_registry import load_all_hazards, background_executor
-        background_executor.submit(load_all_hazards)
+
         
     def is_stale(self) -> bool:
         with self.lock:
@@ -639,97 +637,126 @@ def recalculate_single_hazard(hazard_id: str, new_db_record: Optional[Dict[str, 
     from services.reverse_geocoder import geocoder_service
     import datetime
 
-    # For a brand new hazard
-    if event_type == "new_detection" and new_db_record and source:
-        # Check if we can cluster it into an existing hazard
-        lat = float(new_db_record.get("latitude") or new_db_record.get("gps_lat") or 0.0)
-        lon = float(new_db_record.get("longitude") or new_db_record.get("gps_lon") or 0.0)
-        
-        # In a real cluster, we would fetch assigns. For a new record, there's no assignment yet.
-        new_h = normalize_record(new_db_record, source, {})
-        new_h.report_count = 1
-        new_h.latest_report_time = new_h.created_at
-        new_h.highest_confidence = new_h.confidence
-        new_h.images = [new_h.image_url] if new_h.image_url else []
-        new_h.original_reports = [new_h]
-        hist_type = "Detection" if source == "AI" else "Citizen Report"
-        new_h.history = [{
-            "history_type": hist_type,
-            "timestamp": new_h.created_at,
-            "status": new_h.status,
-            "worker": new_h.worker,
-            "source": new_h.source,
-            "confidence": new_h.confidence,
-            "severity": new_h.severity,
-            "image": new_h.image_url
-        }]
-        
-        target_hazard = new_h
-        
-        # Clustering check
-        nearby = find_nearby(lat, lon, radius_m=50.0)
-        if nearby:
-            # We found an existing cluster, attach to it.
-            target_hazard = nearby[0]
-            target_hazard.report_count += 1
-            if new_h.confidence > target_hazard.highest_confidence:
-                target_hazard.highest_confidence = new_h.confidence
-            if new_h.created_at and target_hazard.latest_report_time and new_h.created_at > target_hazard.latest_report_time:
-                target_hazard.latest_report_time = new_h.created_at
-            
-            if new_h.image_url and new_h.image_url not in target_hazard.images:
-                target_hazard.images.append(new_h.image_url)
-            target_hazard.original_reports.append(new_h)
-            target_hazard.history.append(new_h.history[0])
-            
-            # Re-evaluate dominant severity
-            sevs = [orig.severity for orig in target_hazard.original_reports]
-            target_hazard.severity = resolve_severity(sevs)
+    target_hazard = registry_cache.data.get(hazard_id)
+    
+    # Check if it was clustered into another hazard
+    if not target_hazard:
+        for master in registry_cache.data.values():
+            if any(orig.hazard_id == hazard_id for orig in master.original_reports):
+                target_hazard = master
+                break
 
-    else:
-        # It's an update to an existing hazard (like verify, reject, assign)
-        target_hazard = registry_cache.data.get(hazard_id)
-        
-        # Check if it was clustered into another hazard
-        if not target_hazard:
-            for master in registry_cache.data.values():
-                if any(orig.hazard_id == hazard_id for orig in master.original_reports):
-                    target_hazard = master
-                    break
-
-        if not target_hazard:
-            logger.warning(f"recalculate_single_hazard: {hazard_id} not found in cache. Doing full reload.")
-            load_all_hazards()
-            target_hazard = registry_cache.data.get(hazard_id)
-            if not target_hazard:
-                for master in registry_cache.data.values():
-                    if any(orig.hazard_id == hazard_id for orig in master.original_reports):
-                        target_hazard = master
-                        break
-            if not target_hazard:
-                return None
+    # For status updates, reload the latest DB record to ensure we preserve all fields
+    if event_type == "status_update":
+        try:
+            from app import supabase
+            db_id_str = hazard_id.replace("AI-", "").replace("USER-", "")
+            table_name = "potholes" if "AI-" in hazard_id else "user_reports"
+            res = supabase.table(table_name).select("*").eq("id", db_id_str).execute()
+            
+            if res.data:
+                latest_db_record = res.data[0]
+                source_type = "AI" if "AI-" in hazard_id else "Citizen"
+                assigns = load_assignments()
+                updated_h = normalize_record(latest_db_record, source_type, assigns)
                 
-        # If it's an assignment update, fetch latest assignment for it
-        if event_type == "assignment_update":
+                if target_hazard:
+                    target_hazard.status = updated_h.status
+                    target_hazard.severity = updated_h.severity
+                    target_hazard.confidence = updated_h.confidence
+                    target_hazard.worker = updated_h.worker
+                    target_hazard.maintenance_state = updated_h.maintenance_state
+                    target_hazard.assignment = updated_h.assignment
+                    target_hazard.updated_at = updated_h.updated_at
+                    
+                    for orig in target_hazard.original_reports:
+                        if orig.hazard_id == hazard_id:
+                            orig.status = updated_h.status
+                            orig.severity = updated_h.severity
+                            orig.confidence = updated_h.confidence
+                            orig.worker = updated_h.worker
+                            orig.maintenance_state = updated_h.maintenance_state
+                            orig.assignment = updated_h.assignment
+                            orig.updated_at = updated_h.updated_at
+                            break
+                else:
+                    # Target hazard wasn't in cache (e.g. newly approved citizen report).
+                    # Treat it as a new detection to cluster and add it.
+                    event_type = "new_detection"
+                    new_db_record = latest_db_record
+                    source = source_type
+            else:
+                logger.warning(f"recalculate_single_hazard: DB record not found for {hazard_id}")
+        except Exception as e:
+            logger.error(f"Failed to fetch updated record for {hazard_id}: {e}")
+            if new_db_record and target_hazard:
+                target_hazard.status = new_db_record.get("status", target_hazard.status)
+
+    # For a brand new hazard (or a newly approved one being integrated)
+    if event_type == "new_detection" and new_db_record and source:
+        if not target_hazard:
+            # Initialize it
+            lat = float(new_db_record.get("latitude") or new_db_record.get("gps_lat") or 0.0)
+            lon = float(new_db_record.get("longitude") or new_db_record.get("gps_lon") or 0.0)
+            
             assigns = load_assignments()
-            if target_hazard.hazard_id in assigns:
-                a_data = assigns[target_hazard.hazard_id]
+            new_h = normalize_record(new_db_record, source, assigns)
+            new_h.report_count = 1
+            new_h.latest_report_time = new_h.created_at
+            new_h.highest_confidence = new_h.confidence
+            new_h.images = [new_h.image_url] if new_h.image_url else []
+            new_h.original_reports = [new_h]
+            hist_type = "Detection" if source == "AI" else "Citizen Report"
+            new_h.history = [{
+                "history_type": hist_type,
+                "timestamp": new_h.created_at,
+                "status": new_h.status,
+                "worker": new_h.worker,
+                "source": new_h.source,
+                "confidence": new_h.confidence,
+                "severity": new_h.severity,
+                "image": new_h.image_url
+            }]
+            
+            target_hazard = new_h
+            
+            # Clustering check
+            nearby = find_nearby(lat, lon, radius_m=50.0)
+            if nearby:
+                target_hazard = nearby[0]
+                target_hazard.report_count += 1
+                if new_h.confidence > target_hazard.highest_confidence:
+                    target_hazard.highest_confidence = new_h.confidence
+                if new_h.created_at and target_hazard.latest_report_time and new_h.created_at > target_hazard.latest_report_time:
+                    target_hazard.latest_report_time = new_h.created_at
+                
+                if new_h.image_url and new_h.image_url not in target_hazard.images:
+                    target_hazard.images.append(new_h.image_url)
+                target_hazard.original_reports.append(new_h)
+                target_hazard.history.append(new_h.history[0])
+                
+                sevs = [orig.severity for orig in target_hazard.original_reports]
+                target_hazard.severity = resolve_severity(sevs)
+
+    elif event_type == "assignment_update" and target_hazard:
+        assigns = load_assignments()
+        if target_hazard.hazard_id in assigns:
+            a_data = assigns[target_hazard.hazard_id]
+            target_hazard.worker = a_data.get("worker_name") or a_data.get("worker_id")
+            target_hazard.maintenance_state = a_data.get("status")
+            target_hazard.status = target_hazard.maintenance_state
+            target_hazard.assignment = a_data
+        else:
+            if target_hazard.db_id in assigns:
+                a_data = assigns[target_hazard.db_id]
                 target_hazard.worker = a_data.get("worker_name") or a_data.get("worker_id")
                 target_hazard.maintenance_state = a_data.get("status")
                 target_hazard.status = target_hazard.maintenance_state
                 target_hazard.assignment = a_data
-            else:
-                # Also check legacy fallback
-                if target_hazard.db_id in assigns:
-                    a_data = assigns[target_hazard.db_id]
-                    target_hazard.worker = a_data.get("worker_name") or a_data.get("worker_id")
-                    target_hazard.maintenance_state = a_data.get("status")
-                    target_hazard.status = target_hazard.maintenance_state
-                    target_hazard.assignment = a_data
-                    
-        elif event_type == "status_update" and new_db_record:
-            # Explicit status override
-            target_hazard.status = new_db_record.get("status", target_hazard.status)
+                
+    if not target_hazard:
+        logger.warning(f"recalculate_single_hazard: target_hazard not found or created for {hazard_id}")
+        return None
 
     # 1. Reverse Geocoding Check (Only if missing)
     if not target_hazard.formatted_address or target_hazard.formatted_address == "Location unavailable":
