@@ -371,7 +371,11 @@ function focusTargetReport() {
         setTimeout(() => {
             let foundLayer = null;
             markerClusterGroup.eachLayer(layer => {
-                if (layer.options && layer.options.marker_id === targetGroup.marker_id) {
+                // Ensure we compare valid identifiers, not undefined === undefined
+                const layerId = layer.options.marker_id ?? layer.options.hazard_id;
+                const targetId = targetGroup.marker_id ?? targetGroup.id;
+                
+                if (layer.options && layerId && targetId && layerId === targetId) {
                     foundLayer = layer;
                 }
             });
@@ -392,7 +396,11 @@ function focusTargetReport() {
                     
                     setTimeout(() => {
                         if (typeof showReports === 'function') {
-                            showReports(targetGroup.marker_id, targetReportId || targetHazardId);
+                            // Compute a valid identifier first, never call showReports(undefined)
+                            const validId = targetGroup.marker_id ?? targetGroup.id;
+                            if (validId) {
+                                showReports(validId, targetReportId || targetHazardId);
+                            }
                         }
                     }, 500);
                 });
@@ -418,7 +426,9 @@ function renderMarkers() {
     if (showClusters) {
       const isUserReport = r.type === 'user_report';
       const marker = L.marker([lat, lon], { icon: makeIcon(r.severity) });
-      marker.options.marker_id = r.marker_id;
+      
+      // Store a usable identifier inside the marker options even if marker_id does not exist.
+      marker.options.marker_id = r.marker_id ?? r.id;
       marker.options.hazard_id = r.id;
       
       const popupHtml = buildPremiumPopup(r, lat, lon, isUserReport);
@@ -445,10 +455,42 @@ async function updateStats() {
     const res  = await fetch('/api/stats');
     const data = await res.json();
     const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-    setEl('stat-total',   data.total   ?? '—');
-    setEl('stat-today',   data.today   ?? '—');
-    setEl('stat-fixed',   data.fixed   ?? '—');
-    setEl('stat-pending', data.pending ?? '—');
+    
+    if (typeof allData !== 'undefined' && allData) {
+        let totalLocations = allData.length;
+        let todayLocations = 0;
+        let fixedLocations = 0;
+        let pendingLocations = 0;
+        
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        allData.forEach(r => {
+            // Check if the grouped location was detected today (in UTC to match server)
+            if (r.created_at && r.created_at.startsWith(todayStr)) {
+                todayLocations++;
+            }
+
+            // Check the status of the grouped location
+            const s = (r.status || 'Pending').toLowerCase().trim();
+            if (s === 'completed' || s === 'fixed' || s === 'closed') {
+                fixedLocations++;
+            } else if (s === 'in progress') {
+                pendingLocations++; // Alternatively track separately if needed, but 'Pending Repairs' usually encompasses non-fixed
+            } else {
+                pendingLocations++;
+            }
+        });
+
+        setEl('stat-total',   totalLocations);
+        setEl('stat-today',   todayLocations);
+        setEl('stat-fixed',   fixedLocations);
+        setEl('stat-pending', pendingLocations);
+    } else {
+        setEl('stat-total',   data.total   ?? '—');
+        setEl('stat-today',   data.today   ?? '—');
+        setEl('stat-fixed',   data.fixed   ?? '—');
+        setEl('stat-pending', data.pending ?? '—');
+    }
   } catch (_) {}
 }
 
@@ -547,10 +589,12 @@ window.showReports = async function(report_id) {
 
       if (typeof allData !== 'undefined' && allData && allData.length > 0) {
           for (let r of allData) {
-              // Priority 1: marker_id
-              if (r.marker_id && String(r.marker_id) === search_id) {
+              const checkMarkerId = r.marker_id ?? r.id;
+              
+              // Priority 1: marker_id (or fallback id)
+              if (checkMarkerId && String(checkMarkerId) === search_id) {
                   fallbackData = r;
-                  lookupStrategy = "marker_id";
+                  lookupStrategy = "marker_id_fallback";
                   break;
               }
               // Priority 2: hazard_id
@@ -610,7 +654,9 @@ window.showReports = async function(report_id) {
       let popupObj = null;
       if (typeof markerClusterGroup !== 'undefined') {
           markerClusterGroup.eachLayer(layer => {
-              if (layer.options && fallbackData && layer.options.marker_id === fallbackData.marker_id) {
+              const layerId = layer.options.marker_id ?? layer.options.hazard_id;
+              const fbId = fallbackData ? (fallbackData.marker_id ?? fallbackData.id) : null;
+              if (layer.options && fbId && layerId === fbId) {
                   markerObj = layer;
                   if (typeof layer.getPopup === 'function') popupObj = layer.getPopup();
               }

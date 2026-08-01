@@ -233,9 +233,15 @@ def get_unified_data():
                             g["images"].append(r["image"])
                             if not g["image"]: g["image"] = r["image"]
                             
-                        # If a new report comes in, priority logic means status could revert or inherit
-                        # We keep the most actionable status
-                        if g["status"] == "FIXED" and r["status"] != "FIXED":
+                        # Never downgrade a workflow. Keep the most advanced state.
+                        def get_status_weight(s):
+                            s_upper = str(s).upper()
+                            if s_upper in ["FIXED", "APPROVED", "COMPLETED", "CLOSED"]: return 3
+                            if s_upper in ["IN_PROGRESS"]: return 2
+                            if s_upper in ["ASSIGNED"]: return 1
+                            return 0
+                            
+                        if get_status_weight(r["status"]) > get_status_weight(g["status"]):
                             g["status"] = r["status"]
                             
                         g["reports"].append(r)
@@ -319,9 +325,12 @@ def get_unified_data():
             if str(g["created_at"]).startswith(today_str):
                 stats["today"] += 1
                 
-        if norm_stat == "FIXED": stats["fixed"] += 1
-        elif norm_stat == "IN_PROGRESS": stats["in_progress"] += 1
-        else: stats["pending"] += 1
+        if norm_stat in ["FIXED", "APPROVED", "COMPLETED", "CLOSED"]: 
+            stats["fixed"] += 1
+        elif norm_stat == "IN_PROGRESS": 
+            stats["in_progress"] += 1
+        else: 
+            stats["pending"] += 1
 
         # Markers (Only active)
         if norm_stat != "FIXED":

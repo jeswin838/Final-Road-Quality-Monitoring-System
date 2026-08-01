@@ -686,58 +686,16 @@ def get_stats():
     if _stats_cache["data"] and _stats_cache["time"] and (now_ts - _stats_cache["time"]).total_seconds() < 5:
         return jsonify(_stats_cache["data"])
 
-    supabase = get_supabase()
-    if not supabase: return jsonify({"total":0, "today":0, "fixed":0, "pending":0})
-    
     try:
-        # Fetch all active potholes
-        p_res = supabase.table("potholes").select("id, created_at, status").eq("pothole", True).execute()
-        p_data = p_res.data or []
-
-        u_res = supabase.table("user_reports").select("id, created_at, status").eq("status", "approved").execute()
-        u_data = u_res.data or []
-        for c in u_data:
-            c["pothole"] = True
-            c["type"] = "Citizen Report"
-            
-        p_data = p_data + u_data
-
-        total = len(p_data)
-        print(f"Dashboard potholes fetched: {len(p_res.data or [])}")
-        print(f"Dashboard approved user reports fetched: {len(u_data)}")
-        print(f"Merged hazards: {total}")
-        print(f"Dashboard response count: {total}")
-
-        # Count today's detections (UTC day matching creation date)
-        today_str = datetime.utcnow().strftime("%Y-%m-%d")
-        today = sum(1 for r in p_data if r.get("created_at", "").startswith(today_str))
-
-        # Status derived from assignments
-        fixed, pending, inprog = 0, 0, 0
-        try:
-            a_res = supabase.table("assignments").select("hazard_id, status").execute()
-            assigns = {r["hazard_id"]: r["status"] for r in a_res.data} if a_res.data else {}
-        except:
-            assigns = {}
-
-        for p in p_data:
-            s = assigns.get(p["id"], "Pending")
-            if s in ("Completed", "Fixed"):
-                fixed += 1
-            elif s == "In Progress":
-                inprog += 1
-            else:
-                pending += 1
-
-        stats_data = {
-            "total": total, 
-            "today": today, 
-            "fixed": fixed,
-            "pending": pending, 
-            "in_progress": inprog
-        }
-        _stats_cache = {"data": stats_data, "time": now_ts}
-        return jsonify(stats_data)
+        from services.hazard_engine import get_unified_data
+        unified = get_unified_data()
+        if "stats" in unified:
+            stats_data = unified["stats"]
+            _stats_cache = {"data": stats_data, "time": now_ts}
+            return jsonify(stats_data)
+        
+        # Fallback if somehow stats are missing
+        return jsonify({"total":0, "today":0, "fixed":0, "pending":0})
     except Exception as e:
         print(f"[!] Stats API Error: {e}")
         return jsonify({"total":0, "today":0, "fixed":0, "pending":0, "error": str(e)})
@@ -940,6 +898,16 @@ def create_assignment():
             hazard_source = 'USER'
         else:
             return jsonify({"error": "Hazard not found"}), 404
+
+    # Prevent duplicate active assignments
+    existing_res = supabase.table('assignments').select('id, status').eq('hazard_id', pothole_id).order('id', desc=True).limit(1).execute()
+    if existing_res.data:
+        latest_status = str(existing_res.data[0].get('status', '')).lower()
+        if latest_status not in ['completed', 'closed', 'rejected', 'resolved', 'fixed', 'verified']:
+            return jsonify({
+                "error": "An active assignment already exists for this hazard.",
+                "id": existing_res.data[0]['id']
+            }), 409
 
     insert_data = {
         'hazard_id': pothole_id,
@@ -2257,6 +2225,8 @@ def verify_repair(hazard_id_str):
             # Mark hazard as closed so it drops off active maps
             if row.get('hazard_source') == 'potholes':
                 supabase.table('potholes').update({'status': 'closed'}).eq('id', hazard_id).execute()
+            elif row.get('hazard_source') in ['user_reports', 'USER']:
+                supabase.table('user_reports').update({'status': 'closed'}).eq('id', hazard_id).execute()
             
             if worker_id:
                 supabase.table('users').update({'worker_status': 'Available'}).eq('id', worker_id).execute()
