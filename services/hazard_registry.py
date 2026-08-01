@@ -263,6 +263,96 @@ def normalize_record(record: Dict[str, Any], source_type: str, assigns: Dict[int
         assignment=assignment_dict
     )
 
+def build_or_merge_hazard(new_h: Hazard, master_hazard: Optional[Hazard] = None) -> Hazard:
+    """
+    ONE reusable hazard creation/merge pipeline.
+    Handles duplicate detection, clustering, report_count, highest confidence, 
+    image list, history, original_reports, and severity resolution.
+    """
+    if master_hazard is not None:
+        # Merge into existing
+        master_hazard.report_count += getattr(new_h, 'report_count', 1)
+        
+        if new_h.confidence > master_hazard.highest_confidence:
+            master_hazard.highest_confidence = new_h.confidence
+            
+        h_time = new_h.created_at or ""
+        gh_time = master_hazard.latest_report_time or ""
+        if h_time > gh_time:
+            master_hazard.latest_report_time = h_time
+            
+        if new_h.image_url and new_h.image_url not in master_hazard.images:
+            master_hazard.images.append(new_h.image_url)
+            
+        master_hazard.original_reports.append(new_h)
+        
+        hist_type = "Detection" if new_h.source == "AI" else "Citizen Report"
+        master_hazard.history.append({
+            "history_type": hist_type,
+            "timestamp": new_h.created_at,
+            "status": new_h.status,
+            "worker": new_h.worker,
+            "worker_team": getattr(new_h, "worker_team", None),
+            "note": getattr(new_h, "reason", None) or getattr(new_h, "description", None),
+            "source": new_h.source,
+            "confidence": new_h.confidence,
+            "severity": new_h.severity,
+            "image": new_h.image_url
+        })
+        
+        sevs = [orig.severity for orig in master_hazard.original_reports]
+        master_hazard.severity = resolve_severity(sevs)
+        
+        # PRESERVE ACTIVE ASSIGNMENT
+        terminal_statuses = ["Completed", "Closed", "Rejected", "Cancelled"]
+        
+        master_has_active = (
+            master_hazard.assignment and 
+            master_hazard.assignment.get("status") and 
+            master_hazard.assignment.get("status") not in terminal_statuses
+        )
+        
+        new_h_has_active = (
+            new_h.assignment and 
+            new_h.assignment.get("status") and 
+            new_h.assignment.get("status") not in terminal_statuses
+        )
+        
+        if new_h_has_active and not master_has_active:
+            master_hazard.assignment = new_h.assignment
+            master_hazard.worker = new_h.worker
+            master_hazard.maintenance_state = new_h.maintenance_state
+            master_hazard.status = new_h.status
+            # Preserve the hazard_id of the one that holds the active assignment
+            # so DB updates apply to the correct assignment record.
+            master_hazard.hazard_id = new_h.hazard_id
+            
+        return master_hazard
+    else:
+        # Initialize as brand new master
+        new_h.report_count = getattr(new_h, 'report_count', 1) or 1
+        new_h.latest_report_time = new_h.created_at
+        new_h.highest_confidence = new_h.confidence
+        new_h.images = [new_h.image_url] if new_h.image_url else []
+        new_h.original_reports = [new_h]
+        
+        hist_type = "Detection" if new_h.source == "AI" else "Citizen Report"
+        new_h.history = [{
+            "history_type": hist_type,
+            "timestamp": new_h.created_at,
+            "status": new_h.status,
+            "worker": new_h.worker,
+            "worker_team": getattr(new_h, "worker_team", None),
+            "note": getattr(new_h, "reason", None) or getattr(new_h, "description", None),
+            "source": new_h.source,
+            "confidence": new_h.confidence,
+            "severity": new_h.severity,
+            "image": new_h.image_url
+        }]
+        
+        new_h.severity = resolve_severity([new_h.severity])
+        return new_h
+
 def merge_sources(ai_potholes: List[Hazard], citizen_reports: List[Hazard]) -> List[Hazard]:
     """Cluster co-located hazards spatially (50m radius) into master municipal hazards."""
     start_time = time.time()
@@ -285,73 +375,17 @@ def merge_sources(ai_potholes: List[Hazard], citizen_reports: List[Hazard]) -> L
             if k in grid:
                 for gh in grid[k]:
                     if haversine(h.latitude, h.longitude, gh.latitude, gh.longitude) < 50.0:
-                        # Cluster merge
-                        gh.report_count += h.report_count
-                        
-                        # Max confidence resolved independently
-                        if h.confidence > gh.highest_confidence:
-                            gh.highest_confidence = h.confidence
-                            
-                        # Update latest report time
-                        h_time = h.created_at or ""
-                        gh_time = gh.latest_report_time or ""
-                        if h_time > gh_time:
-                            gh.latest_report_time = h_time
-                            
-                        # Accumulate unique images
-                        if h.image_url and h.image_url not in gh.images:
-                            gh.images.append(h.image_url)
-                            
-                        gh.original_reports.append(h)
-                        
-                        # Expand historical maintenance record
-                        hist_type = "Detection" if h.source == "AI" else "Citizen Report"
-                        gh.history.append({
-                            "history_type": hist_type,
-                            "timestamp": h.created_at,
-                            "status": h.status,
-                            "worker": h.worker,
-                            "worker_team": h.worker_team,
-                            "note": getattr(h, "reason", None) or getattr(h, "description", None),
-                            "source": h.source,
-                            "confidence": h.confidence,
-                            "severity": h.severity,
-                            "image": h.image_url
-                        })
+                        build_or_merge_hazard(h, master_hazard=gh)
                         found = True
                         break
             if found:
                 break
                 
         if not found:
-            # Set initial grouping context on the master anchor hazard
-            h.report_count = h.report_count
-            h.latest_report_time = h.created_at
-            h.highest_confidence = h.confidence
-            h.images = [h.image_url] if h.image_url else []
-            h.original_reports = [h]
-            
-            hist_type = "Detection" if h.source == "AI" else "Citizen Report"
-            h.history = [{
-                "history_type": hist_type,
-                "timestamp": h.created_at,
-                "status": h.status,
-                "worker": h.worker,
-                "worker_team": h.worker_team,
-                "note": getattr(h, "reason", None) or getattr(h, "description", None),
-                "source": h.source,
-                "confidence": h.confidence,
-                "severity": h.severity,
-                "image": h.image_url
-            }]
+            build_or_merge_hazard(h, master_hazard=None)
             grouped_hazards.append(h)
             x, y = math.floor(h.latitude / CELL_SIZE), math.floor(h.longitude / CELL_SIZE)
             grid.setdefault((x, y), []).append(h)
-            
-    # Resolve dominant severity via weighted helper
-    for gh in grouped_hazards:
-        sevs = [orig.severity for orig in gh.original_reports]
-        gh.severity = resolve_severity(sevs)
         
     merge_time = time.time() - start_time
     logger.info(f"Deduplication complete: merged {len(all_hazards)} records into {len(grouped_hazards)} unique municipal hazards (Merge Time: {merge_time:.4f}s)")
@@ -552,12 +586,12 @@ def load_hazard(hazard_id: str) -> Optional[Hazard]:
     return None
 
 def find_nearby(lat: float, lon: float, radius_m: float = 50.0) -> List[Hazard]:
-    """Retrieve all hazards within radius_m of target coords."""
-    hazards = load_all_hazards()
+    """Retrieve all hazards within radius_m of target coords directly from in-memory cache."""
     nearby = []
-    for h in hazards:
-        if haversine(lat, lon, h.latitude, h.longitude) <= radius_m:
-            nearby.append(h)
+    with registry_cache.lock:
+        for h in registry_cache.data.values():
+            if haversine(lat, lon, h.latitude, h.longitude) <= radius_m:
+                nearby.append(h)
     return nearby
 
 def count_reports() -> Dict[str, int]:
@@ -661,12 +695,21 @@ def recalculate_single_hazard(hazard_id: str, new_db_record: Optional[Dict[str, 
                 updated_h = normalize_record(latest_db_record, source_type, assigns)
                 
                 if target_hazard:
-                    target_hazard.status = updated_h.status
+                    terminal_statuses = ["Completed", "Closed", "Rejected", "Cancelled"]
+                    has_active_assignment = (
+                        target_hazard.assignment and 
+                        target_hazard.assignment.get("status") and 
+                        target_hazard.assignment.get("status") not in terminal_statuses
+                    )
+
+                    if not has_active_assignment:
+                        target_hazard.status = updated_h.status
+                        target_hazard.worker = updated_h.worker
+                        target_hazard.maintenance_state = updated_h.maintenance_state
+                        target_hazard.assignment = updated_h.assignment
+
                     target_hazard.severity = updated_h.severity
                     target_hazard.confidence = updated_h.confidence
-                    target_hazard.worker = updated_h.worker
-                    target_hazard.maintenance_state = updated_h.maintenance_state
-                    target_hazard.assignment = updated_h.assignment
                     target_hazard.updated_at = updated_h.updated_at
                     
                     for orig in target_hazard.original_reports:
@@ -674,9 +717,10 @@ def recalculate_single_hazard(hazard_id: str, new_db_record: Optional[Dict[str, 
                             orig.status = updated_h.status
                             orig.severity = updated_h.severity
                             orig.confidence = updated_h.confidence
-                            orig.worker = updated_h.worker
-                            orig.maintenance_state = updated_h.maintenance_state
-                            orig.assignment = updated_h.assignment
+                            if not has_active_assignment:
+                                orig.worker = updated_h.worker
+                                orig.maintenance_state = updated_h.maintenance_state
+                                orig.assignment = updated_h.assignment
                             orig.updated_at = updated_h.updated_at
                             break
                 else:
@@ -695,48 +739,43 @@ def recalculate_single_hazard(hazard_id: str, new_db_record: Optional[Dict[str, 
     # For a brand new hazard (or a newly approved one being integrated)
     if event_type == "new_detection" and new_db_record and source:
         if not target_hazard:
-            # Initialize it
             lat = float(new_db_record.get("latitude") or new_db_record.get("gps_lat") or 0.0)
             lon = float(new_db_record.get("longitude") or new_db_record.get("gps_lon") or 0.0)
             
             assigns = load_assignments()
             new_h = normalize_record(new_db_record, source, assigns)
-            new_h.report_count = 1
-            new_h.latest_report_time = new_h.created_at
-            new_h.highest_confidence = new_h.confidence
-            new_h.images = [new_h.image_url] if new_h.image_url else []
-            new_h.original_reports = [new_h]
-            hist_type = "Detection" if source == "AI" else "Citizen Report"
-            new_h.history = [{
-                "history_type": hist_type,
-                "timestamp": new_h.created_at,
-                "status": new_h.status,
-                "worker": new_h.worker,
-                "source": new_h.source,
-                "confidence": new_h.confidence,
-                "severity": new_h.severity,
-                "image": new_h.image_url
-            }]
             
-            target_hazard = new_h
-            
-            # Clustering check
             nearby = find_nearby(lat, lon, radius_m=50.0)
+            before_size = len(registry_cache.data)
+            
             if nearby:
-                target_hazard = nearby[0]
-                target_hazard.report_count += 1
-                if new_h.confidence > target_hazard.highest_confidence:
-                    target_hazard.highest_confidence = new_h.confidence
-                if new_h.created_at and target_hazard.latest_report_time and new_h.created_at > target_hazard.latest_report_time:
-                    target_hazard.latest_report_time = new_h.created_at
-                
-                if new_h.image_url and new_h.image_url not in target_hazard.images:
-                    target_hazard.images.append(new_h.image_url)
-                target_hazard.original_reports.append(new_h)
-                target_hazard.history.append(new_h.history[0])
-                
-                sevs = [orig.severity for orig in target_hazard.original_reports]
-                target_hazard.severity = resolve_severity(sevs)
+                master = nearby[0]
+                build_or_merge_hazard(new_h, master_hazard=master)
+                target_hazard = master
+                inserted = False
+                logger.info(f"[RUNTIME SYNC] Merged {new_h.hazard_id} into {master.hazard_id}")
+            else:
+                build_or_merge_hazard(new_h, master_hazard=None)
+                target_hazard = new_h
+                inserted = True
+                logger.info(f"[RUNTIME SYNC] Created new master hazard {new_h.hazard_id}")
+            
+            # Immediately refresh the JSON cache via update_hazard_in_cache
+            registry_cache.update_hazard_in_cache(target_hazard)
+            after_size = len(registry_cache.data)
+            
+            logger.info(
+                f"[RUNTIME DETECTION]\n"
+                f"Hazard ID: {new_h.hazard_id}\n"
+                f"Latitude: {new_h.latitude}\n"
+                f"Longitude: {new_h.longitude}\n"
+                f"Nearby hazards found: {len(nearby)}\n"
+                f"Merged? {'YES' if nearby else 'NO'}\n"
+                f"Inserted? {'YES' if inserted else 'NO'}\n"
+                f"Registry size before: {before_size}\n"
+                f"Registry size after: {after_size}\n"
+                f"JSON cache refreshed: YES"
+            )
 
     elif event_type == "assignment_update" and target_hazard:
         assigns = load_assignments()

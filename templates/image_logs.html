@@ -386,6 +386,8 @@ function createCardHTML(r) {
     let statClass = statRaw === 'approved' ? 'badge-pill-app' : (statRaw === 'rejected' ? 'badge-pill-rej' : 'badge-pill-pen');
     let statIcon = statRaw === 'approved' ? 'fa-check' : (statRaw === 'rejected' ? 'fa-xmark' : 'fa-clock');
 
+    const hazardIdStr = (sRaw === 'citizen') ? 'USER-' + r.id : 'AI-' + r.id;
+
     return `
       <div class="source-tag">DETECTION</div>
       
@@ -430,7 +432,7 @@ function createCardHTML(r) {
         </div>
         
         <div class="card-actions">
-            <button class="btn-card-action" onclick="window.location.href='{{ url_for('pages.dashboard') }}?report_id=${r.id}'"><i class="fa-solid fa-map-location-dot"></i> Map</button>
+            <button class="btn-card-action" onclick="window.location.href='{{ url_for('pages.dashboard') }}?hazard=${hazardIdStr}'"><i class="fa-solid fa-map-location-dot"></i> Map</button>
             <button class="btn-card-action" onclick="openLightbox('${mediaUrl}', ${r.id}, '${r.latitude}', '${r.longitude}', '${r.severity}', '${r.created_at}', '${isVideo ? 'video' : 'image'}')"><i class="fa-solid fa-magnifying-glass"></i> View</button>
             <button class="btn-card-action" onclick="downloadImage('${mediaUrl}')"><i class="fa-solid fa-download"></i> Save</button>
         </div>

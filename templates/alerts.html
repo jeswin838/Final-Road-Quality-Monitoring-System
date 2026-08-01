@@ -423,7 +423,6 @@ function renderList() {
         const cardInnerHtml = `
             <div class="card-top">
                 <div class="badges">
-                    <span class="badge ${pri}">${priRaw}</span>
                     <span class="badge ${sevLower}">${sevRaw}</span>
                 </div>
                 <span class="risk-score">Risk: ${Math.round(h.risk_score || 0)}</span>
@@ -442,7 +441,7 @@ function renderList() {
             <div class="card-bottom">
                 <div>
                     <span class="meta-reports"><i class="fa-solid fa-users"></i> ${h.report_count || 1} Reps</span>
-                    <span class="meta-time"><i class="fa-regular fa-clock"></i> ${h.created_at ? new Date(h.created_at).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}) : 'Now'}</span>
+                    <span class="meta-time"><i class="fa-regular fa-clock"></i> ${h.created_at ? new Date(h.created_at).toLocaleString('en-US', {month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'}) : 'Now'}</span>
                 </div>
                 <div>
                     ${workerBadge}
@@ -549,18 +548,7 @@ function populateDetail(h) {
         <!-- SECTION 1: Header Image & Location -->
         <div class="roc-hero-section">
             <div class="roc-hero-image-wrap">
-                ${assign && assign.status === 'Waiting Verification' ? `
-                    <div style="display: flex; gap: 1rem; width: 100%; height: 100%;">
-                        <div style="flex: 1; position: relative;">
-                            <div style="position: absolute; top: 0; left: 0; background: rgba(0,0,0,0.7); padding: 2px 8px; font-size: 10px; z-index: 10;">BEFORE</div>
-                            <img src="${img}" class="roc-hero-image" style="object-fit: cover;" />
-                        </div>
-                        <div style="flex: 1; position: relative;">
-                            <div style="position: absolute; top: 0; left: 0; background: rgba(0,0,0,0.7); padding: 2px 8px; font-size: 10px; z-index: 10;">AFTER</div>
-                            ${assign.photo_after ? `<img src="${assign.photo_after}" class="roc-hero-image" style="object-fit: cover;" />` : `<div style="display:flex;align-items:center;justify-content:center;height:100%;background:#1a202c;"><i class="fa-solid fa-image"></i></div>`}
-                        </div>
-                    </div>
-                ` : img ? `<img src="${img}" class="roc-hero-image" />` : 
+                ${img ? `<img src="${img}" class="roc-hero-image" />` : 
                        `<div class="roc-empty-state" style="height: 100%; padding: 0;">
                             <i class="fa-solid fa-camera-slash" style="font-size: 3rem; color: rgba(255,255,255,0.1);"></i>
                         </div>`}
@@ -601,7 +589,7 @@ function populateDetail(h) {
             </div>
             <div class="roc-chip warning">
                 <span class="roc-chip-label">Waiting</span>
-                <span class="roc-chip-value">${h.waiting_days}d</span>
+                <span class="roc-chip-value">${realWaitingDays}d</span>
             </div>
             <div class="roc-chip primary">
                 <span class="roc-chip-label">Reports</span>
@@ -694,18 +682,6 @@ function populateDetail(h) {
                         <div class="roc-road-item">
                             <span class="roc-road-label">Latest Report Date</span>
                             <span class="roc-road-value">${h.last_seen ? new Date(h.last_seen).toLocaleDateString() : 'Not Available'}</span>
-                        </div>
-                        <div class="roc-road-item">
-                            <span class="roc-road-label">Average Confidence</span>
-                            <span class="roc-road-value">${h.confidence ? (h.confidence * 100).toFixed(1) + '%' : 'Not Available'}</span>
-                        </div>
-                        <div class="roc-road-item">
-                            <span class="roc-road-label">Average Severity</span>
-                            <span class="roc-road-value">${h.severity ? h.severity.toUpperCase() : 'NOT AVAILABLE'}</span>
-                        </div>
-                        <div class="roc-road-item">
-                            <span class="roc-road-label">Total Reports</span>
-                            <span class="roc-road-value">${h.report_count || 0}</span>
                         </div>
                     </div>
                 </div>
@@ -854,13 +830,6 @@ function populateDetail(h) {
     document.getElementById('detailEmptyState').style.display = 'none';
     if(destDesk) destDesk.style.display = 'flex';
     
-    // Trigger auto-scroll for timeline
-    setTimeout(() => {
-        const activeNodes = document.querySelectorAll('.roc-tl-node.current');
-        activeNodes.forEach(node => {
-            node.scrollIntoView({behavior: 'smooth', block: 'nearest', inline: 'center'});
-        });
-    }, 100);
 }
 
 // Custom Modal Logic

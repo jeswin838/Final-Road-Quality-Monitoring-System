@@ -71,12 +71,13 @@ def get_location_reports():
         except:
             pass
 
-        # Fetch ONLY approved potholes near coordinates (pending/rejected never shown in logs)
-        print(f"[DB] Querying approved potholes near {lat}, {lon} (±{EPSILON})")
+        active_statuses = ["approved", "Approved", "Available", "available", "Assigned", "assigned", "Accepted", "accepted", "In Progress", "in progress", "Waiting Verification", "waiting verification"]
+        
+        print(f"[DB] Querying active potholes near {lat}, {lon} (±{EPSILON})")
         p_res = supabase.table("potholes") \
             .select("*") \
             .eq("pothole", True) \
-            .eq("status", "approved") \
+            .in_("status", active_statuses) \
             .gte("latitude", lat - EPSILON) \
             .lte("latitude", lat + EPSILON) \
             .gte("longitude", lon - EPSILON) \
@@ -85,10 +86,10 @@ def get_location_reports():
         
         p_data = getattr(p_res, 'data', []) or []
         
-        # Fetch approved user reports near coordinates
+        # Fetch active user reports near coordinates
         u_res = supabase.table("user_reports") \
             .select("*") \
-            .eq("status", "approved") \
+            .in_("status", active_statuses) \
             .gte("latitude", lat - EPSILON) \
             .lte("latitude", lat + EPSILON) \
             .gte("longitude", lon - EPSILON) \
@@ -111,7 +112,7 @@ def get_location_reports():
             c["pothole"] = True
             
         p_data = u_data + p_data
-        p_data.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        p_data.sort(key=lambda x: x.get("created_at") or "", reverse=True)
         
         # Merge with Supabase assignments to get Status
         try:
@@ -138,12 +139,12 @@ def get_location_reports():
             if not is_citizen:
                 p["source"] = "AI Detection"
 
-            # Skip rejected or non-approved records (double-check beyond the DB filter)
+            # Skip rejected, pending, or closed records
             p_status = p.get("status", "approved")
             if not is_citizen and p.get("id") in assigns:
                 p_status = assigns[p["id"]]
 
-            if (p_status or "").lower() in ('rejected', 'pending'):
+            if (p_status or "").lower() in ('rejected', 'pending', 'closed'):
                 continue
                 
             # Collect and Normalize URLs

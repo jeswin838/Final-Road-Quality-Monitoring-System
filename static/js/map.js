@@ -29,8 +29,19 @@ let isLoadingMarkers   = false;
 let activeFilters      = { severity: '', status: '', confidence: 0 };
 let userMarker         = null;
 let firstLoad           = true;
+let currentOpenMarkerId = null;
 
 map.addLayer(markerClusterGroup);
+
+map.on('popupopen', function(e) {
+  if (e.popup && e.popup._source && e.popup._source.options) {
+    currentOpenMarkerId = e.popup._source.options.marker_id || e.popup._source.options.hazard_id;
+  }
+});
+
+map.on('popupclose', function(e) {
+  currentOpenMarkerId = null;
+});
 
 // ── Geolocation ─────────────────────────────────────────────────────────────
 function initGeolocation() {
@@ -368,6 +379,7 @@ function focusTargetReport() {
             if (foundLayer) {
                 markerClusterGroup.zoomToShowLayer(foundLayer, () => {
                     foundLayer.openPopup();
+                    window.history.replaceState({}, document.title, window.location.pathname);
                     
                     if (foundLayer._icon) {
                         foundLayer._icon.classList.add('marker-pulse-highlight');
@@ -407,6 +419,7 @@ function renderMarkers() {
       const isUserReport = r.type === 'user_report';
       const marker = L.marker([lat, lon], { icon: makeIcon(r.severity) });
       marker.options.marker_id = r.marker_id;
+      marker.options.hazard_id = r.id;
       
       const popupHtml = buildPremiumPopup(r, lat, lon, isUserReport);
       
@@ -414,6 +427,15 @@ function renderMarkers() {
       markerClusterGroup.addLayer(marker);
     }
   });
+  
+  if (currentOpenMarkerId) {
+      markerClusterGroup.eachLayer(layer => {
+          if (layer.options && (layer.options.marker_id === currentOpenMarkerId || layer.options.hazard_id === currentOpenMarkerId)) {
+              // Wait slightly for cluster to finish updating
+              setTimeout(() => { layer.openPopup(); }, 100);
+          }
+      });
+  }
 
 }
 
@@ -562,8 +584,8 @@ window.showReports = async function(report_id) {
       }
       
       if (fallbackData) {
-          lat = fallbackData.latitude || fallbackData.lat || (fallbackData.location && fallbackData.location.lat) || (fallbackData.location && fallbackData.location.latitude);
-          lon = fallbackData.longitude || fallbackData.lng || fallbackData.lon || (fallbackData.location && fallbackData.location.lon) || (fallbackData.location && fallbackData.location.longitude);
+          lat = fallbackData.latitude !== undefined ? fallbackData.latitude : (fallbackData.lat !== undefined ? fallbackData.lat : (fallbackData.location ? (fallbackData.location.lat !== undefined ? fallbackData.location.lat : fallbackData.location.latitude) : null));
+          lon = fallbackData.longitude !== undefined ? fallbackData.longitude : (fallbackData.lng !== undefined ? fallbackData.lng : (fallbackData.lon !== undefined ? fallbackData.lon : (fallbackData.location ? (fallbackData.location.lon !== undefined ? fallbackData.location.lon : fallbackData.location.longitude) : null)));
           
           console.log("Lookup Strategy Used:", lookupStrategy);
           console.log("Matched Object:", fallbackData);
@@ -576,7 +598,27 @@ window.showReports = async function(report_id) {
           console.error("Lookup failed. Could not find ID:", search_id, "in allData.");
       }
       
-      console.log("-----------------------------------------");
+      console.log("----- DEBUG LOGS -----");
+      console.log("Clicked report id:", report_id);
+      console.log("Resolved report:", fallbackData);
+      console.log("Latitude:", lat);
+      console.log("Longitude:", lon);
+      console.log("API URL:", `/api/location-reports?lat=${lat}&lon=${lon}`);
+      console.log("Current allData length:", allData ? allData.length : 0);
+      
+      let markerObj = null;
+      let popupObj = null;
+      if (typeof markerClusterGroup !== 'undefined') {
+          markerClusterGroup.eachLayer(layer => {
+              if (layer.options && fallbackData && layer.options.marker_id === fallbackData.marker_id) {
+                  markerObj = layer;
+                  if (typeof layer.getPopup === 'function') popupObj = layer.getPopup();
+              }
+          });
+      }
+      console.log("Marker object:", markerObj);
+      console.log("Popup object:", popupObj);
+      console.log("Current selected marker:", typeof selectedMarker !== 'undefined' ? selectedMarker : null);
 
       if (!lat || !lon) {
           throw new Error("Location coordinates not found in active map data.");
@@ -584,8 +626,11 @@ window.showReports = async function(report_id) {
 
       // 2. Fetch all reports at this location
       const res = await fetch(`/api/location-reports?lat=${lat}&lon=${lon}`);
-      if (!res.ok) throw new Error("Failed to load historical reports");
+      console.log("API response status:", res.status, res.statusText);
+      if (!res.ok) throw new Error("Failed to fetch data"); // Match exact error text
       const reports = await res.json();
+      console.log("API response (JSON):", reports);
+      console.log("Number of reports returned:", reports ? reports.length : 0);
       
       if (!reports || reports.length === 0) {
           throw new Error("No reports found for this location");
@@ -828,9 +873,13 @@ window.showReports = async function(report_id) {
       </div>`;
 
       // Init first image
-      setTimeout(() => { setGalleryImage(0); }, 50);
+      setTimeout(() => { 
+          console.log("Gallery images count:", document.querySelectorAll('#reportsContainer .gallery-item').length);
+          setGalleryImage(0); 
+      }, 50);
 
     } catch (err) {
+      console.error("DEBUG ERROR TRACE:", err);
       inner.innerHTML = `
       <div style="display: flex; width: 100%; height: 100%; align-items:center; justify-content:center; flex-direction:column; padding:40px; text-align:center;">
         <i class="fa-solid fa-circle-exclamation fa-4x" style="color:#ef4444; margin-bottom:25px;"></i>

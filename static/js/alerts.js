@@ -7,6 +7,7 @@ let knownIds    = new Set();
 let alertCount  = 0;
 let alertSound  = null;
 let notifBadge  = 0;
+let isInitialLoad = true;
 
 // Simple beep via Web Audio API
 function playBeep() {
@@ -129,28 +130,33 @@ function detectNew(potholes) {
   const newOnes = potholes.filter(r => !knownIds.has(r.id));
   newOnes.forEach(r => {
     knownIds.add(r.id);
-    alertCount++;
-    notifBadge++;
+    
+    if (!isInitialLoad) {
+      alertCount++;
+      notifBadge++;
 
-    // Toast
-    if (typeof showToast === 'function') {
-      const sevLower = String(r.severity || '').toLowerCase();
-      showToast(`New ${r.severity} pothole #${r.id} detected!`, (sevLower === 'critical' || sevLower === 'high') ? 'error' : 'warning', 4000);
-    }
+      // Toast
+      if (typeof showToast === 'function') {
+        const sevLower = String(r.severity || '').toLowerCase();
+        showToast(`New ${r.severity} pothole #${r.id} detected!`, (sevLower === 'critical' || sevLower === 'high') ? 'error' : 'warning', 4000);
+      }
 
-    // Beep & browser notification for High severity
-    if (["critical", "high"].includes(String(r.severity || '').toLowerCase())) {
-      playBeep();
-      sendBrowserNotif('🚨 High Severity Pothole', `#${r.id} at ${(+r.latitude).toFixed(4)}, ${(+r.longitude).toFixed(4)}`);
-    }
+      // Beep & browser notification for High severity
+      if (["critical", "high"].includes(String(r.severity || '').toLowerCase())) {
+        playBeep();
+        sendBrowserNotif('🚨 High Severity Pothole', `#${r.id} at ${(+r.latitude).toFixed(4)}, ${(+r.longitude).toFixed(4)}`);
+      }
 
-    // Highlight badge
-    const badge = document.getElementById('notifBadge');
-    if (badge) {
-      badge.style.display = 'flex';
-      badge.textContent   = notifBadge > 99 ? '99+' : notifBadge;
+      // Highlight badge
+      const badge = document.getElementById('notifBadge');
+      if (badge) {
+        badge.style.display = 'flex';
+        badge.textContent   = notifBadge > 99 ? '99+' : notifBadge;
+      }
     }
   });
+  
+  isInitialLoad = false;
 }
 
 // ── Request notification permission on load ──────────────────────────────────
