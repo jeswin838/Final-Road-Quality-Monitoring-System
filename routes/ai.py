@@ -1095,6 +1095,14 @@ def user_report():
     _t_total_start = time.time()
     _mem_start = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024) if 'psutil' in globals() else 0.0
     _diag_log("STEP 1: Request received", _t_total_start, None, None, None, _mem_start)
+
+    # ── PERF PROFILE ─────────────────────────────────────────────────────────
+    _perf_t0 = time.perf_counter()  # high-resolution wall-clock start
+    print("==============================")
+    print("PERFORMANCE PROFILE")
+    print("==============================")
+    print(f"[PERF] Request Received\n{time.perf_counter() - _perf_t0:.2f} sec")
+    # ─────────────────────────────────────────────────────────────────────────
     
     dlog = DetectionLogger()
 
@@ -1120,6 +1128,7 @@ def user_report():
     try:
         file_bytes = file.read()  # Preserve original bytes from upload
         _diag_log("STEP 4: Image read", _t_total_start, file, file_bytes, None, _mem_start)
+        print(f"[PERF] Images Loaded\n{time.perf_counter() - _perf_t0:.2f} sec")
         byte_size = len(file_bytes or b"")
         if byte_size == 0:
             return jsonify({"error": "Empty image data"}), 400
@@ -1223,6 +1232,7 @@ def user_report():
             img = img.astype(np.uint8)
             
         _diag_log("STEP 8: Image validation", _t_total_start, file, file_bytes, img, _mem_start)
+        print(f"[PERF] Validation Completed\n{time.perf_counter() - _perf_t0:.2f} sec")
             
         # --- Large Image Protection (ROOT CAUSE FIX) ---
         # Mobile uploads are often 12MP (4000x3000). A 4096 MAX_DIM allows 36MB+ numpy arrays.
@@ -1340,6 +1350,7 @@ def user_report():
                 mem_before_ai = 0.0
                 
             _diag_log("STEP 11: YOLO inference start", _t_total_start, file, file_bytes, img, mem_before_ai)
+            print(f"[PERF] YOLO Started\n{time.perf_counter() - _perf_t0:.2f} sec")
 
             logger.info("4. AI Stage (Before):")
             logger.info(f"   - Model Path: {getattr(m, 'model_name', 'N/A')}")
@@ -1361,6 +1372,7 @@ def user_report():
             )
             _yolo_ms = (time.time() - _t_yolo_start) * 1000
             print(f"YOLO: {_yolo_ms/1000:.2f}s")
+            print(f"[PERF] YOLO Finished\n{time.perf_counter() - _perf_t0:.2f} sec")
             
             try:
                 mem_after_ai = psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
@@ -1583,6 +1595,7 @@ def user_report():
     if duplicate_image:
         trust_score -= 25
     trust_score = int(max(0, min(100, trust_score)))
+    print(f"[PERF] Duplicate Check Finished\n{time.perf_counter() - _perf_t0:.2f} sec")
 
     if trust_score > 80:
         trust_level = "trusted"
@@ -1701,6 +1714,7 @@ def user_report():
 
     _total_s = time.time() - _t_total_start
     print(f"Total: {_total_s:.2f}s")
+    print(f"[PERF] Database Insert Finished\n{time.perf_counter() - _perf_t0:.2f} sec")
     dlog.timings(yolo_ms=_yolo_ms, upload_ms=_upload_ms, total_s=_total_s)
     dlog.request_end()
 
@@ -1732,8 +1746,14 @@ def user_report():
         "latitude": lat_f,
         "longitude": lon_f
     }
+    print(f"[PERF] Response Prepared\n{time.perf_counter() - _perf_t0:.2f} sec")
     if status == "rejected" and not pothole_detected:
         response_payload["message"] = "not detected anything"
+    _perf_total = time.perf_counter() - _perf_t0
+    print(f"[PERF] Response Sent\n{_perf_total:.2f} sec")
+    print("==============================")
+    print(f"TOTAL REQUEST = {_perf_total:.2f} sec")
+    print("==============================")
     return jsonify(response_payload)
 
 

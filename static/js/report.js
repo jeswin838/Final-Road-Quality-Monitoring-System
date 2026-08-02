@@ -24,6 +24,53 @@ const resultImg = document.getElementById('resultPreviewImage');
 const resultMeta = document.getElementById('resultMeta');
 const resultBadge = document.getElementById('resultStatusBadge');
 
+/* ── Image Optimisation Helper ──────────────────────────────────────────── */
+/**
+ * optimizeImage(blob)
+ *
+ * Resize + re-encode a captured photo blob before upload.
+ *
+ * Rules:
+ *   • Only downscale — never upscale (scale capped at 1).
+ *   • Maximum output: 1920 × 1080 (Full HD), aspect ratio preserved.
+ *   • Output format: JPEG at 90 % quality.
+ *   • Uses browser-native APIs only: createImageBitmap, Canvas, toBlob.
+ *
+ * Why this is safe for YOLO:
+ *   YOLOv8/v5 internally resizes every input to its training stride (usually
+ *   640 × 640). Sending a 4 K image gives no detection advantage over Full HD;
+ *   it only increases transfer time and server memory usage.
+ *   90 % JPEG preserves all edges and colour information needed for inference.
+ *
+ * @param  {Blob} blob  Raw photo blob from ImageCapture.takePhoto() or canvas.
+ * @returns {Promise<Blob>}  Optimised JPEG blob (≤ 1920 × 1080, quality 0.90).
+ */
+async function optimizeImage(blob) {
+  const bitmap = await createImageBitmap(blob);
+
+  let { width, height } = bitmap;
+
+  // Downscale only when larger than Full HD.
+  const MAX_WIDTH  = 1920;
+  const MAX_HEIGHT = 1080;
+
+  // Math.min(..., 1) ensures we never upscale an image smaller than Full HD.
+  const scale = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height, 1);
+
+  width  = Math.round(width  * scale);
+  height = Math.round(height * scale);
+
+  const resizeCanvas = document.createElement('canvas');
+  resizeCanvas.width  = width;
+  resizeCanvas.height = height;
+
+  resizeCanvas.getContext('2d').drawImage(bitmap, 0, 0, width, height);
+
+  return new Promise(resolve =>
+    resizeCanvas.toBlob(resolve, 'image/jpeg', 0.90)
+  );
+}
+
 /* ── Camera Logic ────────────────────────────────────────────────────────── */
 async function startCamera() {
   try {
@@ -50,10 +97,12 @@ function captureImage() {
   if (track && 'ImageCapture' in window) {
     const imageCapture = new ImageCapture(track);
     imageCapture.takePhoto()
-      .then((blob) => {
-        capturedBlob = blob; // original-quality capture blob
+      .then(async (blob) => {
+        // Resize to ≤ 1920×1080 and encode as JPEG 90% before upload.
+        // The original blob is discarded; capturedBlob holds the optimised copy.
+        capturedBlob = await optimizeImage(blob);
         captureSource = 'live_camera';
-        const url = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(capturedBlob); // use optimised blob for preview
         preview.src = url;
         preview.style.display = 'block';
         video.style.display = 'none';
@@ -76,7 +125,8 @@ function captureImage() {
           captureBtn.style.display = 'none';
           retakeBtn.style.display = 'flex';
           checkSubmitReady();
-        }, 'image/png');
+          // JPEG 90% — smaller than PNG with no meaningful quality loss for YOLO.
+        }, 'image/jpeg', 0.90);
       });
     return;
   }
@@ -95,7 +145,8 @@ function captureImage() {
     captureBtn.style.display = 'none';
     retakeBtn.style.display = 'flex';
     checkSubmitReady();
-  }, 'image/png');
+    // JPEG 90% — smaller than PNG with no meaningful quality loss for YOLO.
+  }, 'image/jpeg', 0.90);
 }
 
 function retake() {
