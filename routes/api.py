@@ -2099,13 +2099,13 @@ def assign_alert():
             # If it's already Available (admin clicked twice), just return success
             if existing_status == 'Available':
                 master_id = f"USER-{hazard_id}" if hazard_source == 'user_reports' else f"AI-{hazard_id}"
-                updated_hazard = recalculate_single_hazard(master_id, None, None, "assignment_update")
+                cached = registry_cache.get(master_id)
                 return jsonify({
                     'success': True,
                     'assignment_created': False,
                     'assignment_status': 'Available',
                     'note': 'Assignment already published',
-                    'updated_hazard': updated_hazard._cached_dict if updated_hazard else None
+                    'updated_hazard': cached._cached_dict if cached else None
                 })
             else:
                 return jsonify({'error': f'Cannot assign: hazard already in status={existing_status}', 'success': False}), 409
@@ -2143,14 +2143,14 @@ def assign_alert():
         new_assignment = assign_res.data[0] if assign_res.data else insert_data
         patch_hazard_assignment(master_id, new_assignment)
 
-        # Also run full recalculate to ensure engines are up-to-date for the response
-        updated_hazard = recalculate_single_hazard(master_id, None, None, "assignment_update")
+        # Read directly from cache
+        cached = registry_cache.get(master_id)
         
         return jsonify({
             'success': True, 
             'assignment_created': True,
             'assignment_status': 'Available',
-            'updated_hazard': updated_hazard._cached_dict if updated_hazard else None
+            'updated_hazard': cached._cached_dict if cached else None
         })
     except Exception as e:
         print(f"[SQL ERROR] {str(e)}")
@@ -2285,8 +2285,8 @@ def verify_repair(hazard_id_str):
         # For approve, updated_hazard is None (removed from active alerts)
         # For reject, fetch fresh from cache after patch
         if action == 'reject':
-            from services.hazard_registry import recalculate_single_hazard
-            updated_hazard = recalculate_single_hazard(master_id, None, None, "assignment_update")
+            cached = registry_cache.get(master_id)
+            updated_hazard = cached
         
         return jsonify({
             'message': msg, 

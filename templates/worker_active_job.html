@@ -535,7 +535,7 @@
     
     // Stats
     document.getElementById('statRisk').textContent = h.risk_score || 50;
-    document.getElementById('statConf').textContent = `${h.confidence}%`;
+    document.getElementById('statConf').textContent = `${(h.confidence * 100).toFixed(0)}%`;
     document.getElementById('statWait').textContent = h.waiting_time;
     
     // Map Setup
@@ -638,17 +638,17 @@
         if (stage === "Accepted") {
           actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="startNavigation()"><i class="fa-solid fa-car"></i> Start Navigation</button></div>`;
         } else if (stage === "Travelling") {
-          actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="handleReachedSite(${job.hazard_id}, ${job.hazard.latitude}, ${job.hazard.longitude}, this)"><i class="fa-solid fa-location-dot"></i> Mark as Reached Site</button></div>`;
+          actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="handleReachedSite('${job.hazard_id}', ${job.hazard.latitude}, ${job.hazard.longitude}, this)"><i class="fa-solid fa-location-dot"></i> Mark as Reached Site</button></div>`;
         } else if (stage === "Reached Site") {
           if (job.verification_status === 'Before Photo Verified' || job.verification_status === 'Pending Admin Review') {
-             actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="updateStage(${job.hazard_id}, 'Repair Started', this)"><i class="fa-solid fa-play"></i> Start Repair</button></div>`;
+             actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="updateStage('${job.hazard_id}', 'Repair Started', this)"><i class="fa-solid fa-play"></i> Start Repair</button></div>`;
           } else {
-             actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="openCaptureModal('before', ${job.hazard_id})"><i class="fa-solid fa-camera"></i> Open Live Camera</button></div>`;
+             actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="openCaptureModal('before', '${job.hazard_id}')"><i class="fa-solid fa-camera"></i> Open Live Camera</button></div>`;
           }
         } else if (stage === "Repair Started") {
-          actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="updateStage(${job.hazard_id}, 'Repair Completed', this)"><i class="fa-solid fa-check"></i> Complete Repair</button></div>`;
+          actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="updateStage('${job.hazard_id}', 'Repair Completed', this)"><i class="fa-solid fa-check"></i> Complete Repair</button></div>`;
         } else if (stage === "Repair Completed") {
-          actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="openCaptureModal('after', ${job.hazard_id})"><i class="fa-solid fa-camera"></i> Capture Repair Result</button></div>`;
+          actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="openCaptureModal('after', '${job.hazard_id}')"><i class="fa-solid fa-camera"></i> Capture Repair Result</button></div>`;
         }
       }
       
@@ -668,8 +668,8 @@
     
     // Cancel button
     const cancelBtn = document.getElementById('cancelBtnContainer');
-    if (currentIndex < stages.indexOf("Repair Started")) {
-      cancelBtn.innerHTML = `<button class="wk-btn wk-btn-outline wk-btn-full" style="color:var(--worker-danger); border-color:rgba(239, 68, 68, 0.3);" onclick="cancelJob(${job.hazard_id})"><i class="fa-solid fa-xmark"></i> Cancel Job</button>`;
+    if (currentIndex < stages.indexOf("Waiting Verification")) {
+      cancelBtn.innerHTML = `<button class="wk-btn wk-btn-outline wk-btn-full" style="color:var(--worker-danger); border-color:rgba(239, 68, 68, 0.3);" onclick="cancelJob('${job.hazard_id}')"><i class="fa-solid fa-xmark"></i> Cancel Job</button>`;
     } else {
       cancelBtn.innerHTML = '';
     }
@@ -1288,7 +1288,15 @@
                       const totalMeters = summary.totalDistance;
                       const mins = Math.ceil(summary.totalTime / 60);
                       const distText = totalMeters > 1000 ? (totalMeters / 1000).toFixed(1) + ' km' : totalMeters.toFixed(0) + ' m';
-                      const etaText = mins > 0 ? mins + ' min' : '45 sec';
+                      
+                      let etaText = '45 sec';
+                      if (mins >= 60) {
+                          const hrs = Math.floor(mins / 60);
+                          const remMins = mins % 60;
+                          etaText = hrs + ' hr ' + (remMins > 0 ? remMins + ' min' : '');
+                      } else if (mins > 0) {
+                          etaText = mins + ' min';
+                      }
                       
                       document.getElementById('kpiEta').textContent = etaText;
                       document.getElementById('kpiDist').textContent = distText;

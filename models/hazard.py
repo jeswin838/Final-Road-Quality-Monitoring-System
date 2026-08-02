@@ -153,6 +153,9 @@ class Hazard:
             if dates:
                 first_rep = min(dates).isoformat()
         
+        # Prefer raw assignment dict if present to guarantee fresh cache
+        a_dict = getattr(self, "assignment", {}) or {}
+        
         return {
             "id": self.hazard_id,
             "display_id": self.hazard_id,
@@ -217,16 +220,22 @@ class Hazard:
             },
             
             "workflow": {
-                "state": self.maintenance_state or "Detected",
-                "assigned_to": self.assigned_worker_name or "Unassigned",
-                "verified_at": self.verified_at or "",
-                "completed_at": self.completed_at or ""
+                "state": a_dict.get("status") or self.maintenance_state or "Detected",
+                "assigned_to": a_dict.get("worker_name") or self.assigned_worker_name or "Unassigned",
+                "verified_at": a_dict.get("verified_at") or self.verified_at or "",
+                "completed_at": a_dict.get("repair_completed_at") or a_dict.get("completed_at") or self.completed_at or ""
             },
             
             "assignment": {
-                "status": self.assignment_status or "Unassigned",
-                "worker_id": self.assigned_worker_id or "",
-                "worker_name": self.assigned_worker_name or "",
-                "time": self.assignment_time or ""
+                "status": a_dict.get("status") or self.assignment_status or "Unassigned",
+                "worker_id": a_dict.get("worker_id") or self.assigned_worker_id or "",
+                "worker_name": a_dict.get("worker_name") or self.assigned_worker_name or "",
+                "time": a_dict.get("assigned_time") or self.assignment_time or "",
+                "accepted_at": a_dict.get("accepted_at") or self.accepted_at or "",
+                "travelling_at": a_dict.get("travelling_at", ""),
+                "reached_at": a_dict.get("reached_at", ""),
+                "repair_started_at": a_dict.get("repair_started_at") or a_dict.get("started_at") or self.started_at or "",
+                "repair_completed_at": a_dict.get("repair_completed_at") or a_dict.get("completed_at") or self.completed_at or "",
+                "verified_at": a_dict.get("verified_at") or self.verified_at or ""
             }
         }

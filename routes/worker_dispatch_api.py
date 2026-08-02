@@ -120,9 +120,47 @@ def safe_int(value, default=0):
     except (TypeError, ValueError):
         return default
 
-def _get_hazard_details(hazard_id):
+def _get_hazard_details(hazard_id, hazard_source=None):
+    from services.hazard_registry import registry_cache
+    import datetime
+    
+    master_id = str(hazard_id)
+    if not (master_id.startswith("AI-") or master_id.startswith("USER-")):
+        source_prefix = "USER-" if hazard_source == "user_reports" or hazard_source == "USER" else "AI-"
+        master_id = f"{source_prefix}{hazard_id}"
+        
+    cached_hazard = registry_cache.get(master_id)
+    
+    if cached_hazard:
+        h_dict = cached_hazard._cached_dict
+        
+        wait = "Unknown"
+        first_rep = h_dict.get("first_reported_at") or h_dict.get("created_at")
+        if first_rep:
+            try:
+                dt = datetime.datetime.fromisoformat(first_rep.replace("Z", "+00:00"))
+                delta = datetime.datetime.now(datetime.timezone.utc) - dt
+                days = delta.days
+                if days > 0: wait = f"{days} days"
+                else: wait = f"{delta.seconds // 3600} hours"
+            except: pass
+            
+        return {
+            "id": h_dict.get("hazard_id"),
+            "image": h_dict.get("image"),
+            "latitude": h_dict.get("latitude", 0.0),
+            "longitude": h_dict.get("longitude", 0.0),
+            "severity": h_dict.get("severity", "Medium"),
+            "confidence": h_dict.get("confidence", 0.0),
+            "created_at": h_dict.get("created_at"),
+            "first_reported_at": first_rep,
+            "waiting_time": wait,
+            "reports_count": h_dict.get("report_count", 1),
+            "risk_score": h_dict.get("priority_breakdown", {}).get("risk_score", 50)
+        }
+        
+    # Fallback to database if not in cache
     try:
-        # Clean up legacy IDs (e.g. 'AI-123') and ignore purely invalid ones ('TEST_HAZARD')
         numeric_id = int(str(hazard_id).replace('AI-', '').replace('USER-', ''))
     except ValueError:
         return None
@@ -153,6 +191,7 @@ def _get_hazard_details(hazard_id):
         
         url = p.get("image_url") or p.get("media_url")
         if url and not url.startswith("http") and not url.startswith("/static"):
+            from config import Config
             url = f"{Config.SUPABASE_URL.rstrip('/')}/storage/v1/object/public/pothole-images/{url}"
             
         p_lat = safe_float(p.get("latitude"), 0.0)
@@ -167,7 +206,8 @@ def _get_hazard_details(hazard_id):
             "confidence": safe_float(p.get("confidence"), 0.0),
             "created_at": p.get("created_at"),
             "waiting_time": wait,
-            "reports_count": safe_int(p.get("reports_count"), 1)
+            "reports_count": safe_int(p.get("reports_count"), 1),
+            "risk_score": p.get("risk_score", 50)
         }
     return None
 
@@ -442,19 +482,15 @@ def accept_job(job_id, sql_log):
     print(f"[WORKFLOW] [ASSIGNMENT UPDATED] Worker {worker_id} accepted job {master_id}.")
     
     try:
-        from services.hazard_registry import patch_hazard_assignment, recalculate_single_hazard_async
+        from services.hazard_registry import patch_hazard_assignment
         # Instantly patch the assignment in the cache so /api/alerts reflects Accepted status immediately
         patch_hazard_assignment(master_id, accepted_row)
         print("Registry Updated: True")
         print(f"[WORKFLOW] [ALERT CACHE REFRESHED] {master_id} updated to Accepted in registry.")
-        # Fire full recalculate in background for completeness
-        recalculate_single_hazard_async(master_id, None, None, "assignment_update")
-        print("Background Recalculation Started: True")
         print("Completed Successfully: True")
         print("=================================")
     except Exception as e:
         print("Registry Updated: False")
-        print("Background Recalculation Started: False")
         print(f"Completed Successfully: False ({e})")
         print("=================================")
         print(f"[!] Error updating hazard cache on accept: {e}")
@@ -470,7 +506,7 @@ def get_active_job(sql_log):
     if not assignment:
         return None
         
-    hazard = _get_hazard_details(assignment["hazard_id"])
+    hazard = _get_hazard_details(assignment["hazard_id"], assignment.get("hazard_source"))
     if hazard:
         assignment["hazard"] = hazard
         
@@ -520,7 +556,7 @@ def update_status(job_id, sql_log):
     print(f"[WORKFLOW] [ASSIGNMENT UPDATED] update_data={update_data}")
     
     try:
-        from services.hazard_registry import patch_hazard_assignment, recalculate_single_hazard_async
+        from services.hazard_registry import patch_hazard_assignment
         master_id = f"USER-{job_id}" if row["hazard_source"] == 'user_reports' else f"AI-{job_id}"
         
         # Build a minimal assignment dict with the new status for instant cache patch
@@ -528,9 +564,6 @@ def update_status(job_id, sql_log):
         patched_assignment.update(update_data)
         patch_hazard_assignment(master_id, patched_assignment)
         print(f"[WORKFLOW] [ALERT CACHE REFRESHED] {master_id} updated to {new_status} in registry.")
-        
-        # Background full recalculate for completeness
-        recalculate_single_hazard_async(master_id, None, None, "assignment_update")
     except Exception as e:
         print(f"[!] Error updating hazard cache on status update: {e}")
     
@@ -620,8 +653,8 @@ def cancel_job(job_id, sql_log):
         return {"success": False, "message": "Assignment not found"}, 404
         
     row = a_res.data[0]
-    if row["status"] in ["Repair Started", "Repair Completed", "Waiting Verification", "Verified"]:
-        return {"success": False, "message": "Cannot cancel after repair has started"}, 400
+    if row["status"] in ["Verified"]:
+        return {"success": False, "message": "Cannot cancel a verified job"}, 400
         
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     
@@ -650,7 +683,7 @@ def cancel_job(job_id, sql_log):
 
     # Instantly patch cache to show Available again
     try:
-        from services.hazard_registry import patch_hazard_assignment, recalculate_single_hazard_async
+        from services.hazard_registry import patch_hazard_assignment
         # Determine master_id from assignment source
         source_res = supabase.table("assignments").select("hazard_source").eq("hazard_id", job_id).execute()
         h_source = source_res.data[0].get("hazard_source", "AI") if source_res.data else "AI"
@@ -660,7 +693,6 @@ def cancel_job(job_id, sql_log):
         cancelled_assignment.update(payload)
         patch_hazard_assignment(master_id, cancelled_assignment)
         print(f"[WORKFLOW] [ALERT CACHE REFRESHED] {master_id} returned to Available in registry.")
-        recalculate_single_hazard_async(master_id, None, None, "assignment_update")
     except Exception as e:
         print(f"[!] Error updating hazard cache on cancel: {e}")
     
@@ -683,7 +715,7 @@ def get_history(sql_log):
     
     history = []
     for r in rows:
-        hz = _get_hazard_details(r["hazard_id"])
+        hz = _get_hazard_details(r["hazard_id"], r.get("hazard_source"))
         if hz:
             r["hazard"] = hz
         history.append(r)
@@ -900,13 +932,12 @@ def upload_photo(job_id, sql_log):
                 full_row_res = supabase.table("assignments").select("*").eq("hazard_id", job_id).eq("worker_id", worker_id).execute()
                 full_row = full_row_res.data[0] if full_row_res.data else None
                 
-                from services.hazard_registry import patch_hazard_assignment, recalculate_single_hazard_async
+                from services.hazard_registry import patch_hazard_assignment
                 if full_row:
                     print(f"[WORKFLOW] [STATUS CHANGED] Hazard {master_id} | photo_type={photo_type} | -> {full_row.get('status')}")
                     print(f"[WORKFLOW] [ASSIGNMENT UPDATED] {master_id} photo upload processed.")
                     patch_hazard_assignment(master_id, full_row)
                     print(f"[WORKFLOW] [ALERT CACHE REFRESHED] {master_id} photo state updated in registry.")
-                recalculate_single_hazard_async(master_id, None, None, "assignment_update")
             except Exception as e:
                 print(f"[!] Error updating hazard cache on photo upload: {e}")
         

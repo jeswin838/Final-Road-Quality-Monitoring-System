@@ -109,6 +109,11 @@ class HazardRegistryCache:
             # Yield pre-sorted objects
             return [self.data[k] for k in self.sorted_keys if k in self.data]
             
+    def get(self, master_id: str):
+        """Fetch a single hazard directly from the cache."""
+        with self.lock:
+            return self.data.get(master_id)
+            
     def get_all_json(self) -> List[Dict]:
         """Return O(1) precomputed JSON response for all hazards."""
         with self.lock:
@@ -629,18 +634,35 @@ def patch_hazard_assignment(master_id: str, assignment_data: Dict[str, Any]):
         recalculate_single_hazard(master_id, None, None, "assignment_update")
         return
 
-    # Patch assignment fields directly on the in-memory Hazard object
     target_hazard.assignment = assignment_data
-    target_hazard.worker = assignment_data.get("worker_name") or assignment_data.get("worker_id")
+    target_hazard.worker = assignment_data.get("worker_name") or assignment_data.get("worker_id") or ""
     target_hazard.assigned_worker_name = assignment_data.get("worker_name") or ""
     target_hazard.assigned_worker_id = assignment_data.get("worker_id") or ""
     target_hazard.assignment_status = assignment_data.get("status") or "Unassigned"
     target_hazard.assignment_time = assignment_data.get("assigned_time") or assignment_data.get("created_at") or ""
+    
+    target_hazard.accepted_at = assignment_data.get("accepted_at") or target_hazard.accepted_at
+    target_hazard.started_at = assignment_data.get("repair_started_at") or assignment_data.get("started_at") or target_hazard.started_at
+    target_hazard.completed_at = assignment_data.get("repair_completed_at") or assignment_data.get("completed_at") or target_hazard.completed_at
+    target_hazard.verified_at = assignment_data.get("verified_at") or target_hazard.verified_at
+    
+    # Store other specific lifecycle fields in the assignment dict so to_dict can access them
+    # Ensure they are present if provided by Supabase
+    if "travelling_at" in assignment_data:
+        target_hazard.assignment["travelling_at"] = assignment_data["travelling_at"]
+    if "reached_at" in assignment_data:
+        target_hazard.assignment["reached_at"] = assignment_data["reached_at"]
 
     new_status = assignment_data.get("status")
     if new_status:
         target_hazard.maintenance_state = new_status
         target_hazard.status = new_status
+
+    import datetime
+    target_hazard.updated_at = datetime.datetime.utcnow().isoformat()
+    
+    # Generate the cached JSON directly on the hazard object
+    target_hazard._cached_dict = target_hazard.to_dict()
 
     # Invalidate the precomputed JSON dict for this hazard and the global list cache
     registry_cache._precompute_dict(target_hazard)
