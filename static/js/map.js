@@ -246,10 +246,9 @@ function buildPremiumPopup(r, lat, lon, isUserReport) {
     : '';
 
   // Action buttons
-  const assignText = (statusRaw === 'Pending Repair' || statusRaw === 'Pending') ? 'Assign Worker' : 'Update Status';
   const markFixedBtn = !isUserReport
-    ? `<button class="popup-btn popup-btn-success" onclick="openAssignModal(\'${r.id}\', '${statusRaw}')">
-        <i class="fa-solid fa-clipboard-user"></i> ${assignText}
+    ? `<button class="popup-btn popup-btn-success" onclick="navigateHazardToSafeNav('${r.id}', ${r.latitude}, ${r.longitude})">
+        <i class="fa-solid fa-location-arrow"></i> Navigate Hazard
       </button>`
     : '';
 
@@ -520,6 +519,40 @@ document.querySelectorAll('#statusFilters .filter-chip').forEach(btn => {
     scheduleRefresh();
   });
 });
+
+function selectHazard(id) {
+  if (hazardList) {
+    hazardList.querySelectorAll('.hazard-item').forEach(el => el.classList.remove('active'));
+    const item = hazardList.querySelector(`[data-id="${id}"]`);
+    if (item) {
+      item.classList.add('active');
+      item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+}
+
+// ── Dashboard Popup Navigate Hazard ────────────────────────────────────
+window.navigateHazardToSafeNav = function(id, lat, lng) {
+  if (!lat || !lng) {
+      alert("Invalid hazard location.");
+      return;
+  }
+  if (!navigator.geolocation) {
+      alert("Unable to obtain current location.");
+      return;
+  }
+  navigator.geolocation.getCurrentPosition((position) => {
+      const userLat = position.coords.latitude;
+      const userLng = position.coords.longitude;
+      window.location.href = `/navigation?destLat=${lat}&destLng=${lng}&destId=${id}&srcLat=${userLat}&srcLng=${userLng}`;
+  }, (error) => {
+      if (error.code === error.PERMISSION_DENIED) {
+          alert("Location permission is required to navigate.");
+      } else {
+          alert("Unable to obtain current location.");
+      }
+  });
+};
 
 const confSlider = document.getElementById('confSlider');
 if (confSlider) {

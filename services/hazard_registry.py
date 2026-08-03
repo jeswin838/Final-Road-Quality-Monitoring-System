@@ -675,6 +675,32 @@ def patch_hazard_assignment(master_id: str, assignment_data: Dict[str, Any]):
         f"[ALERT CACHE REFRESHED]"
     )
 
+def refresh_assignment_cache(master_id, hazard_id):
+    try:
+        from app import supabase
+    except ImportError:
+        supabase = None
+    if not supabase:
+        from routes.api import get_supabase
+        supabase = get_supabase()
+
+    latest = (
+        supabase.table("assignments")
+        .select("*")
+        .eq("hazard_id", hazard_id)
+        .order("id", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    if latest.data:
+        latest_row = latest.data[0]
+        patch_hazard_assignment(master_id, latest_row)
+        print("[WORKFLOW] Cache refreshed")
+        print(f"Hazard ID: {hazard_id}")
+        print(f"Assignment ID: {latest_row.get('id')}")
+        print(f"Latest Status: {latest_row.get('status')}")
+
 def recalculate_single_hazard_async(hazard_id: str, new_db_record: Optional[Dict[str, Any]] = None, source: Optional[str] = None, event_type: str = "update"):
     """
     Submits a recalculation job to the background thread pool, allowing APIs to return instantly.

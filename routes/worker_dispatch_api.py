@@ -482,9 +482,9 @@ def accept_job(job_id, sql_log):
     print(f"[WORKFLOW] [ASSIGNMENT UPDATED] Worker {worker_id} accepted job {master_id}.")
     
     try:
-        from services.hazard_registry import patch_hazard_assignment
+        from routes.api import sync_hazard_cache
         # Instantly patch the assignment in the cache so /api/alerts reflects Accepted status immediately
-        patch_hazard_assignment(master_id, accepted_row)
+        sync_hazard_cache(master_id, hazard_id_int)
         print("Registry Updated: True")
         print(f"[WORKFLOW] [ALERT CACHE REFRESHED] {master_id} updated to Accepted in registry.")
         print("Completed Successfully: True")
@@ -556,14 +556,41 @@ def update_status(job_id, sql_log):
     print(f"[WORKFLOW] [ASSIGNMENT UPDATED] update_data={update_data}")
     
     try:
-        from services.hazard_registry import patch_hazard_assignment
+        from routes.api import sync_hazard_cache
         master_id = f"USER-{job_id}" if row["hazard_source"] == 'user_reports' else f"AI-{job_id}"
         
-        # Build a minimal assignment dict with the new status for instant cache patch
-        patched_assignment = dict(row)
-        patched_assignment.update(update_data)
-        patch_hazard_assignment(master_id, patched_assignment)
+        # Fetch the COMPLETE updated assignment row
+        updated = (
+            supabase.table("assignments")
+            .select("*")
+            .eq("hazard_id", job_id)
+            .eq("worker_id", worker_id)
+            .single()
+            .execute()
+        )
+        patched_assignment = updated.data
+        sync_hazard_cache(master_id, int(job_id))
         print(f"[WORKFLOW] [ALERT CACHE REFRESHED] {master_id} updated to {new_status} in registry.")
+
+        from services.hazard_registry import (
+            registry_cache,
+            recalculate_single_hazard_async
+        )
+
+        recalculate_single_hazard_async(
+            master_id,
+            patched_assignment,
+            row.get("hazard_source"),
+            "status_update"
+        )
+
+        registry_cache.invalidate()
+
+        try:
+            from routes.api import global_alerts_cache
+            global_alerts_cache["data"] = None
+        except Exception:
+            pass
     except Exception as e:
         print(f"[!] Error updating hazard cache on status update: {e}")
     
@@ -681,17 +708,14 @@ def cancel_job(job_id, sql_log):
     supabase = get_supabase()
     supabase.table("users").update({"worker_status": "Available"}).eq("id", worker_id).execute()
 
-    # Instantly patch cache to show Available again
     try:
-        from services.hazard_registry import patch_hazard_assignment
+        from routes.api import sync_hazard_cache
         # Determine master_id from assignment source
         source_res = supabase.table("assignments").select("hazard_source").eq("hazard_id", job_id).execute()
         h_source = source_res.data[0].get("hazard_source", "AI") if source_res.data else "AI"
         master_id = f"USER-{job_id}" if h_source == 'user_reports' else f"AI-{job_id}"
         
-        cancelled_assignment = dict(row)
-        cancelled_assignment.update(payload)
-        patch_hazard_assignment(master_id, cancelled_assignment)
+        sync_hazard_cache(master_id, int(job_id))
         print(f"[WORKFLOW] [ALERT CACHE REFRESHED] {master_id} returned to Available in registry.")
     except Exception as e:
         print(f"[!] Error updating hazard cache on cancel: {e}")
@@ -932,12 +956,32 @@ def upload_photo(job_id, sql_log):
                 full_row_res = supabase.table("assignments").select("*").eq("hazard_id", job_id).eq("worker_id", worker_id).execute()
                 full_row = full_row_res.data[0] if full_row_res.data else None
                 
-                from services.hazard_registry import patch_hazard_assignment
+                from routes.api import sync_hazard_cache
                 if full_row:
                     print(f"[WORKFLOW] [STATUS CHANGED] Hazard {master_id} | photo_type={photo_type} | -> {full_row.get('status')}")
                     print(f"[WORKFLOW] [ASSIGNMENT UPDATED] {master_id} photo upload processed.")
-                    patch_hazard_assignment(master_id, full_row)
+                    sync_hazard_cache(master_id, int(job_id))
                     print(f"[WORKFLOW] [ALERT CACHE REFRESHED] {master_id} photo state updated in registry.")
+                    
+                    from services.hazard_registry import (
+                        registry_cache,
+                        recalculate_single_hazard_async
+                    )
+
+                    recalculate_single_hazard_async(
+                        master_id,
+                        full_row,
+                        row.get("hazard_source"),
+                        "photo_upload"
+                    )
+
+                    registry_cache.invalidate()
+
+                    try:
+                        from routes.api import global_alerts_cache
+                        global_alerts_cache["data"] = None
+                    except Exception:
+                        pass
             except Exception as e:
                 print(f"[!] Error updating hazard cache on photo upload: {e}")
         

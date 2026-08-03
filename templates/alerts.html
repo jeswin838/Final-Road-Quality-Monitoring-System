@@ -960,13 +960,15 @@ function hotSwapHazard(updated) {
         allHazards[idx] = updated;
         
         // Update detail view if selected
-        if (selectedHazardId === updated.id) {
+        if (selectedHazardId && (selectedHazardId == updated.id || selectedHazardId == updated.hazard_id)) {
             populateDetail(updated);
         }
     } else {
         // If it's a new assignment dynamically added, push it
         allHazards.push(updated);
-        if (selectedHazardId === updated.id) populateDetail(updated);
+        if (selectedHazardId && (selectedHazardId == updated.id || selectedHazardId == updated.hazard_id)) {
+            populateDetail(updated);
+        }
     }
     
     // Refresh list instantly to apply layout/filters

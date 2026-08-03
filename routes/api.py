@@ -679,6 +679,63 @@ def delete_pothole(pid):
 # Simple In-Memory Cache for Stats
 _stats_cache = {"data": None, "time": None}
 
+def sync_hazard_cache(master_id, hazard_id):
+    """
+    Synchronize every runtime cache after a hazard assignment change.
+
+    DO NOT change business logic.
+    Only refresh runtime caches.
+    """
+    try:
+        from services.hazard_registry import (
+            refresh_assignment_cache,
+            registry_cache,
+            load_all_hazards
+        )
+
+        global global_alerts_cache
+        global _stats_cache
+
+        print("[CACHE SYNC]")
+        print(f"Master ID: {master_id}")
+        print(f"Hazard ID: {hazard_id}")
+
+        # Refresh assignment object
+        refresh_assignment_cache(master_id, hazard_id)
+
+        # Force registry to rebuild
+        registry_cache.invalidate()
+        print("Registry invalidated")
+        load_all_hazards()
+        print("Registry rebuilt")
+
+        # Clear API caches
+        try:
+            global_alerts_cache["data"] = None
+            global_alerts_cache["timestamp"] = 0
+            print("Alerts cache cleared")
+        except Exception:
+            pass
+
+        try:
+            _stats_cache["data"] = None
+            _stats_cache["time"] = 0
+            print("Stats cache cleared")
+        except Exception:
+            pass
+
+        print("Synchronization completed")
+        current_app.logger.info(
+            "[CACHE SYNC] %s synchronized successfully.",
+            master_id
+        )
+
+    except Exception:
+        current_app.logger.exception(
+            "[CACHE SYNC ERROR]"
+        )
+
+
 @api_bp.route("/stats", methods=["GET"])
 def get_stats():
     global _stats_cache
@@ -925,6 +982,16 @@ def create_assignment():
     try:
         res = supabase.table('assignments').insert(insert_data).execute()
         new_id = res.data[0]['id'] if res.data else None
+
+        # Construct master hazard ID for cache update
+        prefix = 'AI' if hazard_source == 'AI' else 'USER'
+        master_id = f"{prefix}-{pothole_id}"
+
+        # Update cache instantly
+        from services.hazard_registry import registry_cache, global_alerts_cache
+        sync_hazard_cache(master_id, pothole_id)
+        # Invalidate alerts JSON cache so next fetch returns fresh data
+        global_alerts_cache["data"] = None
         
         print("\n========== ASSIGNMENT DEBUG ==========")
         print(f"Hazard ID: {pothole_id}")
@@ -953,8 +1020,7 @@ def update_assignment(aid):
             prefix = "USER" if hs == "user_reports" or hs == "USER" else "AI"
             master_id = f"{prefix}-{assigned_hazard.get('hazard_id')}"
             
-            from services.hazard_registry import patch_hazard_assignment
-            patch_hazard_assignment(master_id, assigned_hazard)
+            sync_hazard_cache(master_id, assigned_hazard.get('hazard_id'))
             
         return jsonify({"message": "Updated"})
     except Exception as e:
@@ -978,8 +1044,7 @@ def update_assignment_by_pothole(pid):
         prefix = "USER" if hs == "user_reports" or hs == "USER" else "AI"
         master_id = f"{prefix}-{assigned_hazard.get('hazard_id')}"
         
-        from services.hazard_registry import patch_hazard_assignment
-        patch_hazard_assignment(master_id, assigned_hazard)
+        sync_hazard_cache(master_id, assigned_hazard.get('hazard_id'))
             
         return jsonify({"message": "Updated"})
     except Exception as e:
@@ -2062,7 +2127,7 @@ def reject_alert():
 
 @api_bp.route('/alerts/assign', methods=['POST'])
 def assign_alert():
-    from services.hazard_registry import recalculate_single_hazard, patch_hazard_assignment
+    from services.hazard_registry import recalculate_single_hazard, registry_cache
     if session.get('role') != 'admin': return jsonify({'error': 'Unauthorized'}), 403
     
     data = request.json or {}
@@ -2141,7 +2206,7 @@ def assign_alert():
 
         # Use patch for instant UI update (no full rebuild)
         new_assignment = assign_res.data[0] if assign_res.data else insert_data
-        patch_hazard_assignment(master_id, new_assignment)
+        sync_hazard_cache(master_id, hazard_id)
 
         # Read directly from cache
         cached = registry_cache.get(master_id)
@@ -2190,6 +2255,7 @@ def get_pending_verifications():
 @api_bp.route('/alerts/<hazard_id_str>/verify-repair', methods=['POST'])
 def verify_repair(hazard_id_str):
     if session.get('role') != 'admin': return jsonify({'error': 'Unauthorized'}), 403
+    from services.hazard_registry import registry_cache
     data = request.json or {}
     action = data.get('action')
     try:
@@ -2235,8 +2301,7 @@ def verify_repair(hazard_id_str):
             print(f"[WORKFLOW] [ASSIGNMENT UPDATED] Row {row_id} | Approved | worker={worker_id}")
 
             # Remove the hazard from the active registry so it disappears from /api/alerts
-            from services.hazard_registry import registry_cache as _registry_cache
-            _registry_cache.remove_hazard(master_id)
+            registry_cache.remove_hazard(master_id)
             print(f"[WORKFLOW] [CACHE INVALIDATED] {master_id} removed from active registry.")
             print(f"[WORKFLOW] [ALERT CACHE REFRESHED] {master_id} no longer in active alerts.")
 
@@ -2275,9 +2340,8 @@ def verify_repair(hazard_id_str):
             print(f"[WORKFLOW] [CACHE INVALIDATED] {master_id} assignment patched to Available.")
 
             # Patch the cache instantly to show new Available state
-            from services.hazard_registry import patch_hazard_assignment, recalculate_single_hazard
-            new_assignment_data = new_res.data[0] if new_res.data else new_payload
-            patch_hazard_assignment(master_id, new_assignment_data)
+            from services.hazard_registry import recalculate_single_hazard
+            sync_hazard_cache(master_id, hazard_id)
             print(f"[WORKFLOW] [ALERT CACHE REFRESHED] {master_id} now shows Available in alerts.")
 
             msg = 'Repair rejected, new assignment created'

@@ -975,5 +975,29 @@ function toggleFullScreen() {
 document.addEventListener('DOMContentLoaded', () => {
   initNavMap();
   setClickMode('start');
+
+  // Check for auto-navigation parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const destLat = urlParams.get('destLat');
+  const destLng = urlParams.get('destLng');
+  const srcLat = urlParams.get('srcLat');
+  const srcLng = urlParams.get('srcLng');
+
+  if (destLat && destLng && srcLat && srcLng) {
+      const sLat = parseFloat(srcLat);
+      const sLng = parseFloat(srcLng);
+      document.getElementById('startInput').value = `${sLat.toFixed(5)}, ${sLng.toFixed(5)}`;
+      placeMarker('start', sLat, sLng);
+      
+      const dLat = parseFloat(destLat);
+      const dLng = parseFloat(destLng);
+      document.getElementById('endInput').value = `${dLat.toFixed(5)}, ${dLng.toFixed(5)}`;
+      placeMarker('end', dLat, dLng);
+      
+      // Execute existing calculation automatically
+      setTimeout(() => {
+          findSafeRoute();
+      }, 500);
+  }
 });
 
