@@ -57,4 +57,42 @@ class ApprovalService:
                 worker.current_workload += 1
                 self.worker_repo.save_worker(worker)
                 
+            # Sync to Supabase assignments table so worker dispatch system picks it up
+            try:
+                from app import supabase
+                worker_id = recommendation.get("worker_id", "")
+                worker_name = recommendation.get("worker_name", "")
+                if worker_id and not worker_name:
+                    w = self.worker_repo.get_worker(worker_id)
+                    if w:
+                        worker_name = w.name
+                
+                clean_hid = hazard_id
+                hazard_source = 'AI'
+                if isinstance(hazard_id, str):
+                    if hazard_id.startswith('AI-'):
+                        clean_hid = hazard_id.replace('AI-', '')
+                        hazard_source = 'AI'
+                    elif hazard_id.startswith('USER-'):
+                        clean_hid = hazard_id.replace('USER-', '')
+                        hazard_source = 'USER'
+                try:
+                    clean_hid = int(clean_hid)
+                except (ValueError, TypeError):
+                    pass
+
+                supabase.table('assignments').insert({
+                    'hazard_id': clean_hid,
+                    'hazard_source': hazard_source,
+                    'worker_id': worker_id if worker_id else None,
+                    'worker_name': worker_name if worker_name else "Assigned Worker",
+                    'assigned_by_name': admin_id,
+                    'status': 'Assigned',
+                    'verification_status': 'Pending',
+                    'admin_notes': f"Approved recommendation with score {assignment.recommendation_score}"
+                }).execute()
+            except Exception as e:
+                print("[!] ApprovalService Supabase sync notice:", e)
+
             return assignment
+

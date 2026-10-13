@@ -376,9 +376,22 @@ function renderPotholes() {
     if (sev === 'medium') { hClass = 'hazard-medium'; iconClass = 'fa-exclamation'; }
     if (sev === 'high' || sev === 'critical') { hClass = 'hazard-high'; iconClass = 'fa-skull-crossbones'; }
 
-    const iconHtml = `<div class="hazard-marker ${hClass}"><i class="fa-solid ${iconClass}"></i></div>`;
+    let iconHtml = `<div class="hazard-marker ${hClass}"><i class="fa-solid ${iconClass}"></i></div>`;
+    let iSize = [24, 24];
+    let iAnchor = [12, 12];
+    
+    const status = (p.status || '').toLowerCase();
+    if (status === 'in progress' || status === 'repair started') {
+      iconHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 32" width="24" height="32" style="filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4));">
+        <path d="M12 0C5.4 0 0 5.4 0 12c0 8 12 20 12 20S24 20 24 12C24 5.4 18.6 0 12 0z" fill="#f59e0b" stroke="#fff" stroke-width="1.5"/>
+        <path d="M7 16h10l-1-7H8l-1 7zM9 8h6v1H9V8z" fill="#111" />
+      </svg>`;
+      iSize = [24, 32];
+      iAnchor = [12, 32];
+    }
+
     const m = L.marker([lat, lon], {
-      icon: L.divIcon({ className: '', html: iconHtml, iconSize: [24, 24], iconAnchor: [12, 12] }),
+      icon: L.divIcon({ className: '', html: iconHtml, iconSize: iSize, iconAnchor: iAnchor }),
       pane: 'hazardPane'
     });
 

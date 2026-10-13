@@ -21,8 +21,23 @@ class RiskEngine:
         Calculates all risk scores and thresholds, enriching the Hazard object.
         Runs in O(1) per hazard, avoiding DB queries.
         """
-        # Calculate Waiting Days dynamically
-        hazard.waiting_days = calculate_waiting_days(hazard.created_at)
+        # Calculate Waiting Days dynamically based on the actual earliest report date
+        import datetime
+        first_rep = hazard.created_at
+        if getattr(hazard, 'original_reports', None):
+            dates = []
+            for r in hazard.original_reports:
+                if hasattr(r, 'created_at') and r.created_at:
+                    try:
+                        # Normalize time zone to avoid errors when parsing mixed formats
+                        d_str = r.created_at.replace("Z", "+00:00")
+                        dates.append(datetime.datetime.fromisoformat(d_str))
+                    except Exception:
+                        pass
+            if dates:
+                first_rep = min(dates).isoformat()
+                
+        hazard.waiting_days = calculate_waiting_days(first_rep)
         
         # Calculate Individual Component Scores
         hazard.severity_score = calculate_severity_score(hazard.severity)

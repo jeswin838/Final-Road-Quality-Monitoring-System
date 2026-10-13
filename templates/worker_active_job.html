@@ -1,121 +1,155 @@
 {% extends "base.html" %}
 {% block title %}Active Assignment — Worker
 <style>
-/* Glassmorphism Classes */
-.glass-panel {
-    background: rgba(30, 41, 59, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    color: white;
-}
+    /* Glassmorphism Classes */
+    .glass-panel {
+        background: rgba(30, 41, 59, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        color: white;
+    }
 
-/* Route Info Card */
-.route-info-card {
-    padding: 16px;
-    margin-bottom: 16px;
-}
-.route-info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 12px;
-    margin-top: 12px;
-}
-.route-info-item {
-    display: flex;
-    flex-direction: column;
-}
-.route-info-label {
-    font-size: 0.75rem;
-    color: #94a3b8;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 4px;
-}
-.route-info-value {
-    font-size: 1rem;
-    font-weight: 600;
-}
+    /* Route Info Card */
+    .route-info-card {
+        padding: 16px;
+        margin-bottom: 16px;
+    }
 
-/* Route Summary Strip */
-.route-summary-strip {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 20px;
-    margin-bottom: 16px;
-    border-radius: 12px;
-}
-.summary-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-.summary-val {
-    font-size: 1.1rem;
-    font-weight: 700;
-}
-.summary-label {
-    font-size: 0.7rem;
-    color: #94a3b8;
-}
+    .route-info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+    }
 
-/* Live Camera UI */
-#cameraStream {
-    width: 100%;
-    aspect-ratio: 4/3;
-    object-fit: cover;
-    background: #000;
-    border-radius: 12px;
-    display: none; /* Initially hidden until unlocked */
-}
-#cameraOverlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: rgba(0,0,0,0.8);
-    border-radius: 12px;
-    flex-direction: column;
-    z-index: 5;
-}
-#cameraOverlay i {
-    font-size: 3rem;
-    color: #ef4444;
-    margin-bottom: 12px;
-}
-#cameraOverlay p {
-    color: white;
-    font-weight: 600;
-    text-align: center;
-    padding: 0 16px;
-}
-.live-capture-btn {
-    width: 100%;
-    padding: 16px;
-    font-size: 1.1rem;
-    font-weight: bold;
-    border-radius: 12px;
-    background: #22c55e;
-    color: white;
-    border: none;
-    cursor: pointer;
-    box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
-    transition: transform 0.2s;
-}
-.live-capture-btn:hover { transform: scale(1.02); }
-.live-capture-btn:disabled { background: #475569; box-shadow: none; cursor: not-allowed; transform: none; }
+    .route-info-item {
+        display: flex;
+        flex-direction: column;
+    }
 
-/* Responsive Adjustments */
-@media(max-width: 768px) {
-    .wk-dash-grid { grid-template-columns: repeat(2, 1fr) !important; }
-    .route-info-grid { grid-template-columns: repeat(2, 1fr); }
-    .route-summary-strip { flex-wrap: wrap; gap: 8px; justify-content: center; }
-    .summary-item { width: 45%; }
-}
+    .route-info-label {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
+    }
+
+    .route-info-value {
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    /* Route Summary Strip */
+    .route-summary-strip {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 20px;
+        margin-bottom: 16px;
+        border-radius: 12px;
+    }
+
+    .summary-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .summary-val {
+        font-size: 1.1rem;
+        font-weight: 700;
+    }
+
+    .summary-label {
+        font-size: 0.7rem;
+        color: #94a3b8;
+    }
+
+    /* Live Camera UI */
+    #cameraStream {
+        width: 100%;
+        aspect-ratio: 4/3;
+        object-fit: cover;
+        background: #000;
+        border-radius: 12px;
+        display: none;
+        /* Initially hidden until unlocked */
+    }
+
+    #cameraOverlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.8);
+        border-radius: 12px;
+        flex-direction: column;
+        z-index: 5;
+    }
+
+    #cameraOverlay i {
+        font-size: 3rem;
+        color: #ef4444;
+        margin-bottom: 12px;
+    }
+
+    #cameraOverlay p {
+        color: white;
+        font-weight: 600;
+        text-align: center;
+        padding: 0 16px;
+    }
+
+    .live-capture-btn {
+        width: 100%;
+        padding: 16px;
+        font-size: 1.1rem;
+        font-weight: bold;
+        border-radius: 12px;
+        background: #22c55e;
+        color: white;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
+        transition: transform 0.2s;
+    }
+
+    .live-capture-btn:hover {
+        transform: scale(1.02);
+    }
+
+    .live-capture-btn:disabled {
+        background: #475569;
+        box-shadow: none;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    /* Responsive Adjustments */
+    @media(max-width: 768px) {
+        .wk-dash-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+
+        .route-info-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .route-summary-strip {
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .summary-item {
+            width: 45%;
+        }
+    }
 </style>
 
 {% endblock %}
@@ -123,369 +157,523 @@
 
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.css" />
+<link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.css" />
+<script async src="https://docs.opencv.org/4.8.0/opencv.js" type="text/javascript"></script>
 {% endblock %}
 
 {% block content %}
 <div class="wk-active-layout">
-  
-  <!-- Main Details Column -->
-  <div class="wk-active-main wk-animate-slide-right">
-    
-    <div class="wk-active-hero">
-      <img id="heroImg" src="" alt="Hazard Image">
-      <div class="wk-active-hero-overlay">
-        <div>
-          <span class="wk-badge wk-badge-status-travelling wk-mb-2" id="heroStatus">Status: Loading...</span>
-          <h1 class="worker-h1" id="heroTitle" style="color:white; margin:0;">Loading...</h1>
-          <p id="heroDesc" style="color:rgba(255,255,255,0.7); margin-top:8px;"></p>
-        </div>
-      </div>
-    </div>
-    
-    <div class="wk-dash-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom:0;">
-      <div class="wk-stat-card" style="padding: 16px;">
-        <div class="wk-stat-label">Risk Score</div>
-        <div class="wk-stat-val" id="statRisk" style="font-size:2rem; color:var(--worker-danger);">--</div>
-      </div>
-      <div class="wk-stat-card" style="padding: 16px;">
-        <div class="wk-stat-label">Confidence</div>
-        <div class="wk-stat-val" id="statConf" style="font-size:2rem; color:var(--worker-success);">--</div>
-      </div>
-      <div class="wk-stat-card" style="padding: 16px;">
-        <div class="wk-stat-label">Waiting Time</div>
-        <div class="wk-stat-val" id="statWait" style="font-size:1.5rem;">--</div>
-      </div>
-      <div class="wk-stat-card" style="padding: 16px;">
-        <div class="wk-stat-label">Material</div>
-        <div class="wk-stat-val" style="font-size:1.5rem;">Hot Mix</div>
-      </div>
-    </div>
-    
-    
-      <!-- Assigned Route Information Card -->
-      <div class="glass-panel route-info-card" id="assignedRouteCard" style="display:none;">
-          <h3 style="margin-top:0; margin-bottom: 12px; font-size:1.1rem; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:8px;">
-             <i class="fa-solid fa-route" style="color:var(--worker-accent-primary);"></i> Assigned Route
-          </h3>
-          <div style="display:flex; align-items:center; gap:12px; font-size:0.9rem; margin-bottom:12px;">
-             <div><span style="color:#94a3b8;">Start:</span> <span id="uiRouteStart">Current Location</span></div>
-             <i class="fa-solid fa-arrow-right" style="color:#64748b; font-size:0.8rem;"></i>
-             <div><span style="color:#94a3b8;">Destination:</span> <span id="uiRouteEnd">Hazard Site</span></div>
-          </div>
-          
-          <div class="route-info-grid">
-             <div class="route-info-item">
-                 <span class="route-info-label">Assignment ID</span>
-                 <span class="route-info-value" id="uiJobId">--</span>
-             </div>
-             <div class="route-info-item">
-                 <span class="route-info-label">Hazard</span>
-                 <span class="route-info-value" id="uiHazardType">Pothole</span>
-             </div>
-             <div class="route-info-item">
-                 <span class="route-info-label">Severity</span>
-                 <span class="route-info-value" id="uiSeverity">--</span>
-             </div>
-             <div class="route-info-item">
-                 <span class="route-info-label">Distance</span>
-                 <span class="route-info-value" id="uiTotalDist">--</span>
-             </div>
-             <div class="route-info-item">
-                 <span class="route-info-label">Travel Time</span>
-                 <span class="route-info-value" id="uiTravelTime">--</span>
-             </div>
-          </div>
-      </div>
-      
-      <!-- Route Summary Strip -->
-      <div class="glass-panel route-summary-strip" id="routeSummaryStrip" style="display:none;">
-          <div class="summary-item">
-             <span class="summary-val" id="stripTotalDist">--</span>
-             <span class="summary-label">Total Distance</span>
-          </div>
-          <div class="summary-item">
-             <span class="summary-val" id="stripEta">--</span>
-             <span class="summary-label">ETA</span>
-          </div>
-          <div class="summary-item">
-             <span class="summary-val" id="stripRemaining" style="color:var(--worker-success);">--</span>
-             <span class="summary-label">Remaining</span>
-          </div>
-          <div class="summary-item">
-             <span class="summary-val" id="stripRisk" style="color:var(--worker-danger);">--</span>
-             <span class="summary-label">Hazard</span>
-          </div>
-      </div>
-<div class="wk-card worker-glass">
-      <div class="wk-card-header">
-        <div class="wk-card-title">
-          <div class="wk-card-icon"><i class="fa-solid fa-map-location-dot"></i></div>
-          Assigned Route
-        </div>
-        <button class="wk-btn wk-btn-outline" id="startNavBtn" onclick="startNavigation()"><i class="fa-solid fa-diamond-turn-right"></i> Start Navigation</button>
-      </div>
-      
-      <!-- NEW KPI BAR -->
-      <div id="liveNavKpiBar" style="display:none; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
-        <div class="wk-stat-card" style="padding: 12px; text-align:center; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); transition: all 0.3s;">
-           <div style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase; margin-bottom:4px;">🕒 ETA</div>
-           <div id="kpiEta" style="font-size:1.4rem; font-weight:700; color:white;">--</div>
-        </div>
-        <div class="wk-stat-card" style="padding: 12px; text-align:center; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); transition: all 0.3s;">
-           <div style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase; margin-bottom:4px;">📍 Remaining</div>
-           <div id="kpiDist" style="font-size:1.4rem; font-weight:700; color:white;">--</div>
-        </div>
-        <div class="wk-stat-card" style="padding: 12px; text-align:center; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); transition: all 0.3s;">
-           <div style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase; margin-bottom:4px;">🚗 Status</div>
-           <div id="kpiStatus" style="font-size:1.1rem; font-weight:600; color:#3b82f6; margin-top:4px;">Waiting</div>
-        </div>
-      </div>
 
-      <!-- MAP CONTROLS -->
-      <div id="mapControls" style="display:none; gap:8px; margin-bottom: 12px;">
-          <button class="wk-btn wk-btn-outline wk-btn-sm" onclick="centerOnWorker()"><i class="fa-solid fa-location-crosshairs"></i> Current Location</button>
-          <button class="wk-btn wk-btn-outline wk-btn-sm" onclick="centerOnWorker()"><i class="fa-solid fa-compass"></i> Recenter</button>
-          <button class="wk-btn wk-btn-outline wk-btn-sm" onclick="fitRouteBounds()"><i class="fa-solid fa-route"></i> Fit Route</button>
-      </div>
+    <!-- Main Details Column -->
+    <div class="wk-active-main wk-animate-slide-right">
 
-      <div class="wk-job-map-container" style="height:400px; position:relative; border-radius:12px; overflow:hidden;" id="activeMapContainer">
-      </div>
+        <div class="wk-active-hero">
+            <img id="heroImg" src="" alt="Hazard Image">
+            <div class="wk-active-hero-overlay">
+                <div>
+                    <span class="wk-badge wk-badge-status-travelling wk-mb-2" id="heroStatus">Status: Loading...</span>
+                    <h1 class="worker-h1" id="heroTitle" style="color:white; margin:0;">Loading...</h1>
+                    <p id="heroDesc" style="color:rgba(255,255,255,0.7); margin-top:8px;"></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="wk-dash-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom:0;">
+            <div class="wk-stat-card" style="padding: 16px;">
+                <div class="wk-stat-label">Risk Score</div>
+                <div class="wk-stat-val" id="statRisk" style="font-size:2rem; color:var(--worker-danger);">--</div>
+            </div>
+            <div class="wk-stat-card" style="padding: 16px;">
+                <div class="wk-stat-label">Confidence</div>
+                <div class="wk-stat-val" id="statConf" style="font-size:2rem; color:var(--worker-success);">--</div>
+            </div>
+            <div class="wk-stat-card" style="padding: 16px;">
+                <div class="wk-stat-label">Waiting Time</div>
+                <div class="wk-stat-val" id="statWait" style="font-size:1.5rem;">--</div>
+            </div>
+            <div class="wk-stat-card" style="padding: 16px;">
+                <div class="wk-stat-label">Material</div>
+                <div class="wk-stat-val" style="font-size:1.5rem;">Hot Mix</div>
+            </div>
+        </div>
+
+
+        <!-- Assigned Route Information Card -->
+        <div class="glass-panel route-info-card" id="assignedRouteCard" style="display:none;">
+            <h3
+                style="margin-top:0; margin-bottom: 12px; font-size:1.1rem; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:8px;">
+                <i class="fa-solid fa-route" style="color:var(--worker-accent-primary);"></i> Assigned Route
+            </h3>
+            <div style="display:flex; align-items:center; gap:12px; font-size:0.9rem; margin-bottom:12px;">
+                <div><span style="color:#94a3b8;">Start:</span> <span id="uiRouteStart">Current Location</span></div>
+                <i class="fa-solid fa-arrow-right" style="color:#64748b; font-size:0.8rem;"></i>
+                <div><span style="color:#94a3b8;">Destination:</span> <span id="uiRouteEnd">Hazard Site</span></div>
+            </div>
+
+            <div class="route-info-grid">
+                <div class="route-info-item">
+                    <span class="route-info-label">Assignment ID</span>
+                    <span class="route-info-value" id="uiJobId">--</span>
+                </div>
+                <div class="route-info-item">
+                    <span class="route-info-label">Hazard</span>
+                    <span class="route-info-value" id="uiHazardType">Pothole</span>
+                </div>
+                <div class="route-info-item">
+                    <span class="route-info-label">Severity</span>
+                    <span class="route-info-value" id="uiSeverity">--</span>
+                </div>
+                <div class="route-info-item">
+                    <span class="route-info-label">Distance</span>
+                    <span class="route-info-value" id="uiTotalDist">--</span>
+                </div>
+                <div class="route-info-item">
+                    <span class="route-info-label">Travel Time</span>
+                    <span class="route-info-value" id="uiTravelTime">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Route Summary Strip -->
+        <div class="glass-panel route-summary-strip" id="routeSummaryStrip" style="display:none;">
+            <div class="summary-item">
+                <span class="summary-val" id="stripTotalDist">--</span>
+                <span class="summary-label">Total Distance</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-val" id="stripEta">--</span>
+                <span class="summary-label">ETA</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-val" id="stripRemaining" style="color:var(--worker-success);">--</span>
+                <span class="summary-label">Remaining</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-val" id="stripRisk" style="color:var(--worker-danger);">--</span>
+                <span class="summary-label">Hazard</span>
+            </div>
+        </div>
+        <div class="wk-card worker-glass">
+            <div class="wk-card-header">
+                <div class="wk-card-title">
+                    <div class="wk-card-icon"><i class="fa-solid fa-map-location-dot"></i></div>
+                    Assigned Route
+                </div>
+                <button class="wk-btn wk-btn-outline" id="startNavBtn" onclick="startNavigation()"><i
+                        class="fa-solid fa-diamond-turn-right"></i> Start Navigation</button>
+            </div>
+
+            <!-- NEW KPI BAR -->
+            <div id="liveNavKpiBar"
+                style="display:none; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+                <div class="wk-stat-card"
+                    style="padding: 12px; text-align:center; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); transition: all 0.3s;">
+                    <div style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase; margin-bottom:4px;">🕒 ETA
+                    </div>
+                    <div id="kpiEta" style="font-size:1.4rem; font-weight:700; color:white;">--</div>
+                </div>
+                <div class="wk-stat-card"
+                    style="padding: 12px; text-align:center; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); transition: all 0.3s;">
+                    <div style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase; margin-bottom:4px;">📍
+                        Remaining</div>
+                    <div id="kpiDist" style="font-size:1.4rem; font-weight:700; color:white;">--</div>
+                </div>
+                <div class="wk-stat-card"
+                    style="padding: 12px; text-align:center; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); transition: all 0.3s;">
+                    <div style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase; margin-bottom:4px;">🚗
+                        Status</div>
+                    <div id="kpiStatus" style="font-size:1.1rem; font-weight:600; color:#3b82f6; margin-top:4px;">
+                        Waiting</div>
+                </div>
+            </div>
+
+            <!-- MAP CONTROLS -->
+            <div id="mapControls" style="display:none; gap:8px; margin-bottom: 12px;">
+                <button class="wk-btn wk-btn-outline wk-btn-sm" onclick="centerOnWorker()"><i
+                        class="fa-solid fa-location-crosshairs"></i> Current Location</button>
+                <button class="wk-btn wk-btn-outline wk-btn-sm" onclick="centerOnWorker()"><i
+                        class="fa-solid fa-compass"></i> Recenter</button>
+                <button class="wk-btn wk-btn-outline wk-btn-sm" onclick="fitRouteBounds()"><i
+                        class="fa-solid fa-route"></i> Fit Route</button>
+            </div>
+
+            <div class="wk-job-map-container"
+                style="height:400px; position:relative; border-radius:12px; overflow:hidden;" id="activeMapContainer">
+            </div>
+        </div>
+
+        <div class="wk-card worker-glass">
+            <div class="wk-card-header">
+                <div class="wk-card-title">
+                    <div class="wk-card-icon"><i class="fa-solid fa-list-check"></i></div>
+                    Assignment Details
+                </div>
+            </div>
+            <p class="worker-p wk-mb-4">This hazard was automatically assigned based on proximity and severity. Please
+                adhere to municipal standards during repair.</p>
+
+            <div class="wk-flex-column wk-gap-2 worker-small">
+                <div class="wk-flex-between"
+                    style="border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:8px;">
+                    <span>Detected At</span><span id="detDetect"></span>
+                </div>
+                <div class="wk-flex-between"
+                    style="border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:8px;">
+                    <span>Assigned By</span><span>Auto-Dispatch Engine</span>
+                </div>
+                <div class="wk-flex-between" style="padding-bottom:8px;">
+                    <span>Required Materials</span><span>Hot Mix Asphalt, Sealer</span>
+                </div>
+            </div>
+        </div>
+
     </div>
-    
-    <div class="wk-card worker-glass">
-      <div class="wk-card-header">
-        <div class="wk-card-title">
-          <div class="wk-card-icon"><i class="fa-solid fa-list-check"></i></div>
-          Assignment Details
+
+    <!-- Sidebar Column: Timeline & Actions -->
+    <div class="wk-flex-column wk-gap-6 wk-animate-fade-in-up delay-200">
+
+        <div class="wk-card worker-glass">
+            <div class="wk-card-header">
+                <div class="wk-card-title">
+                    <div class="wk-card-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                    Workflow Timeline
+                </div>
+            </div>
+
+            <div class="wk-timeline" id="timelineContainer">
+                <!-- Timeline populated via JS -->
+            </div>
+
+            <div class="wk-mt-6" id="cancelBtnContainer"
+                style="border-top:1px solid rgba(255,255,255,0.1); padding-top:16px;">
+                <!-- Cancel Button injected here -->
+            </div>
+
         </div>
-      </div>
-      <p class="worker-p wk-mb-4">This hazard was automatically assigned based on proximity and severity. Please adhere to municipal standards during repair.</p>
-      
-      <div class="wk-flex-column wk-gap-2 worker-small">
-        <div class="wk-flex-between" style="border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:8px;">
-          <span>Detected At</span><span id="detDetect"></span>
-        </div>
-        <div class="wk-flex-between" style="border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:8px;">
-          <span>Assigned By</span><span>Auto-Dispatch Engine</span>
-        </div>
-        <div class="wk-flex-between" style="padding-bottom:8px;">
-          <span>Required Materials</span><span>Hot Mix Asphalt, Sealer</span>
-        </div>
-      </div>
+
     </div>
-    
-  </div>
-  
-  <!-- Sidebar Column: Timeline & Actions -->
-  <div class="wk-flex-column wk-gap-6 wk-animate-fade-in-up delay-200">
-    
-    <div class="wk-card worker-glass">
-      <div class="wk-card-header">
-        <div class="wk-card-title">
-          <div class="wk-card-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
-          Workflow Timeline
-        </div>
-      </div>
-      
-      <div class="wk-timeline" id="timelineContainer">
-        <!-- Timeline populated via JS -->
-      </div>
-      
-      <div class="wk-mt-6" id="cancelBtnContainer" style="border-top:1px solid rgba(255,255,255,0.1); padding-top:16px;">
-        <!-- Cancel Button injected here -->
-      </div>
-      
-    </div>
-    
-  </div>
 </div>
 
 <!-- AI Verification Capture Modal -->
-<div id="captureModal" class="wk-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(15, 23, 42, 0.95); z-index:9999; backdrop-filter:blur(15px); flex-direction:column; justify-content:center; align-items:center;">
-  <div class="glass-panel" style="width:95%; max-width:550px; padding:0; text-align:left; position:relative; overflow:hidden; display:flex; flex-direction:column; border:1px solid rgba(255,255,255,0.1); border-radius:16px;">
-    <!-- Header -->
-    <div style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; background: rgba(0,0,0,0.2);">
-      <div>
-        <h2 id="captureModalTitle" style="color:white; margin:0; font-weight:700; font-size:1.4rem;">Site Verification</h2>
-        <p style="color:#94a3b8; font-size:0.85rem; margin:4px 0 0 0;">Verifying worker presence at assigned location</p>
-      </div>
-      <button onclick="closeCaptureModal()" style="background:none; border:none; color:#94a3b8; font-size:1.5rem; cursor:pointer; transition:color 0.2s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='#94a3b8'"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    
-    <div style="padding: 20px; flex-grow: 1; overflow-y: auto;">
-        
-        <!-- Site Verification Card -->
-        <div id="verificationCard" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
-                <div>
-                    <div style="color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Assigned Location</div>
-                    <div style="color:white; font-size:1rem; font-weight:600;" id="liveAssignedLoc">Hazard Site</div>
-                </div>
-                <div style="text-align:right;">
-                    <div style="color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Hazard ID</div>
-                    <div style="color:white; font-size:1rem; font-weight:600;" id="liveHazardId">--</div>
-                </div>
+<div id="captureModal" class="wk-modal-overlay"
+    style="display:none; position:fixed; inset:0; background:rgba(15, 23, 42, 0.95); z-index:9999; backdrop-filter:blur(15px); flex-direction:column; justify-content:center; align-items:center;">
+    <div class="glass-panel"
+        style="width:95%; max-width:550px; padding:0; text-align:left; position:relative; overflow:hidden; display:flex; flex-direction:column; border:1px solid rgba(255,255,255,0.1); border-radius:16px;">
+        <!-- Header -->
+        <div
+            style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; background: rgba(0,0,0,0.2);">
+            <div>
+                <h2 id="captureModalTitle" style="color:white; margin:0; font-weight:700; font-size:1.4rem;">Site
+                    Verification</h2>
+                <p style="color:#94a3b8; font-size:0.85rem; margin:4px 0 0 0;">Verifying worker presence at assigned
+                    location</p>
             </div>
-            
-            <hr style="border:0; border-top:1px solid rgba(255,255,255,0.05); margin:12px 0;">
-            
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:16px;">
-                <div>
-                    <div style="color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Current Distance</div>
-                    <div style="font-size:1.8rem; font-weight:700; transition: color 0.3s;" id="liveDistance">--</div>
+            <button onclick="closeCaptureModal()"
+                style="background:none; border:none; color:#94a3b8; font-size:1.5rem; cursor:pointer; transition:color 0.2s;"
+                onmouseover="this.style.color='white'" onmouseout="this.style.color='#94a3b8'"><i
+                    class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div style="padding: 20px; flex-grow: 1; overflow-y: auto;">
+
+            <!-- Site Verification Card -->
+            <div id="verificationCard"
+                style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
+                    <div>
+                        <div
+                            style="color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">
+                            Assigned Location</div>
+                        <div style="color:white; font-size:1rem; font-weight:600;" id="liveAssignedLoc">Hazard Site
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div
+                            style="color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">
+                            Hazard ID</div>
+                        <div style="color:white; font-size:1rem; font-weight:600;" id="liveHazardId">--</div>
+                    </div>
                 </div>
-                <div style="text-align:right;">
-                    <div style="color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">GPS Accuracy</div>
-                    <div style="color:white; font-size:1.2rem; font-weight:600; margin-top:8px;" id="liveAccuracy">--</div>
+
+                <hr style="border:0; border-top:1px solid rgba(255,255,255,0.05); margin:12px 0;">
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:16px;">
+                    <div>
+                        <div
+                            style="color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">
+                            Current Distance</div>
+                        <div style="font-size:1.8rem; font-weight:700; transition: color 0.3s;" id="liveDistance">--
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div
+                            style="color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">
+                            GPS Accuracy</div>
+                        <div style="color:white; font-size:1.2rem; font-weight:600; margin-top:8px;" id="liveAccuracy">
+                            --</div>
+                    </div>
                 </div>
-            </div>
-            
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <div style="color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px;">Current Coordinates</div>
-                <div style="color:white; font-size:0.85rem; font-family:monospace;" id="liveCoords">--</div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div style="color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px;">Current
+                        Coordinates</div>
+                    <div style="color:white; font-size:0.85rem; font-family:monospace;" id="liveCoords">--</div>
+                </div>
+
+                <!-- Optional Telemetry Row -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <div style="color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px;">Signal
+                    </div>
+                    <div style="color:white; font-size:0.85rem;" id="liveSignal">--</div>
+                    <div style="color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px;">Updated
+                    </div>
+                    <div style="color:white; font-size:0.85rem;" id="liveUpdated">--</div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div style="margin-bottom: 16px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                        <span style="font-size:0.8rem; color:#94a3b8;"><i class="fa-solid fa-person-walking"></i>
+                            Worker</span>
+                        <span style="font-size:0.8rem; color:#94a3b8; font-weight:bold;" id="liveProgressText">--</span>
+                        <span style="font-size:0.8rem; color:#94a3b8;"><i class="fa-solid fa-map-pin"></i> Hazard</span>
+                    </div>
+                    <div
+                        style="width:100%; height:8px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden;">
+                        <div id="liveProgressBar"
+                            style="height:100%; width:0%; background:#ef4444; transition:width 0.5s ease-out, background-color 0.5s ease-out;">
+                        </div>
+                    </div>
+                </div>
+
+                <hr style="border:0; border-top:1px solid rgba(255,255,255,0.05); margin:12px 0;">
+
+                <div
+                    style="display:flex; align-items:center; gap:12px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                    <div id="liveStatusIcon" style="font-size:1.5rem;"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                    <div>
+                        <div style="font-weight:600; font-size:0.95rem;" id="liveStatusTitle">Initializing GPS...</div>
+                        <div style="color:#94a3b8; font-size:0.8rem;" id="liveStatusMsg">Please wait while we determine
+                            your location.</div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Optional Telemetry Row -->
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                <div style="color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px;">Signal</div>
-                <div style="color:white; font-size:0.85rem;" id="liveSignal">--</div>
-                <div style="color:#94a3b8; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px;">Updated</div>
-                <div style="color:white; font-size:0.85rem;" id="liveUpdated">--</div>
-            </div>
-            
-            <!-- Progress Bar -->
-            <div style="margin-bottom: 16px;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-                    <span style="font-size:0.8rem; color:#94a3b8;"><i class="fa-solid fa-person-walking"></i> Worker</span>
-                    <span style="font-size:0.8rem; color:#94a3b8; font-weight:bold;" id="liveProgressText">--</span>
-                    <span style="font-size:0.8rem; color:#94a3b8;"><i class="fa-solid fa-map-pin"></i> Hazard</span>
-                </div>
-                <div style="width:100%; height:8px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden;">
-                    <div id="liveProgressBar" style="height:100%; width:0%; background:#ef4444; transition:width 0.5s ease-out, background-color 0.5s ease-out;"></div>
-                </div>
-            </div>
-            
-            <hr style="border:0; border-top:1px solid rgba(255,255,255,0.05); margin:12px 0;">
-            
-            <div style="display:flex; align-items:center; gap:12px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
-                <div id="liveStatusIcon" style="font-size:1.5rem;"><i class="fa-solid fa-spinner fa-spin"></i></div>
-                <div>
-                    <div style="font-weight:600; font-size:0.95rem;" id="liveStatusTitle">Initializing GPS...</div>
-                    <div style="color:#94a3b8; font-size:0.8rem;" id="liveStatusMsg">Please wait while we determine your location.</div>
-                </div>
-            </div>
-        </div>
-    
-        <!-- PREMIUM CAMERA CARD -->
-        <style>
-        .premium-capture-btn {
-            height: 65px; width: 240px; border-radius: 35px; border: 1px solid rgba(255,255,255,0.2); 
-            background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; font-weight: 700; font-size: 1.1rem; 
-            display: flex; justify-content: center; align-items: center; gap: 12px; 
-            box-shadow: 0 10px 25px rgba(37,99,235,0.4); cursor: pointer; 
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); outline: none; margin: 0 auto;
-        }
-        .premium-capture-btn:not(:disabled):hover {
-            transform: translateY(-4px) scale(1.02);
-            box-shadow: 0 14px 30px rgba(37,99,235,0.6);
-            background: linear-gradient(135deg, #60a5fa, #2563eb);
-        }
-        .premium-capture-btn:not(:disabled):active {
-            transform: translateY(2px) scale(0.95);
-            box-shadow: 0 4px 10px rgba(37,99,235,0.4);
-        }
-        .premium-capture-btn:disabled {
-            background: #475569 !important;
-            box-shadow: none !important;
-            transform: none !important;
-            cursor: not-allowed;
-            opacity: 0.8;
-        }
-        .btn-captured {
-            background: linear-gradient(135deg, #22c55e, #16a34a) !important;
-            box-shadow: 0 10px 25px rgba(34,197,94,0.4) !important;
-        }
-        </style>
+            <!-- PREMIUM CAMERA CARD -->
+            <style>
+                .premium-capture-btn {
+                    height: 65px;
+                    width: 240px;
+                    border-radius: 35px;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    background: linear-gradient(135deg, #3b82f6, #2563eb);
+                    color: white;
+                    font-weight: 700;
+                    font-size: 1.1rem;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    gap: 12px;
+                    box-shadow: 0 10px 25px rgba(37, 99, 235, 0.4);
+                    cursor: pointer;
+                    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    outline: none;
+                    margin: 0 auto;
+                }
 
-        <div style="margin-bottom: 24px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding: 0 4px;">
-                <h3 id="cameraHeaderTxt" style="color:white; margin:0; font-size:1.1rem; font-weight:600;"><i class="fa-solid fa-camera"></i> Repair Evidence</h3>
-                <span style="font-size:0.8rem; color:#94a3b8;">Capture a clear image</span>
-            </div>
-            
-            <div style="position:relative; width:100%; aspect-ratio:4/3; border-radius:24px; overflow:hidden; border:1px solid rgba(255,255,255,0.15); box-shadow: 0 12px 32px rgba(0,0,0,0.5); background: linear-gradient(145deg, #1e293b, #0f172a);">
-                <video id="cameraStream" autoplay playsinline style="width:100%; height:100%; object-fit:cover; display:none; background:#000;"></video>
-                <canvas id="cameraCanvas" style="display:none;"></canvas>
-                <img id="imagePreview" src="" style="display:none; width:100%; height:100%; object-fit:cover;">
-                
-                <div id="cameraOverlay" style="position:absolute; inset:0; background:rgba(15, 23, 42, 0.85); display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:5; backdrop-filter:blur(8px); transition: opacity 0.5s;">
-                    <i class="fa-solid fa-lock" id="cameraLockIcon" style="font-size:3.5rem; color:#64748b; margin-bottom:16px; transition: color 0.3s, transform 0.3s;"></i>
-                    <p id="cameraOverlayText" style="color:white; font-weight:600; font-size:1.2rem; letter-spacing:0.5px;">Camera Locked</p>
-                    <p style="color:#94a3b8; font-size:0.9rem; margin-top:8px;" id="cameraOverlaySubtext">Move closer to unlock</p>
+                .premium-capture-btn:not(:disabled):hover {
+                    transform: translateY(-4px) scale(1.02);
+                    box-shadow: 0 14px 30px rgba(37, 99, 235, 0.6);
+                    background: linear-gradient(135deg, #60a5fa, #2563eb);
+                }
+
+                .premium-capture-btn:not(:disabled):active {
+                    transform: translateY(2px) scale(0.95);
+                    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.4);
+                }
+
+                .premium-capture-btn:disabled {
+                    background: #475569 !important;
+                    box-shadow: none !important;
+                    transform: none !important;
+                    cursor: not-allowed;
+                    opacity: 0.8;
+                }
+
+                .btn-captured {
+                    background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+                    box-shadow: 0 10px 25px rgba(34, 197, 94, 0.4) !important;
+                }
+            </style>
+
+            <div style="margin-bottom: 24px;">
+                <div
+                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding: 0 4px;">
+                    <h3 id="cameraHeaderTxt" style="color:white; margin:0; font-size:1.1rem; font-weight:600;"><i
+                            class="fa-solid fa-camera"></i> Repair Evidence</h3>
+                    <span style="font-size:0.8rem; color:#94a3b8;">Capture a clear image</span>
+                </div>
+
+                <div id="matchScoreContainer"
+                    style="display:none; background:rgba(0,0,0,0.7); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:12px; margin-bottom:16px; text-align:left;">
+                    <div
+                        style="font-size:0.8rem; color:#94a3b8; text-transform:uppercase; margin-bottom:8px; text-align:center;">
+                        Camera Stability</div>
+                    <div style="margin-top: 10px; text-align:center;">
+                        <span style="font-size:1.5rem; font-weight:700; color:#ef4444;" id="matchScoreVal">0%</span>
+                        <div id="matchGuidance" style="font-size:0.9rem; color:#cbd5e1; margin-top:4px;">Align the
+                            camera with the before photo.</div>
+                    </div>
+                </div>
+
+                <div
+                    style="position:relative; width:100%; aspect-ratio:4/3; border-radius:24px; overflow:hidden; border:1px solid rgba(255,255,255,0.15); box-shadow: 0 12px 32px rgba(0,0,0,0.5); background: linear-gradient(145deg, #1e293b, #0f172a);">
+                    <video id="cameraStream" autoplay playsinline
+                        style="width:100%; height:100%; object-fit:cover; display:none; background:#000;"></video>
+                    <canvas id="cameraCanvas" style="display:none;"></canvas>
+                    <img id="imagePreview" src="" style="display:none; width:100%; height:100%; object-fit:cover;">
+                    <!-- Overlay opacity: 0.40 (was 0.55) — worker can see live road + before photo simultaneously -->
+                    <img id="cameraOverlayImage" src=""
+                        style="display:none; position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0.40; z-index:2; pointer-events:none;">
+
+                    <div id="cameraOverlay"
+                        style="position:absolute; inset:0; background:rgba(15, 23, 42, 0.85); display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:5; backdrop-filter:blur(8px); transition: opacity 0.5s;">
+                        <i class="fa-solid fa-lock" id="cameraLockIcon"
+                            style="font-size:3.5rem; color:#64748b; margin-bottom:16px; transition: color 0.3s, transform 0.3s;"></i>
+                        <p id="cameraOverlayText"
+                            style="color:white; font-weight:600; font-size:1.2rem; letter-spacing:0.5px;">Camera Locked
+                        </p>
+                        <p style="color:#94a3b8; font-size:0.9rem; margin-top:8px;" id="cameraOverlaySubtext">Move
+                            closer to unlock</p>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:center; margin-top:-32px; position:relative; z-index:10;">
+                    <button class="premium-capture-btn" id="captureBtn" onclick="takePhoto()" disabled>
+                        <i class="fa-solid fa-lock"></i> <span>Open Live Camera</span>
+                    </button>
                 </div>
             </div>
-            
-            <div style="display:flex; justify-content:center; margin-top:-32px; position:relative; z-index:10;">
-                <button class="premium-capture-btn" id="captureBtn" onclick="takePhoto()" disabled>
-                    <i class="fa-solid fa-lock"></i> <span>Open Live Camera</span>
-                </button>
+
+            <!-- Rejection Results Card (Shown when after photo verification fails) -->
+            <div id="rejectionCard"
+                style="display:none; background:rgba(239, 68, 68, 0.08); border:1px solid rgba(239, 68, 68, 0.3); border-radius:16px; padding:16px; margin-bottom:16px;">
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+                    <div
+                        style="width:36px; height:36px; border-radius:50%; background:rgba(239,68,68,0.2); border:1px solid #ef4444; display:flex; align-items:center; justify-content:center; color:#ef4444; font-size:1.2rem;">
+                        <i class="fa-solid fa-circle-xmark"></i>
+                    </div>
+                    <div>
+                        <h4 style="color:#ef4444; margin:0; font-size:1.05rem; font-weight:700;">Repair Verification
+                            Failed</h4>
+                        <span style="color:#fca5a5; font-size:0.8rem;">AI detection system result</span>
+                    </div>
+                </div>
+
+                <!-- Canvas for annotated image with bounding box -->
+                <div
+                    style="position:relative; width:100%; aspect-ratio:4/3; border-radius:12px; overflow:hidden; border:2px solid #ef4444; margin-bottom:12px; background:#000;">
+                    <canvas id="rejectionCanvas"
+                        style="width:100%; height:100%; object-fit:cover; display:block;"></canvas>
+                </div>
+
+                <div style="background:rgba(0,0,0,0.4); border-radius:10px; padding:12px; margin-bottom:12px;">
+                    <div style="color:white; font-size:0.9rem; font-weight:600; margin-bottom:4px;">
+                        <i class="fa-solid fa-triangle-exclamation" style="color:#ef4444; margin-right:6px;"></i>
+                        Remaining pothole detected.
+                    </div>
+                    <div style="color:#cbd5e1; font-size:0.85rem; margin-bottom:6px;" id="rejectionConfidenceTxt">
+                        Confidence: --
+                    </div>
+                    <p style="color:#94a3b8; font-size:0.8rem; margin:0;">
+                        Repair the highlighted area and capture another after photo.
+                    </p>
+                </div>
+
+                <!-- Legend -->
+                <div style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:#cbd5e1; padding:4px 0;">
+                    <span
+                        style="width:14px; height:14px; background:rgba(239,68,68,0.2); border:2px solid #ef4444; border-radius:3px; display:inline-block;"></span>
+                    <span>Red box = Remaining road damage</span>
+                </div>
             </div>
-        </div>
-        
-        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px;">
-            <div style="color:white; font-weight:600; font-size:0.95rem; margin-bottom:12px;"><i class="fa-regular fa-lightbulb text-warning"></i> Tips for Best Results</div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:0.85rem; color:#cbd5e1;">
-                <div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-check" style="color:#22c55e;"></i> Stand 2–5m away</div>
-                <div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-check" style="color:#22c55e;"></i> Capture full hazard</div>
-                <div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-check" style="color:#22c55e;"></i> Ensure good lighting</div>
-                <div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-check" style="color:#22c55e;"></i> Keep camera steady</div>
+
+            <div
+                style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px;">
+                <div style="color:white; font-weight:600; font-size:0.95rem; margin-bottom:12px;"><i
+                        class="fa-regular fa-lightbulb text-warning"></i> Tips for Best Results</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:0.85rem; color:#cbd5e1;">
+                    <div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-check"
+                            style="color:#22c55e;"></i> Stand 2–5m away</div>
+                    <div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-check"
+                            style="color:#22c55e;"></i> Capture full hazard</div>
+                    <div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-check"
+                            style="color:#22c55e;"></i> Ensure good lighting</div>
+                    <div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-check"
+                            style="color:#22c55e;"></i> Keep camera steady</div>
+                </div>
             </div>
+
+            <input type="hidden" id="captureType" value="">
+            <input type="hidden" id="captureJobId" value="">
+            <button class="wk-btn wk-btn-outline" id="retakeBtn"
+                style="display:none; width:100%; padding:14px; border-radius:12px; font-size:1rem; margin-top:12px;"
+                onclick="retakePhoto()">
+                <i class="fa-solid fa-camera"></i> Capture Again
+            </button>
         </div>
-        
-        <input type="hidden" id="captureType" value="">
-        <input type="hidden" id="captureJobId" value="">
-        <button class="wk-btn wk-btn-outline" id="retakeBtn" style="display:none; width:100%; padding:14px; border-radius:12px; font-size:1rem; margin-top:12px;" onclick="retakePhoto()">
-            <i class="fa-solid fa-rotate-left"></i> Retake
-        </button>
+
+        <div id="aiLoadingOverlay"
+            style="display:none; position:absolute; inset:0; background:rgba(15, 23, 42, 0.9); flex-direction:column; justify-content:center; align-items:center; z-index:10; backdrop-filter:blur(8px);">
+            <div class="wk-map-marker-pulse"
+                style="margin-bottom:24px; width:40px; height:40px; background:var(--worker-accent-primary);"></div>
+            <h3 style="color:white; margin-bottom:8px; font-size:1.4rem;">Running AI Verification...</h3>
+            <p style="color:#94a3b8; font-size:0.9rem;">Analyzing image with YOLO engine</p>
+        </div>
     </div>
-    
-    <div id="aiLoadingOverlay" style="display:none; position:absolute; inset:0; background:rgba(15, 23, 42, 0.9); flex-direction:column; justify-content:center; align-items:center; z-index:10; backdrop-filter:blur(8px);">
-      <div class="wk-map-marker-pulse" style="margin-bottom:24px; width:40px; height:40px; background:var(--worker-accent-primary);"></div>
-      <h3 style="color:white; margin-bottom:8px; font-size:1.4rem;">Running AI Verification...</h3>
-      <p style="color:#94a3b8; font-size:0.9rem;">Analyzing image with YOLO engine</p>
-    </div>
-  </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
+<script
+    src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
 <script>
-  let map;
-  let workerMarker;
-  let hazardMarker;
-  let routeLine;
-  let watchId = null;
-  let currentJobId = null;
-  let currentHazardLat = null;
-  let currentHazardLon = null;
+    let map;
+    let workerMarker;
+    let hazardMarker;
+    let routeLine;
+    let watchId = null;
+    let currentJobId = null;
+    let currentHazardLat = null;
+    let currentHazardLon = null;
 
-  // --- New Global State for Telemetry ---
-  let currentDistanceMeters = 999999;
-  let videoStream = null;
-  let capturedBlob = null;
-  let captureTelemetry = null;
+    // --- New Global State for Telemetry ---
+    let currentDistanceMeters = 999999;
+    let videoStream = null;
+    let capturedBlob = null;
+    let captureTelemetry = null;
 
-  
-  document.addEventListener('DOMContentLoaded', async () => {
-    try {
-      const res = await fetch('/api/worker/active-job');
-      let data = await res.json();
-      if (data && data.success !== undefined) data = data.data;
-      
-      if (!data) {
-        document.querySelector('.wk-active-layout').innerHTML = `
+    let cvReady = false;
+    let scoreInterval = null;
+
+    if (typeof cv !== 'undefined') {
+        cv['onRuntimeInitialized'] = () => { cvReady = true; };
+    } else {
+        window.addEventListener('load', () => {
+            setTimeout(() => { if (typeof cv !== 'undefined') cvReady = true; }, 1000);
+        });
+    }
+
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const res = await fetch('/api/worker/active-job');
+            let data = await res.json();
+            if (data && data.success !== undefined) data = data.data;
+
+            if (!data) {
+                document.querySelector('.wk-active-layout').innerHTML = `
           <div class="wk-card worker-glass wk-w-full" style="text-align:center; padding: 48px;">
             <i class="fa-solid fa-clipboard-check" style="font-size:3rem; color:var(--worker-success); margin-bottom:16px;"></i>
             <h3>No Active Assignment</h3>
@@ -493,892 +681,1216 @@
             <button class="wk-btn wk-btn-primary wk-mt-4" onclick="window.location.href='/worker/available-jobs'">Find Jobs</button>
           </div>
         `;
-        return;
-      }
-      
-      currentJobId = data.hazard_id;
-      currentHazardLat = data.hazard.latitude;
-      
-      currentJobId = data.hazard_id;
-      currentHazardLat = data.hazard.latitude;
-      currentHazardLon = data.hazard.longitude;
-      
-      document.getElementById('uiJobId').textContent = "JOB-" + data.hazard_id;
-      document.getElementById('uiHazardType').textContent = data.hazard.type || "Pothole";
-      document.getElementById('uiSeverity').textContent = (data.hazard.severity || "medium").toUpperCase();
-      document.getElementById('stripRisk').textContent = (data.hazard.severity || "medium").toUpperCase() + " RISK";
+                return;
+            }
 
-      
-      renderActiveJob(data);
-      
-      // Auto-start GPS tracking if Travelling
-      if (data.status === 'Travelling') {
-          startGpsTracking();
-          document.getElementById('navOverlay').style.display = 'block';
-          document.getElementById('navMetrics').style.display = 'grid';
-          document.getElementById('startNavBtn').innerHTML = '<i class="fa-solid fa-map-location"></i> View in Maps';
-      }
-    } catch(e) {
-      console.error(e);
-    }
-  });
+            currentJobId = data.hazard_id;
+            currentHazardLat = data.hazard.latitude;
 
-  function renderActiveJob(job) {
-    const h = job.hazard;
-    if(!h) return;
-    
-    // Update main hero and tags
-    document.getElementById('heroImg').src = h.image;
-    document.getElementById('heroStatus').textContent = `Status: ${job.status}`;
-    document.getElementById('heroTitle').textContent = `${h.severity.charAt(0).toUpperCase() + h.severity.slice(1)} Hazard`;
-    document.getElementById('heroDesc').textContent = `JOB-${h.id} • ${h.reports_count} Reports • Priority: ${h.severity === 'high' ? 'High' : 'Medium'}`;
-    
-    // Stats
-    document.getElementById('statRisk').textContent = h.risk_score || 50;
-    document.getElementById('statConf').textContent = `${(h.confidence * 100).toFixed(0)}%`;
-    document.getElementById('statWait').textContent = h.waiting_time;
-    
-    // Map Setup
-    map = L.map('activeMapContainer', { zoomControl: false, attributionControl: false }).setView([h.latitude, h.longitude], 15);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
-    
-    const hazardIcon = L.divIcon({
-      className: 'custom-div-icon',
-      html: `<div style="background:var(--worker-danger); width:24px; height:24px; border-radius:50%; border:3px solid white; box-shadow:0 0 15px red; display:flex; align-items:center; justify-content:center;"><div style="width:8px; height:8px; background:white; border-radius:50%;"></div></div>`,
-      iconSize: [24, 24]
+            currentJobId = data.hazard_id;
+            currentHazardLat = data.hazard.latitude;
+            currentHazardLon = data.hazard.longitude;
+
+            document.getElementById('uiJobId').textContent = "JOB-" + data.hazard_id;
+            document.getElementById('uiHazardType').textContent = data.hazard.type || "Pothole";
+            document.getElementById('uiSeverity').textContent = (data.hazard.severity || "medium").toUpperCase();
+            document.getElementById('stripRisk').textContent = (data.hazard.severity || "medium").toUpperCase() + " RISK";
+
+
+            renderActiveJob(data);
+
+            // Auto-start GPS tracking if Travelling
+            if (data.status === 'Travelling') {
+                startGpsTracking();
+                document.getElementById('navOverlay').style.display = 'block';
+                document.getElementById('navMetrics').style.display = 'grid';
+                document.getElementById('startNavBtn').innerHTML = '<i class="fa-solid fa-map-location"></i> View in Maps';
+            }
+        } catch (e) {
+            console.error(e);
+        }
     });
-    hazardMarker = L.marker([h.latitude, h.longitude], { icon: hazardIcon }).addTo(map).bindPopup("Hazard Location").openPopup();
-    
-    // Worker Marker Setup (hidden initially)
-    const workerIcon = L.divIcon({
-      className: 'custom-worker-icon',
-      html: `<div id="workerMarkerDir" style="width: 28px; height: 28px; background: #3b82f6; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 15px rgba(59, 130, 246, 0.8); display: flex; align-items: center; justify-content: center; transform: rotate(0deg); transition: transform 0.4s ease-out;">
+
+    function renderActiveJob(job) {
+        const h = job.hazard;
+        if (!h) return;
+
+        // Update main hero and tags
+        document.getElementById('heroImg').src = h.image;
+        document.getElementById('heroStatus').textContent = `Status: ${job.status}`;
+        document.getElementById('heroTitle').textContent = `${h.severity.charAt(0).toUpperCase() + h.severity.slice(1)} Hazard`;
+        document.getElementById('heroDesc').textContent = `JOB-${h.id} • ${h.reports_count} Reports • Priority: ${h.severity === 'high' ? 'High' : 'Medium'}`;
+
+        // Stats
+        document.getElementById('statRisk').textContent = h.risk_score || 50;
+        document.getElementById('statConf').textContent = `${(h.confidence * 100).toFixed(0)}%`;
+        document.getElementById('statWait').textContent = h.waiting_time;
+
+        // Map Setup
+        map = L.map('activeMapContainer', { zoomControl: false, attributionControl: false }).setView([h.latitude, h.longitude], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        const hazardIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div style="background:var(--worker-danger); width:24px; height:24px; border-radius:50%; border:3px solid white; box-shadow:0 0 15px red; display:flex; align-items:center; justify-content:center;"><div style="width:8px; height:8px; background:white; border-radius:50%;"></div></div>`,
+            iconSize: [24, 24]
+        });
+        hazardMarker = L.marker([h.latitude, h.longitude], { icon: hazardIcon }).addTo(map).bindPopup("Hazard Location").openPopup();
+
+        // Worker Marker Setup (hidden initially)
+        const workerIcon = L.divIcon({
+            className: 'custom-worker-icon',
+            html: `<div id="workerMarkerDir" style="width: 28px; height: 28px; background: #3b82f6; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 15px rgba(59, 130, 246, 0.8); display: flex; align-items: center; justify-content: center; transform: rotate(0deg); transition: transform 0.4s ease-out;">
                 <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 10px solid white; margin-top: -14px;"></div>
              </div>`,
-      iconSize: [28, 28],
-      iconAnchor: [14, 14]
-    });
-    
-    // Accuracy Circle
-    accuracyCircle = L.circle([h.latitude, h.longitude], {
-        radius: 0,
-        fillColor: '#3b82f6',
-        fillOpacity: 0.15,
-        color: '#3b82f6',
-        weight: 1,
-        opacity: 0.3
-    }).addTo(map);
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+        });
 
-    workerMarker = L.marker([h.latitude, h.longitude], { icon: workerIcon }).addTo(map);
-    
-    // Details
-    document.getElementById('detDetect').textContent = new Date(h.created_at).toLocaleString();
-    
-    // Render timeline
-    renderTimeline(job);
-  }
-  
-  async function startNavigation() {
-      // Set status to Travelling
-      await fetch(`/api/worker/jobs/${currentJobId}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'Travelling' })
-      });
-      
-      startGpsTracking();
-      
-      // Update UI for KPI bar
-      document.getElementById('liveNavKpiBar').style.display = 'grid';
-      document.getElementById('mapControls').style.display = 'flex';
-      
-      // Hide old elements if they exist
-      if(document.getElementById('assignedRouteCard')) document.getElementById('assignedRouteCard').style.display = 'none';
-      if(document.getElementById('routeSummaryStrip')) document.getElementById('routeSummaryStrip').style.display = 'none';
-      
-      document.getElementById('startNavBtn').disabled = true;
-      document.getElementById('startNavBtn').innerHTML = '<i class="fa-solid fa-route"></i> Navigating...';
-  }
-  
-  function renderTimeline(job) {
-    const s = job.status;
-    const stages = ["Accepted", "Travelling", "Reached Site", "Repair Started", "Repair Completed", "Waiting Verification", "Completed"];
-    
-    // Map status if needed
-    let mappedStatus = s;
-    if(s === "Verified" || s === "Closed") mappedStatus = "Completed";
-    
-    let currentIndex = stages.indexOf(mappedStatus);
-    if(currentIndex === -1) {
-        // Fallback checks
-        if(s === "Needs Rework") currentIndex = stages.indexOf("Repair Started");
-        else currentIndex = 0;
+        // Accuracy Circle
+        accuracyCircle = L.circle([h.latitude, h.longitude], {
+            radius: 0,
+            fillColor: '#3b82f6',
+            fillOpacity: 0.15,
+            color: '#3b82f6',
+            weight: 1,
+            opacity: 0.3
+        }).addTo(map);
+
+        workerMarker = L.marker([h.latitude, h.longitude], { icon: workerIcon }).addTo(map);
+
+        // Details
+        document.getElementById('detDetect').textContent = new Date(h.created_at).toLocaleString();
+
+        // Render timeline
+        renderTimeline(job);
     }
-    
-    const tl = document.getElementById('timelineContainer');
-    tl.innerHTML = '';
-    
-    let html = '';
-    for (let i = 0; i < stages.length; i++) {
-      let stage = stages[i];
-      let itemClass = "";
-      let contentClass = "";
-      let meta = `<span>Pending</span>`;
-      let actionBtn = "";
-      
-      if (i < currentIndex) {
-        itemClass = "completed";
-        meta = `<span><i class="fa-solid fa-check"></i> Completed</span>`;
-      } else if (i === currentIndex) {
-        itemClass = "active";
-        contentClass = `style="border-color:var(--worker-accent-primary);"`;
-        meta = `<span><i class="fa-solid fa-spinner fa-spin"></i> In Progress</span>`;
-        
-        // Add action button for next step
-        if (stage === "Accepted") {
-          actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="startNavigation()"><i class="fa-solid fa-car"></i> Start Navigation</button></div>`;
-        } else if (stage === "Travelling") {
-          actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="handleReachedSite('${job.hazard_id}', ${job.hazard.latitude}, ${job.hazard.longitude}, this)"><i class="fa-solid fa-location-dot"></i> Mark as Reached Site</button></div>`;
-        } else if (stage === "Reached Site") {
-          if (job.verification_status === 'Before Photo Verified' || job.verification_status === 'Pending Admin Review') {
-             actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="updateStage('${job.hazard_id}', 'Repair Started', this)"><i class="fa-solid fa-play"></i> Start Repair</button></div>`;
-          } else {
-             actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="openCaptureModal('before', '${job.hazard_id}')"><i class="fa-solid fa-camera"></i> Open Live Camera</button></div>`;
-          }
-        } else if (stage === "Repair Started") {
-          actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="updateStage('${job.hazard_id}', 'Repair Completed', this)"><i class="fa-solid fa-check"></i> Complete Repair</button></div>`;
-        } else if (stage === "Repair Completed") {
-          actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="openCaptureModal('after', '${job.hazard_id}')"><i class="fa-solid fa-camera"></i> Capture Repair Result</button></div>`;
+
+    async function startNavigation() {
+        // Set status to Travelling
+        await fetch(`/api/worker/jobs/${currentJobId}/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'Travelling' })
+        });
+
+        startGpsTracking();
+
+        // Update UI for KPI bar
+        document.getElementById('liveNavKpiBar').style.display = 'grid';
+        document.getElementById('mapControls').style.display = 'flex';
+
+        // Hide old elements if they exist
+        if (document.getElementById('assignedRouteCard')) document.getElementById('assignedRouteCard').style.display = 'none';
+        if (document.getElementById('routeSummaryStrip')) document.getElementById('routeSummaryStrip').style.display = 'none';
+
+        document.getElementById('startNavBtn').disabled = true;
+        document.getElementById('startNavBtn').innerHTML = '<i class="fa-solid fa-route"></i> Navigating...';
+    }
+
+    function renderTimeline(job) {
+        const s = job.status;
+        const stages = ["Accepted", "Travelling", "Reached Site", "Repair Started", "Repair Completed", "Waiting Verification", "Completed"];
+
+        // Map status if needed
+        let mappedStatus = s;
+        if (s === "Verified" || s === "Closed") mappedStatus = "Completed";
+
+        let currentIndex = stages.indexOf(mappedStatus);
+        if (currentIndex === -1) {
+            // Fallback checks
+            if (s === "Needs Rework") currentIndex = stages.indexOf("Repair Started");
+            else currentIndex = 0;
         }
-      }
-      
-      html += `
+
+        const tl = document.getElementById('timelineContainer');
+        tl.innerHTML = '';
+
+        let html = '';
+        for (let i = 0; i < stages.length; i++) {
+            let stage = stages[i];
+            let itemClass = "";
+            let contentClass = "";
+            let meta = `<span>Pending</span>`;
+            let actionBtn = "";
+
+            if (i < currentIndex) {
+                itemClass = "completed";
+                meta = `<span><i class="fa-solid fa-check"></i> Completed</span>`;
+            } else if (i === currentIndex) {
+                itemClass = "active";
+                contentClass = `style="border-color:var(--worker-accent-primary);"`;
+                meta = `<span><i class="fa-solid fa-spinner fa-spin"></i> In Progress</span>`;
+
+                // Add action button for next step
+                if (stage === "Accepted") {
+                    actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="startNavigation()"><i class="fa-solid fa-car"></i> Start Navigation</button></div>`;
+                } else if (stage === "Travelling") {
+                    actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="handleReachedSite('${job.hazard_id}', ${job.hazard.latitude}, ${job.hazard.longitude}, this)"><i class="fa-solid fa-location-dot"></i> Mark as Reached Site</button></div>`;
+                } else if (stage === "Reached Site") {
+                    if (job.verification_status === 'Before Photo Verified' || job.verification_status === 'Pending Admin Review') {
+                        actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="updateStage('${job.hazard_id}', 'Repair Started', this)"><i class="fa-solid fa-play"></i> Start Repair</button></div>`;
+                    } else {
+                        actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="openCaptureModal('before', '${job.hazard_id}')"><i class="fa-solid fa-camera"></i> Open Live Camera</button></div>`;
+                    }
+                } else if (stage === "Repair Started") {
+                    actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="updateStage('${job.hazard_id}', 'Repair Completed', this)"><i class="fa-solid fa-check"></i> Complete Repair</button></div>`;
+                } else if (stage === "Repair Completed") {
+                    actionBtn = `<div class="wk-mt-4"><button class="wk-btn wk-btn-primary wk-btn-full" onclick="openCaptureModal('after', '${job.hazard_id}')"><i class="fa-solid fa-camera"></i> Capture Repair Result</button></div>`;
+                }
+            }
+
+            html += `
         <div class="wk-timeline-item ${itemClass}">
           <div class="wk-timeline-node"></div>
           <div class="wk-timeline-content" ${contentClass}>
-            <div class="wk-timeline-title" ${i===currentIndex ? 'style="color:var(--worker-accent-primary);"' : ''}>${stage}</div>
+            <div class="wk-timeline-title" ${i === currentIndex ? 'style="color:var(--worker-accent-primary);"' : ''}>${stage}</div>
             <div class="wk-timeline-meta">${meta}</div>
             ${actionBtn}
           </div>
         </div>
       `;
-    }
-    
-    tl.innerHTML = html;
-    
-    // Cancel button
-    const cancelBtn = document.getElementById('cancelBtnContainer');
-    if (currentIndex < stages.indexOf("Waiting Verification")) {
-      cancelBtn.innerHTML = `<button class="wk-btn wk-btn-outline wk-btn-full" style="color:var(--worker-danger); border-color:rgba(239, 68, 68, 0.3);" onclick="cancelJob('${job.hazard_id}')"><i class="fa-solid fa-xmark"></i> Cancel Job</button>`;
-    } else {
-      cancelBtn.innerHTML = '';
-    }
-  }
-  
-  function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-    var R = 6371; 
-    var dLat = (lat2-lat1) * (Math.PI/180);
-    var dLon = (lon2-lon1) * (Math.PI/180); 
-    var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) * 
-            Math.sin(dLon/2) * Math.sin(dLon/2); 
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-    return R * c; 
-  }
-
-  async function handleReachedSite(jobId, hazardLat, hazardLon, btn) {
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Validating GPS...`;
-    
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(async (position) => {
-        const workerLat = position.coords.latitude;
-        const workerLon = position.coords.longitude;
-        const distKm = getDistanceFromLatLonInKm(workerLat, workerLon, hazardLat, hazardLon);
-        const distMeters = distKm * 1000;
-        
-        console.log(`Worker is ${distMeters.toFixed(2)} meters from hazard`);
-        
-        // Use 50m for testing leniency, ideally 30m
-        if (distMeters <= 50 || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-           updateStage(jobId, 'Reached Site', btn);
-        } else {
-           await window.showError('GPS Validation Failed', `You are ${distMeters.toFixed(0)} meters away from the repair location. You must be within 50 meters to start work.`);
-           btn.innerHTML = `<i class="fa-solid fa-location-dot"></i> Mark as Reached Site`;
         }
-      }, async (error) => {
-        await window.showError('GPS Error', "Could not get your location. " + error.message);
-        btn.innerHTML = `<i class="fa-solid fa-location-dot"></i> Mark as Reached Site`;
-      });
-    } else {
-      await window.showError('Unsupported', "Geolocation is not supported by your browser.");
-      btn.innerHTML = `<i class="fa-solid fa-location-dot"></i> Mark as Reached Site`;
-    }
-  }
-  
-  async function updateStage(jobId, newStatus, btn) {
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processing...`;
-    console.log("Updating hazard", jobId, "to", newStatus);
-    try {
-      const res = await fetch(`/api/worker/jobs/${jobId}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      });
-      if(res.ok) {
-        window.location.reload();
-      } else {
-        await window.showError('Error', "Failed to update status");
-        btn.innerHTML = `Retry`;
-      }
-    } catch(e) {
-      console.error(e);
-      btn.innerHTML = `Retry`;
-    }
-  }
-  
-  async function cancelJob(jobId) {
-    const reason = await window.showPrompt({
-      title: 'Cancel Job',
-      message: 'Enter cancellation reason:',
-      inputType: 'text',
-      confirmText: 'Submit',
-      cancelText: 'Cancel'
-    });
-    
-    if (!reason) return;
-    
-    try {
-      const res = await fetch(`/api/worker/jobs/${jobId}/cancel`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: reason })
-      });
-      if(res.ok) {
-        await window.showSuccess('Cancelled', 'Job cancelled successfully.');
-        window.location.href = '/worker/available-jobs';
-      } else {
-        let data = await res.json();
-        if (data && data.success !== undefined) data = data.data;
-        await window.showError('Error', data.error || "Failed to cancel.");
-      }
-    } catch(e) {
-      console.error(e);
-      await window.showError('Error', 'Network Error');
-    }
-  }
 
-  
-  // --- Live Camera WebRTC & Geofence Logic ---
-  let captureWatchId = null;
-  let cameraUnlocked = false;
+        tl.innerHTML = html;
 
-  async function openCaptureModal(type, jobId) {
-    document.getElementById('captureModal').style.display = 'flex';
-    document.getElementById('captureType').value = type;
-    document.getElementById('captureJobId').value = jobId;
-    document.getElementById('captureModalTitle').textContent = type === 'before' ? 'Site Verification - Before' : 'Site Verification - After';
-    
-    document.getElementById('imagePreview').style.display = 'none';
-    document.getElementById('cameraStream').style.display = 'block';
-    document.getElementById('retakeBtn').style.display = 'none';
-    
-    document.getElementById('liveHazardId').textContent = "JOB-" + jobId;
-    
-    const capBtn = document.getElementById('captureBtn');
-    capBtn.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Open Live Camera</span>`;
-    capBtn.disabled = true;
-    capBtn.classList.remove('btn-captured');
-    capBtn.onclick = null;
-
-    document.getElementById('cameraOverlay').style.opacity = "1";
-    document.getElementById('cameraOverlay').style.display = "flex";
-    
-    cameraUnlocked = false;
-
-    if (!("geolocation" in navigator)) {
-        document.getElementById('liveDistance').textContent = "GPS Unavailable";
-        document.getElementById('liveStatusMsg').textContent = "Geolocation is not supported by your browser.";
-        return;
+        // Cancel button
+        const cancelBtn = document.getElementById('cancelBtnContainer');
+        if (currentIndex < stages.indexOf("Waiting Verification")) {
+            cancelBtn.innerHTML = `<button class="wk-btn wk-btn-outline wk-btn-full" style="color:var(--worker-danger); border-color:rgba(239, 68, 68, 0.3);" onclick="cancelJob('${job.hazard_id}')"><i class="fa-solid fa-xmark"></i> Cancel Job</button>`;
+        } else {
+            cancelBtn.innerHTML = '';
+        }
     }
 
-    document.getElementById('liveStatusMsg').textContent = "Waiting for GPS...";
-    document.getElementById('liveStatusTitle').textContent = "Initializing GPS...";
-    document.getElementById('liveStatusIcon').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-    document.getElementById('liveStatusIcon').style.color = "white";
-    
-    captureWatchId = navigator.geolocation.watchPosition((pos) => {
-        const workerLat = pos.coords.latitude;
-        const workerLon = pos.coords.longitude;
-        const acc = pos.coords.accuracy;
-        const speed = pos.coords.speed;
-        const heading = pos.coords.heading;
-        
-        const dist = getDistance(workerLat, workerLon, currentHazardLat, currentHazardLon);
-        
-        updateVerificationUI(dist, acc, workerLat, workerLon, speed, heading);
-        
-    }, (err) => {
-        document.getElementById('liveStatusMsg').textContent = "Unable to fetch GPS. " + err.message;
-        document.getElementById('liveDistance').textContent = "--";
-    }, {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 5000
-    });
-  }
-
-  function updateVerificationUI(distMeters, accMeters, lat, lon, speed, heading) {
-      const liveDistEl = document.getElementById('liveDistance');
-      const liveAccEl = document.getElementById('liveAccuracy');
-      const liveCoordsEl = document.getElementById('liveCoords');
-      const liveSignalEl = document.getElementById('liveSignal');
-      const liveUpdatedEl = document.getElementById('liveUpdated');
-      
-      const pb = document.getElementById('liveProgressBar');
-      const pText = document.getElementById('liveProgressText');
-      const statusIcon = document.getElementById('liveStatusIcon');
-      const statusTitle = document.getElementById('liveStatusTitle');
-      const statusMsg = document.getElementById('liveStatusMsg');
-      const capBtn = document.getElementById('captureBtn');
-      
-      const overlay = document.getElementById('cameraOverlay');
-      const lockIcon = document.getElementById('cameraLockIcon');
-      const overlayText = document.getElementById('cameraOverlayText');
-      const overlaySubtext = document.getElementById('cameraOverlaySubtext');
-  
-      let distStr = "";
-      if (distMeters < 1000) {
-          distStr = distMeters.toFixed(0) + " m";
-      } else {
-          distStr = (distMeters / 1000).toFixed(1) + " km";
-      }
-      liveDistEl.textContent = distStr;
-      liveAccEl.textContent = "±" + accMeters.toFixed(0) + " m";
-      liveCoordsEl.textContent = lat.toFixed(6) + ", " + lon.toFixed(6);
-      
-      if (accMeters <= 10) {
-          liveSignalEl.innerHTML = '<span style="color:#22c55e;">Excellent</span>';
-      } else if (accMeters <= 30) {
-          liveSignalEl.innerHTML = '<span style="color:#f59e0b;">Good</span>';
-      } else {
-          liveSignalEl.innerHTML = '<span style="color:#ef4444;">Weak</span>';
-      }
-      
-      liveUpdatedEl.textContent = "Just now";
-      
-      let maxDistForBar = 500;
-      let progressPct = 0;
-      if (distMeters <= maxDistForBar) {
-          progressPct = ((maxDistForBar - distMeters) / maxDistForBar) * 100;
-      }
-      
-      if (distMeters > 100) {
-          liveDistEl.style.color = "#ef4444";
-          pb.style.width = Math.max(5, progressPct) + "%";
-          pb.style.background = "#ef4444";
-          pText.textContent = distStr + " Remaining";
-          
-          statusIcon.innerHTML = '🚫';
-          statusIcon.style.color = "#ef4444";
-          statusTitle.textContent = "Outside Work Zone";
-          statusTitle.style.color = "#ef4444";
-          statusMsg.textContent = "Move closer to the assigned hazard. Camera will unlock automatically.";
-          
-          if (cameraUnlocked) {
-              cameraUnlocked = false;
-              capBtn.disabled = true;
-              capBtn.classList.remove('btn-captured');
-              capBtn.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Open Live Camera</span>`;
-              capBtn.onclick = null;
-              
-              overlay.style.opacity = "1";
-              setTimeout(() => { overlay.style.display = "flex"; }, 10);
-              lockIcon.className = "fa-solid fa-lock";
-              lockIcon.style.color = "#64748b";
-              overlayText.textContent = "Camera Locked";
-              overlaySubtext.textContent = "Move closer to unlock";
-              
-              stopCamera();
-          }
-          
-      } else if (distMeters > 50 && distMeters <= 100) {
-          liveDistEl.style.color = "#f59e0b";
-          pb.style.width = progressPct + "%";
-          pb.style.background = "#f59e0b";
-          pText.textContent = distStr + " Remaining";
-          
-          statusIcon.innerHTML = '🟠';
-          statusIcon.style.color = "#f59e0b";
-          statusTitle.textContent = "Approaching Site";
-          statusTitle.style.color = "#f59e0b";
-          statusMsg.textContent = "Almost there. Continue walking.";
-          
-          if (cameraUnlocked) {
-              cameraUnlocked = false;
-              capBtn.disabled = true;
-              capBtn.classList.remove('btn-captured');
-              capBtn.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Open Live Camera</span>`;
-              capBtn.onclick = null;
-              
-              overlay.style.opacity = "1";
-              setTimeout(() => { overlay.style.display = "flex"; }, 10);
-              lockIcon.className = "fa-solid fa-lock";
-              lockIcon.style.color = "#64748b";
-              overlayText.textContent = "Camera Locked";
-              overlaySubtext.textContent = "Move closer to unlock";
-              
-              stopCamera();
-          }
-  
-      } else {
-          liveDistEl.style.color = "#22c55e";
-          pb.style.width = "100%";
-          pb.style.background = "#22c55e";
-          pText.textContent = "Arrived";
-          
-          statusIcon.innerHTML = '✅';
-          statusIcon.style.color = "#22c55e";
-          statusTitle.textContent = "Within Geofence";
-          statusTitle.style.color = "#22c55e";
-          statusMsg.textContent = "You have reached the work site. Camera unlocked.";
-          
-          if (!cameraUnlocked) {
-              cameraUnlocked = true;
-              
-              lockIcon.className = "fa-solid fa-lock-open";
-              lockIcon.style.color = "#22c55e";
-              lockIcon.style.transform = "scale(1.2)";
-              overlayText.textContent = "Unlocking...";
-              overlaySubtext.textContent = "";
-              
-              setTimeout(() => {
-                  overlay.style.opacity = "0";
-                  setTimeout(() => { overlay.style.display = "none"; }, 500);
-                  
-                  capBtn.disabled = false;
-                  capBtn.innerHTML = `<i class="fa-solid fa-camera"></i> <span>Capture Photo</span>`;
-                  capBtn.onclick = takePhoto;
-                  
-                  startWebRTC();
-              }, 800);
-          }
-      }
-  }
-
-  async function startWebRTC() {
-      try {
-          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-              throw new Error("Browser does not support live camera.");
-          }
-          
-          videoStream = await navigator.mediaDevices.getUserMedia({
-              video: { facingMode: 'environment' },
-              audio: false
-          });
-          
-          const video = document.getElementById('cameraStream');
-          video.style.display = 'block';
-          video.srcObject = videoStream;
-          video.play();
-      } catch (err) {
-          const overlay = document.getElementById('cameraOverlay');
-          overlay.style.opacity = "1";
-          overlay.style.display = 'flex';
-          overlay.innerHTML = `<i class="fa-solid fa-video-slash" style="font-size:3rem; color:#ef4444; margin-bottom:16px;"></i><p style="color:white; font-weight:600; font-size:1.1rem;">Camera access denied</p><p style="color:#94a3b8; font-size:0.85rem; margin-top:8px;">${err.message}</p>`;
-          
-          const capBtn = document.getElementById('captureBtn');
-          capBtn.disabled = true;
-          capBtn.classList.remove('btn-captured');
-          capBtn.innerHTML = `<i class="fa-solid fa-video-slash"></i> <span>Camera Error</span>`;
-      }
-  }
-  
-  function closeCaptureModal() {
-    document.getElementById('captureModal').style.display = 'none';
-    if (captureWatchId) {
-        navigator.geolocation.clearWatch(captureWatchId);
-        captureWatchId = null;
+    function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+        var R = 6371;
+        var dLat = (lat2 - lat1) * (Math.PI / 180);
+        var dLon = (lon2 - lon1) * (Math.PI / 180);
+        var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
     }
-    stopCamera();
-  }
-  
-  function stopCamera() {
-      if (videoStream) {
-          videoStream.getTracks().forEach(track => track.stop());
-          videoStream = null;
-      }
-  }
-  
-  function takePhoto() {
-      const capBtn = document.getElementById('captureBtn');
-      capBtn.disabled = true;
-      capBtn.classList.remove('btn-captured');
-      capBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Capturing...</span>`;
-      
-      // Request frame to let the button style paint before blocking main thread
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const video = document.getElementById('cameraStream');
-          const canvas = document.getElementById('cameraCanvas');
-          
-          // 1. Capture IMMEDIATELY
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          const ctx = canvas.getContext('2d', { alpha: false });
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          
-          // 2. Display preview IMMEDIATELY
-          document.getElementById('imagePreview').src = canvas.toDataURL('image/jpeg', 0.85);
-          document.getElementById('imagePreview').style.display = 'block';
-          video.style.display = 'none';
-          document.getElementById('retakeBtn').style.display = 'none'; 
-          
-          // Success UI on Button
-          capBtn.classList.add('btn-captured');
-          capBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Photo Captured</span>`;
-          
-          // Freeze hardware camera
-          stopCamera();
-          
-          // Briefly delay showing the AI overlay so the worker sees the success button
-          setTimeout(() => {
-              document.getElementById('aiLoadingOverlay').style.display = 'flex';
-              
-              // 5. Asynchronously process Blob and Telemetry without blocking the UI thread
-              canvas.toBlob((blob) => {
-                  capturedBlob = blob;
-                  
-                  captureTelemetry = null;
-                  if ("geolocation" in navigator) {
-                      navigator.geolocation.getCurrentPosition(pos => {
-                          captureTelemetry = {
-                              lat: pos.coords.latitude,
-                              lon: pos.coords.longitude,
-                              acc: pos.coords.accuracy,
-                              speed: pos.coords.speed || 0,
-                              heading: pos.coords.heading || 0,
-                              time: Date.now()
-                          };
-                          submitPhoto();
-                      }, err => {
-                          console.warn("Telemetry fallback", err);
-                          captureTelemetry = { time: Date.now() };
-                          submitPhoto();
-                      }, { enableHighAccuracy: true, timeout: 5000 });
-                  } else {
-                      captureTelemetry = { time: Date.now() };
-                      submitPhoto();
-                  }
-              }, 'image/jpeg', 0.85);
-          }, 350);
+
+    async function handleReachedSite(jobId, hazardLat, hazardLon, btn) {
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Validating GPS...`;
+
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const workerLat = position.coords.latitude;
+                const workerLon = position.coords.longitude;
+                const distKm = getDistanceFromLatLonInKm(workerLat, workerLon, hazardLat, hazardLon);
+                const distMeters = distKm * 1000;
+
+                console.log(`Worker is ${distMeters.toFixed(2)} meters from hazard`);
+
+                // Use 50m for testing leniency, ideally 30m
+                if (distMeters <= 50 || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    updateStage(jobId, 'Reached Site', btn);
+                } else {
+                    await window.showError('GPS Validation Failed', `You are ${distMeters.toFixed(0)} meters away from the repair location. You must be within 50 meters to start work.`);
+                    btn.innerHTML = `<i class="fa-solid fa-location-dot"></i> Mark as Reached Site`;
+                }
+            }, async (error) => {
+                await window.showError('GPS Error', "Could not get your location. " + error.message);
+                btn.innerHTML = `<i class="fa-solid fa-location-dot"></i> Mark as Reached Site`;
+            });
+        } else {
+            await window.showError('Unsupported', "Geolocation is not supported by your browser.");
+            btn.innerHTML = `<i class="fa-solid fa-location-dot"></i> Mark as Reached Site`;
+        }
+    }
+
+    async function updateStage(jobId, newStatus, btn) {
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processing...`;
+        console.log("Updating hazard", jobId, "to", newStatus);
+        try {
+            const res = await fetch(`/api/worker/jobs/${jobId}/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            if (res.ok) {
+                window.location.reload();
+            } else {
+                await window.showError('Error', "Failed to update status");
+                btn.innerHTML = `Retry`;
+            }
+        } catch (e) {
+            console.error(e);
+            btn.innerHTML = `Retry`;
+        }
+    }
+
+    async function cancelJob(jobId) {
+        const reason = await window.showPrompt({
+            title: 'Cancel Job',
+            message: 'Enter cancellation reason:',
+            inputType: 'text',
+            confirmText: 'Submit',
+            cancelText: 'Cancel'
         });
-      });
-  }
-  
-  function retakePhoto() {
-      capturedBlob = null;
-      document.getElementById('imagePreview').style.display = 'none';
-      document.getElementById('captureBtn').style.display = 'block';
-      document.getElementById('retakeBtn').style.display = 'none';
-      openCaptureModal(document.getElementById('captureType').value, document.getElementById('captureJobId').value);
-  }
-  
-  async function submitPhoto() {
-    if (!capturedBlob) return;
-    
-    const type = document.getElementById('captureType').value;
-    const jobId = document.getElementById('captureJobId').value;
-    
-    document.getElementById('aiLoadingOverlay').style.display = 'flex';
-    
-    const formData = new FormData();
-    formData.append('photo', capturedBlob, `live_capture_${Date.now()}.jpg`);
-    formData.append('type', type);
-    
-    if (captureTelemetry && captureTelemetry.lat) {
-      formData.append('lat', captureTelemetry.lat);
-      formData.append('lon', captureTelemetry.lon);
-      formData.append('accuracy', captureTelemetry.acc);
-      formData.append('timestamp', captureTelemetry.time);
-    } else {
-      formData.append('timestamp', Date.now());
-    }
-    
-    try {
-      const res = await fetch(`/api/worker/jobs/${jobId}/upload-photo`, {
-        method: 'POST',
-        body: formData
-      });
-      let data = await res.json();
-      
-      document.getElementById('aiLoadingOverlay').style.display = 'none';
-      closeCaptureModal();
-      
-      if (res.ok && data.success) {
-        await window.showSuccess('Verification Passed', data.message || "AI Verification completed successfully.");
-        if (type === 'after') {
-           window.location.href = '/worker/available-jobs';
-        } else {
-           window.location.reload();
+
+        if (!reason) return;
+
+        try {
+            const res = await fetch(`/api/worker/jobs/${jobId}/cancel`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: reason })
+            });
+            if (res.ok) {
+                await window.showSuccess('Cancelled', 'Job cancelled successfully.');
+                window.location.href = '/worker/available-jobs';
+            } else {
+                let data = await res.json();
+                if (data && data.success !== undefined) data = data.data;
+                await window.showError('Error', data.error || "Failed to cancel.");
+            }
+        } catch (e) {
+            console.error(e);
+            await window.showError('Error', 'Network Error');
         }
-      } else {
-        await window.showError('Verification Failed', data.message || (data.verification ? data.verification.message : "Image could not be verified."));
-      }
-    } catch(e) {
-      document.getElementById('aiLoadingOverlay').style.display = 'none';
-      await window.showError('Error', 'Network or server error during upload.');
     }
-  }
 
-  // --- GPS Tracking and Telemetry ---
-  
-  function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371e3; // metres
-    const φ1 = lat1 * Math.PI/180;
-    const φ2 = lat2 * Math.PI/180;
-    const Δφ = (lat2-lat1) * Math.PI/180;
-    const Δλ = (lon2-lon1) * Math.PI/180;
-    
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    
-    return R * c; // in metres
-  }
-  
-  function getBearing(startLat, startLng, destLat, destLng) {
-    const startLatRad = (startLat * Math.PI) / 180;
-    const startLngRad = (startLng * Math.PI) / 180;
-    const destLatRad = (destLat * Math.PI) / 180;
-    const destLngRad = (destLng * Math.PI) / 180;
-  
-    const y = Math.sin(destLngRad - startLngRad) * Math.cos(destLatRad);
-    const x = Math.cos(startLatRad) * Math.sin(destLatRad) - Math.sin(startLatRad) * Math.cos(destLatRad) * Math.cos(destLngRad - startLngRad);
-  
-    let brng = Math.atan2(y, x);
-    brng = (brng * 180) / Math.PI;
-    return (brng + 360) % 360;
-  }
-  
-  function centerOnWorker() {
-      if (workerMarker && map) {
-          map.setView(workerMarker.getLatLng(), 17, { animate: true, duration: 1 });
-      }
-  }
-  
-  function fitRouteBounds() {
-      if (workerMarker && hazardMarker && map) {
-          const group = new L.featureGroup([workerMarker, hazardMarker]);
-          map.fitBounds(group.getBounds(), { padding: [50, 50], animate: true, duration: 1 });
-      }
-  }
-  
-  let routingControl = null;
-  let lastRouteUpdate = 0;
-  let lastWaypointLat = null;
-  let lastWaypointLon = null;
-  let lastGpsTime = null;
 
-  function startGpsTracking() {
-      if (watchId) return; // already tracking
-      
-      if (!("geolocation" in navigator)) {
-          window.showError('Error', 'Geolocation is not supported by your browser.');
-          return;
-      }
-      
-      // Update telemetry every 5 seconds
-      setInterval(() => {
-          if (!workerMarker || !currentJobId) return;
-          const pos = workerMarker.getLatLng();
-          fetch(`/api/worker/jobs/${currentJobId}/location`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ lat: pos.lat, lon: pos.lng })
-          }).catch(console.error);
-      }, 5000);
-      
-      let hasArrived = false;
-      
-      watchId = navigator.geolocation.watchPosition((position) => {
-          const lat = position.coords.latitude;
-          const lon = position.coords.longitude;
-          const acc = position.coords.accuracy;
-          let speed = position.coords.speed;
-          
-          workerMarker.setLatLng([lat, lon]);
-          accuracyCircle.setLatLng([lat, lon]);
-          accuracyCircle.setRadius(acc);
-          
-          if (document.getElementById('navAcc')) document.getElementById('navAcc').textContent = acc.toFixed(0) + ' m';
-          
-          const now = Date.now();
-          
-          // Calculate manual speed if browser doesn't provide it
-          let kmh = 0;
-          if (speed != null && speed > 0) {
-              kmh = speed * 3.6;
-          } else if (lastWaypointLat != null && lastGpsTime != null) {
-              const distSinceLast = getDistance(lastWaypointLat, lastWaypointLon, lat, lon);
-              const timeDiffSeconds = (now - lastGpsTime) / 1000;
-              if (timeDiffSeconds > 0) {
-                  kmh = (distSinceLast / timeDiffSeconds) * 3.6;
-              }
-          }
-          
-          if (document.getElementById('navSpeed')) document.getElementById('navSpeed').textContent = kmh > 0 ? kmh.toFixed(0) + ' km/h' : '--';
-          
-          // Smooth rotation logic
-          let currentHeading = 0;
-          if (position.coords.heading !== null && !isNaN(position.coords.heading)) {
-              currentHeading = position.coords.heading;
-          } else if (lastWaypointLat != null && lastWaypointLon != null) {
-              currentHeading = getBearing(lastWaypointLat, lastWaypointLon, lat, lon);
-          }
-          
-          const markerDirEl = document.getElementById('workerMarkerDir');
-          if (markerDirEl && kmh > 1) {
-              markerDirEl.style.transform = `rotate(${currentHeading}deg)`;
-          }
+    // --- Live Camera WebRTC & Geofence Logic ---
+    let captureWatchId = null;
+    let cameraUnlocked = false;
 
-          lastGpsTime = now;
-          
-          // Debounce OSRM routing requests
-          let shouldRoute = false;
-          
-          if (!routingControl) {
-              shouldRoute = true;
-          } else {
-              const distanceFromLast = getDistance(lat, lon, lastWaypointLat, lastWaypointLon);
-              // Route if moved more than 10m or 5 seconds elapsed
-              if (distanceFromLast > 10 || (now - lastRouteUpdate > 5000)) {
-                  shouldRoute = true;
-              }
-          }
-          
-          if (shouldRoute) {
-              lastRouteUpdate = now;
-              lastWaypointLat = lat;
-              lastWaypointLon = lon;
-              
-              if (!routingControl) {
-                  routingControl = L.Routing.control({
-                      waypoints: [
-                          L.latLng(lat, lon),
-                          L.latLng(currentHazardLat, currentHazardLon)
-                      ],
-                      router: L.Routing.osrmv1({
-                          serviceUrl: 'https://router.project-osrm.org/route/v1'
-                      }),
-                      addWaypoints: false,
-                      routeWhileDragging: false,
-                      show: false,
-                      fitSelectedRoutes: true,
-                      lineOptions: {
-                          styles: [{ color: '#3b82f6', opacity: 0.8, weight: 6 }]
-                      },
-                      createMarker: function() { return null; } // Don't duplicate markers
-                  }).addTo(map);
-                  
-                  routingControl.on('routesfound', function(e) {
-                      const routes = e.routes;
-                      const summary = routes[0].summary;
-                      
-                      const totalMeters = summary.totalDistance;
-                      const mins = Math.ceil(summary.totalTime / 60);
-                      const distText = totalMeters > 1000 ? (totalMeters / 1000).toFixed(1) + ' km' : totalMeters.toFixed(0) + ' m';
-                      
-                      let etaText = '45 sec';
-                      if (mins >= 60) {
-                          const hrs = Math.floor(mins / 60);
-                          const remMins = mins % 60;
-                          etaText = hrs + ' hr ' + (remMins > 0 ? remMins + ' min' : '');
-                      } else if (mins > 0) {
-                          etaText = mins + ' min';
-                      }
-                      
-                      document.getElementById('kpiEta').textContent = etaText;
-                      document.getElementById('kpiDist').textContent = distText;
-                      
-                      // Update old UI tags silently if they exist
-                      if (document.getElementById('navDist')) document.getElementById('navDist').textContent = distText;
-                      if (document.getElementById('navEta')) document.getElementById('navEta').textContent = etaText;
-                      if (document.getElementById('uiTotalDist')) document.getElementById('uiTotalDist').textContent = distText;
-                      if (document.getElementById('uiTravelTime')) document.getElementById('uiTravelTime').textContent = etaText;
-                      if (document.getElementById('stripTotalDist')) document.getElementById('stripTotalDist').textContent = distText;
-                      if (document.getElementById('stripEta')) document.getElementById('stripEta').textContent = etaText;
-                      if (document.getElementById('stripRemaining')) document.getElementById('stripRemaining').textContent = distText;
-                      
-                      currentDistanceMeters = totalMeters; // Store for Geofence
-                      
-                      // Navigation Status Logic
-                      let statusText = "Travelling";
-                      let statusColor = "#3b82f6";
-                      if (totalMeters <= 50) {
-                          statusText = "Reached Destination";
-                          statusColor = "#22c55e";
-                      } else if (totalMeters <= 200) {
-                          statusText = "Approaching Destination";
-                          statusColor = "#f59e0b";
-                      }
-                      
-                      document.getElementById('kpiStatus').textContent = statusText;
-                      document.getElementById('kpiStatus').style.color = statusColor;
-                      
-                      // Auto-Arrival Geofencing (100 meters)
-                      if (totalMeters <= 100 && !hasArrived) {
-                          hasArrived = true;
-                          document.getElementById('kpiStatus').textContent = "Navigation Complete";
-                          document.getElementById('kpiStatus').style.color = "#22c55e";
-                          
-                          // 1. Send API request in background
-                          fetch(`/api/worker/jobs/${currentJobId}/status`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ status: 'Reached Site' })
-                          }).then(() => {
-                              // Re-render timeline to unlock camera button seamlessly
-                              fetch('/api/worker/active-job').then(r=>r.json()).then(d=>{ 
-                                  if(d.data) renderTimeline(d.data); 
-                                  else if(d.hazard_id) renderTimeline(d); 
-                              });
-                          });
-                          
-                          // 2. Show inline success banner smoothly
-                          const banner = document.createElement('div');
-                          banner.innerHTML = `<div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.4); padding: 12px 16px; border-radius: 12px; color: #4ade80; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; animation: fadeInScale 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+    async function openCaptureModal(type, jobId) {
+        document.getElementById('captureModal').style.display = 'flex';
+        document.getElementById('captureType').value = type;
+        document.getElementById('captureJobId').value = jobId;
+        document.getElementById('captureModalTitle').textContent = type === 'before' ? 'Site Verification - Before' : 'Site Verification - After';
+
+        // Reset rejection card state — always hide it on (re)open
+        const rejCard = document.getElementById('rejectionCard');
+        if (rejCard) rejCard.style.display = 'none';
+        // Restore camera and GPS sections
+        const verCard = document.getElementById('verificationCard');
+        if (verCard) verCard.style.display = 'block';
+        const camSection = document.querySelector('#captureModal [style*="margin-bottom: 24px"]');
+        // Show the camera div wrapper (parent of matchScoreContainer)
+        const matchScoreContainer = document.getElementById('matchScoreContainer');
+        if (matchScoreContainer && matchScoreContainer.parentElement) {
+            matchScoreContainer.parentElement.style.display = 'block';
+        }
+
+        // Position Lock UI
+        const scoreContainer = document.getElementById('matchScoreContainer');
+        if (scoreContainer) scoreContainer.style.display = (type === 'after') ? 'block' : 'none';
+        if (type === 'after') {
+            const prevPhoto = localStorage.getItem('beforePhoto_' + jobId);
+            if (prevPhoto) {
+                const overlayImg = document.getElementById('cameraOverlayImage');
+                if (overlayImg) {
+                    overlayImg.src = prevPhoto;
+                    overlayImg.style.display = 'block';
+                }
+            }
+        } else {
+            const overlayImg = document.getElementById('cameraOverlayImage');
+            if (overlayImg) overlayImg.style.display = 'none';
+        }
+
+        document.getElementById('imagePreview').style.display = 'none';
+        document.getElementById('cameraStream').style.display = 'block';
+        document.getElementById('retakeBtn').style.display = 'none';
+
+        document.getElementById('liveHazardId').textContent = "JOB-" + jobId;
+
+        const capBtn = document.getElementById('captureBtn');
+        capBtn.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Open Live Camera</span>`;
+        capBtn.disabled = true;
+        capBtn.classList.remove('btn-captured');
+        capBtn.onclick = null;
+
+        document.getElementById('cameraOverlay').style.opacity = "1";
+        document.getElementById('cameraOverlay').style.display = "flex";
+
+        cameraUnlocked = false;
+
+        if (!("geolocation" in navigator)) {
+            document.getElementById('liveDistance').textContent = "GPS Unavailable";
+            document.getElementById('liveStatusMsg').textContent = "Geolocation is not supported by your browser.";
+            return;
+        }
+
+        document.getElementById('liveStatusMsg').textContent = "Waiting for GPS...";
+        document.getElementById('liveStatusTitle').textContent = "Initializing GPS...";
+        document.getElementById('liveStatusIcon').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        document.getElementById('liveStatusIcon').style.color = "white";
+
+        captureWatchId = navigator.geolocation.watchPosition((pos) => {
+            const workerLat = pos.coords.latitude;
+            const workerLon = pos.coords.longitude;
+            const acc = pos.coords.accuracy;
+            const speed = pos.coords.speed;
+            const heading = pos.coords.heading;
+
+            const dist = getDistanceFromLatLonInKm(workerLat, workerLon, currentHazardLat, currentHazardLon) * 1000;
+
+            updateVerificationUI(dist, acc, workerLat, workerLon, speed, heading);
+
+        }, (err) => {
+            document.getElementById('liveStatusMsg').textContent = "Unable to fetch GPS. " + err.message;
+            document.getElementById('liveDistance').textContent = "--";
+        }, {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 5000
+        });
+    }
+
+    function updateVerificationUI(distMeters, accMeters, lat, lon, speed, heading) {
+        const liveDistEl = document.getElementById('liveDistance');
+        const liveAccEl = document.getElementById('liveAccuracy');
+        const liveCoordsEl = document.getElementById('liveCoords');
+        const liveSignalEl = document.getElementById('liveSignal');
+        const liveUpdatedEl = document.getElementById('liveUpdated');
+
+        const pb = document.getElementById('liveProgressBar');
+        const pText = document.getElementById('liveProgressText');
+        const statusIcon = document.getElementById('liveStatusIcon');
+        const statusTitle = document.getElementById('liveStatusTitle');
+        const statusMsg = document.getElementById('liveStatusMsg');
+        const capBtn = document.getElementById('captureBtn');
+
+        const overlay = document.getElementById('cameraOverlay');
+        const lockIcon = document.getElementById('cameraLockIcon');
+        const overlayText = document.getElementById('cameraOverlayText');
+        const overlaySubtext = document.getElementById('cameraOverlaySubtext');
+
+        let distStr = "";
+        if (distMeters < 1000) {
+            distStr = distMeters.toFixed(0) + " m";
+        } else {
+            distStr = (distMeters / 1000).toFixed(1) + " km";
+        }
+        liveDistEl.textContent = distStr;
+        liveAccEl.textContent = "±" + accMeters.toFixed(0) + " m";
+        liveCoordsEl.textContent = lat.toFixed(6) + ", " + lon.toFixed(6);
+
+        if (accMeters <= 10) {
+            liveSignalEl.innerHTML = '<span style="color:#22c55e;">Excellent</span>';
+        } else if (accMeters <= 30) {
+            liveSignalEl.innerHTML = '<span style="color:#f59e0b;">Good</span>';
+        } else {
+            liveSignalEl.innerHTML = '<span style="color:#ef4444;">Weak</span>';
+        }
+
+        liveUpdatedEl.textContent = "Just now";
+
+        let maxDistForBar = 500;
+        let progressPct = 0;
+        if (distMeters <= maxDistForBar) {
+            progressPct = ((maxDistForBar - distMeters) / maxDistForBar) * 100;
+        }
+
+        if (distMeters > 100) {
+            liveDistEl.style.color = "#ef4444";
+            pb.style.width = Math.max(5, progressPct) + "%";
+            pb.style.background = "#ef4444";
+            pText.textContent = distStr + " Remaining";
+
+            statusIcon.innerHTML = '🚫';
+            statusIcon.style.color = "#ef4444";
+            statusTitle.textContent = "Outside Work Zone";
+            statusTitle.style.color = "#ef4444";
+            statusMsg.textContent = "Move closer to the assigned hazard. Camera will unlock automatically.";
+
+            if (cameraUnlocked) {
+                cameraUnlocked = false;
+                capBtn.disabled = true;
+                capBtn.classList.remove('btn-captured');
+                capBtn.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Open Live Camera</span>`;
+                capBtn.onclick = null;
+
+                overlay.style.opacity = "1";
+                setTimeout(() => { overlay.style.display = "flex"; }, 10);
+                lockIcon.className = "fa-solid fa-lock";
+                lockIcon.style.color = "#64748b";
+                overlayText.textContent = "Camera Locked";
+                overlaySubtext.textContent = "Move closer to unlock";
+
+                stopCamera();
+            }
+
+        } else if (distMeters > 50 && distMeters <= 100) {
+            liveDistEl.style.color = "#f59e0b";
+            pb.style.width = progressPct + "%";
+            pb.style.background = "#f59e0b";
+            pText.textContent = distStr + " Remaining";
+
+            statusIcon.innerHTML = '🟠';
+            statusIcon.style.color = "#f59e0b";
+            statusTitle.textContent = "Approaching Site";
+            statusTitle.style.color = "#f59e0b";
+            statusMsg.textContent = "Almost there. Continue walking.";
+
+            if (cameraUnlocked) {
+                cameraUnlocked = false;
+                capBtn.disabled = true;
+                capBtn.classList.remove('btn-captured');
+                capBtn.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Open Live Camera</span>`;
+                capBtn.onclick = null;
+
+                overlay.style.opacity = "1";
+                setTimeout(() => { overlay.style.display = "flex"; }, 10);
+                lockIcon.className = "fa-solid fa-lock";
+                lockIcon.style.color = "#64748b";
+                overlayText.textContent = "Camera Locked";
+                overlaySubtext.textContent = "Move closer to unlock";
+
+                stopCamera();
+            }
+
+        } else {
+            liveDistEl.style.color = "#22c55e";
+            pb.style.width = "100%";
+            pb.style.background = "#22c55e";
+            pText.textContent = "Arrived";
+
+            statusIcon.innerHTML = '✅';
+            statusIcon.style.color = "#22c55e";
+            statusTitle.textContent = "Within Geofence";
+            statusTitle.style.color = "#22c55e";
+            statusMsg.textContent = "You have reached the work site. Camera unlocked.";
+
+            if (!cameraUnlocked) {
+                cameraUnlocked = true;
+
+                lockIcon.className = "fa-solid fa-lock-open";
+                lockIcon.style.color = "#22c55e";
+                lockIcon.style.transform = "scale(1.2)";
+                overlayText.textContent = "Unlocking...";
+                overlaySubtext.textContent = "";
+
+                setTimeout(() => {
+                    overlay.style.opacity = "0";
+                    setTimeout(() => { overlay.style.display = "none"; }, 500);
+
+                    // For 'after' photo, button unlocks only when score >= 90% via calculation loop
+                    if (document.getElementById('captureType').value === 'after') {
+                        capBtn.disabled = true;
+                        capBtn.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Aligning...</span>`;
+                    } else {
+                        capBtn.disabled = false;
+                        capBtn.innerHTML = `<i class="fa-solid fa-camera"></i> <span>Capture Photo</span>`;
+                    }
+                    capBtn.onclick = takePhoto;
+
+                    startWebRTC().then(() => {
+                        if (document.getElementById('captureType').value === 'after') {
+                            startPositionMatchLoop();
+                        }
+                    });
+                }, 800);
+            }
+        }
+    }
+
+    async function startWebRTC() {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("Browser does not support live camera.");
+            }
+
+            videoStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' },
+                audio: false
+            });
+
+            const video = document.getElementById('cameraStream');
+            video.style.display = 'block';
+            video.srcObject = videoStream;
+            return video.play();
+        } catch (err) {
+            const overlay = document.getElementById('cameraOverlay');
+            overlay.style.opacity = "1";
+            overlay.style.display = 'flex';
+            overlay.innerHTML = `<i class="fa-solid fa-video-slash" style="font-size:3rem; color:#ef4444; margin-bottom:16px;"></i><p style="color:white; font-weight:600; font-size:1.1rem;">Camera access denied</p><p style="color:#94a3b8; font-size:0.85rem; margin-top:8px;">${err.message}</p>`;
+
+            const capBtn = document.getElementById('captureBtn');
+            capBtn.disabled = true;
+            capBtn.classList.remove('btn-captured');
+            capBtn.innerHTML = `<i class="fa-solid fa-video-slash"></i> <span>Camera Error</span>`;
+            throw err;
+        }
+    }
+
+    function setChecklist(id, passed, text) {
+        const el = document.getElementById(id);
+        if (el) {
+            if (passed) {
+                el.innerHTML = `<span style="color:#22c55e;">✓ ${text}</span>`;
+                el.style.color = '#22c55e';
+            } else {
+                el.innerHTML = `<span style="color:#ef4444;">✗ ${text}</span>`;
+                el.style.color = '#cbd5e1';
+            }
+        }
+    }
+
+    // scoreInterval already declared globally on line 658
+
+    function startPositionMatchLoop() {
+        // Stop any previous loop
+        if (scoreInterval) {
+            clearInterval(scoreInterval);
+            scoreInterval = null;
+        }
+
+        const beforeImgElement =
+            document.getElementById('cameraOverlayImage');
+
+        // Validate before-photo overlay for after-photo capture
+        if (
+            !beforeImgElement ||
+            !beforeImgElement.src ||
+            !beforeImgElement.complete ||
+            beforeImgElement.naturalWidth === 0
+        ) {
+            console.warn('Before photo is not loaded.');
+            return;
+        }
+
+        // IMPORTANT: Initialize these ONCE, outside setInterval
+        let lastFrameData = null;
+        let stableSince = null;
+        let checking = false;
+
+        const STABILITY_DURATION_MS = 2500;
+        const MOVEMENT_THRESHOLD = 12;
+
+        const diffCanvas = document.createElement('canvas');
+        diffCanvas.width = 64;
+        diffCanvas.height = 48;
+
+        const diffCtx = diffCanvas.getContext('2d', {
+            willReadFrequently: true
+        });
+
+        const capBtn = document.getElementById('captureBtn');
+        const scoreEl = document.getElementById('matchScoreVal');
+        const guidanceEl = document.getElementById('matchGuidance');
+
+        if (!capBtn || !diffCtx) return;
+
+        capBtn.disabled = true;
+
+        scoreInterval = setInterval(() => {
+            if (checking) return;
+            checking = true;
+
+            try {
+                const video = document.getElementById('cameraStream');
+
+                if (
+                    !video ||
+                    video.readyState < 2 ||
+                    !video.videoWidth ||
+                    !video.videoHeight ||
+                    !videoStream ||
+                    !videoStream.active
+                ) {
+                    lastFrameData = null;
+                    stableSince = null;
+                    capBtn.disabled = true;
+
+                    if (guidanceEl) {
+                        guidanceEl.textContent = 'Waiting for camera...';
+                    }
+                    return;
+                }
+
+                diffCtx.drawImage(video, 0, 0, 64, 48);
+
+                const pixels = diffCtx.getImageData(
+                    0, 0, 64, 48
+                ).data;
+
+                const currentFrame = new Uint8Array(64 * 48);
+
+                for (let i = 0, p = 0; i < pixels.length; i += 4, p++) {
+                    currentFrame[p] = Math.round(
+                        0.299 * pixels[i] +
+                        0.587 * pixels[i + 1] +
+                        0.114 * pixels[i + 2]
+                    );
+                }
+
+                let avgDiff = Infinity;
+
+                if (lastFrameData) {
+                    let totalDiff = 0;
+
+                    for (let i = 0; i < currentFrame.length; i++) {
+                        totalDiff += Math.abs(
+                            currentFrame[i] - lastFrameData[i]
+                        );
+                    }
+
+                    avgDiff = totalDiff / currentFrame.length;
+                }
+
+                lastFrameData = currentFrame;
+
+                const now = performance.now();
+                const isMoving = avgDiff > MOVEMENT_THRESHOLD;
+
+                if (isMoving || !Number.isFinite(avgDiff)) {
+                    stableSince = null;
+                } else if (stableSince === null) {
+                    stableSince = now;
+                }
+
+                const elapsed = stableSince === null
+                    ? 0
+                    : now - stableSince;
+
+                const progress = Math.min(
+                    100,
+                    Math.floor(elapsed / STABILITY_DURATION_MS * 100)
+                );
+
+                const ready =
+                    stableSince !== null &&
+                    elapsed >= STABILITY_DURATION_MS;
+
+                if (scoreEl) {
+                    scoreEl.textContent = progress + '%';
+                    scoreEl.style.color = ready
+                        ? '#22c55e'
+                        : '#f59e0b';
+                }
+
+                capBtn.disabled = !ready;
+
+                if (ready) {
+                    capBtn.innerHTML =
+                        '<i class="fa-solid fa-camera"></i> ' +
+                        '<span>Capture Photo</span>';
+
+                    if (guidanceEl) {
+                        guidanceEl.textContent =
+                            'Camera steady — ready to capture.';
+                    }
+                } else {
+                    capBtn.innerHTML =
+                        '<i class="fa-solid fa-lock"></i> ' +
+                        '<span>Aligning...</span>';
+
+                    if (guidanceEl) {
+                        guidanceEl.textContent = isMoving
+                            ? 'Hold steady...'
+                            : 'Keep the camera still...';
+                    }
+                }
+
+            } catch (error) {
+                console.error('Stability check failed:', error);
+
+                lastFrameData = null;
+                stableSince = null;
+                capBtn.disabled = true;
+            } finally {
+                checking = false;
+            }
+        }, 100);
+    }
+
+    function stopPositionMatchLoop() {
+        if (scoreInterval !== null) {
+            clearInterval(scoreInterval);
+            scoreInterval = null;
+        }
+    }
+
+    function closeCaptureModal() {
+        document.getElementById('captureModal').style.display = 'none';
+
+        if (captureWatchId) {
+            navigator.geolocation.clearWatch(captureWatchId);
+            captureWatchId = null;
+        }
+
+        stopPositionMatchLoop();
+        stopCamera();
+    }
+
+    function stopCamera() {
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+            videoStream = null;
+        }
+    }
+
+    function takePhoto() {
+        // Stop alignment loop immediately so it can't re-lock the button during capture
+        stopPositionMatchLoop();
+
+        const capBtn = document.getElementById('captureBtn');
+        capBtn.disabled = true;
+        capBtn.classList.remove('btn-captured');
+        capBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Capturing...</span>`;
+
+        // Request frame to let the button style paint before blocking main thread
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                const video = document.getElementById('cameraStream');
+                const canvas = document.getElementById('cameraCanvas');
+
+                // 1. Capture IMMEDIATELY
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d', { alpha: false });
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // 2. Display preview IMMEDIATELY
+                document.getElementById('imagePreview').src = canvas.toDataURL('image/jpeg', 0.85);
+                document.getElementById('imagePreview').style.display = 'block';
+                video.style.display = 'none';
+                document.getElementById('retakeBtn').style.display = 'none';
+
+                // Success UI on Button
+                capBtn.classList.add('btn-captured');
+                capBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Photo Captured</span>`;
+
+                // Freeze hardware camera
+                stopCamera();
+
+                // Briefly delay showing the AI overlay so the worker sees the success button
+                setTimeout(() => {
+                    document.getElementById('aiLoadingOverlay').style.display = 'flex';
+
+                    // 5. Asynchronously process Blob and Telemetry without blocking the UI thread
+                    canvas.toBlob((blob) => {
+                        capturedBlob = blob;
+
+                        captureTelemetry = null;
+                        if ("geolocation" in navigator) {
+                            navigator.geolocation.getCurrentPosition(pos => {
+                                captureTelemetry = {
+                                    lat: pos.coords.latitude,
+                                    lon: pos.coords.longitude,
+                                    acc: pos.coords.accuracy,
+                                    speed: pos.coords.speed || 0,
+                                    heading: pos.coords.heading || 0,
+                                    time: Date.now()
+                                };
+                                submitPhoto();
+                            }, err => {
+                                console.warn("Telemetry fallback", err);
+                                captureTelemetry = { time: Date.now() };
+                                submitPhoto();
+                            }, { enableHighAccuracy: true, timeout: 5000 });
+                        } else {
+                            captureTelemetry = { time: Date.now() };
+                            submitPhoto();
+                        }
+                    }, 'image/jpeg', 0.85);
+                }, 350);
+            });
+        });
+    }
+
+    function retakePhoto() {
+        capturedBlob = null;
+        document.getElementById('imagePreview').style.display = 'none';
+        document.getElementById('captureBtn').style.display = 'block';
+        document.getElementById('retakeBtn').style.display = 'none';
+        openCaptureModal(document.getElementById('captureType').value, document.getElementById('captureJobId').value);
+    }
+
+    async function submitPhoto() {
+        if (!capturedBlob) return;
+
+        const type = document.getElementById('captureType').value;
+        const jobId = document.getElementById('captureJobId').value;
+
+        document.getElementById('aiLoadingOverlay').style.display = 'flex';
+
+        const formData = new FormData();
+        formData.append('photo', capturedBlob, `live_capture_${Date.now()}.jpg`);
+        formData.append('type', type);
+
+        if (captureTelemetry && captureTelemetry.lat) {
+            formData.append('lat', captureTelemetry.lat);
+            formData.append('lon', captureTelemetry.lon);
+            formData.append('accuracy', captureTelemetry.acc);
+            formData.append('timestamp', captureTelemetry.time);
+        } else {
+            formData.append('timestamp', Date.now());
+        }
+
+        try {
+            const res = await fetch(`/api/worker/jobs/${jobId}/upload-photo`, {
+                method: 'POST',
+                body: formData
+            });
+            let data = await res.json();
+
+            document.getElementById('aiLoadingOverlay').style.display = 'none';
+
+            const isVerified = res.ok && data.success && data.verification && data.verification.verified;
+
+            if (isVerified) {
+                closeCaptureModal();
+                if (type === 'before') {
+                    const meta = {
+                        lat: captureTelemetry ? captureTelemetry.lat : null,
+                        lon: captureTelemetry ? captureTelemetry.lon : null,
+                        heading: captureTelemetry ? captureTelemetry.heading : null,
+                        bbox: data.verification ? data.verification.bbox : null
+                    };
+                    localStorage.setItem('beforeMeta_' + jobId, JSON.stringify(meta));
+
+                    const reader = new FileReader();
+                    reader.readAsDataURL(capturedBlob);
+                    reader.onloadend = async function () {
+                        localStorage.setItem('beforePhoto_' + jobId, reader.result);
+                        await window.showSuccess('Verification Passed', 'Repair completed successfully.');
+                        window.location.reload();
+                    };
+                } else {
+                    await window.showSuccess('Verification Passed', 'Repair completed successfully.');
+                    window.location.href = '/worker/available-jobs';
+                }
+            } else {
+                if (type === 'after') {
+                    // Hide camera/preview elements
+                    document.getElementById('imagePreview').style.display = 'none';
+                    document.getElementById('cameraStream').style.display = 'none';
+                    document.getElementById('matchScoreContainer').style.display = 'none';
+                    // Hide the verification (GPS) card and camera section to make rejection card the focus
+                    const verCard = document.getElementById('verificationCard');
+                    if (verCard) verCard.style.display = 'none';
+                    // Hide the camera wrapper div (parent of matchScoreContainer)
+                    const msParent = document.getElementById('matchScoreContainer').parentElement;
+                    if (msParent) msParent.style.display = 'none';
+
+                    // Render analysed after image with exact bounding box from AI
+                    const rejCard = document.getElementById('rejectionCard');
+                    const rejCanvas = document.getElementById('rejectionCanvas');
+                    const confTxt = document.getElementById('rejectionConfidenceTxt');
+
+                    rejCard.style.display = 'block';
+
+                    const score = data.verification ? data.verification.score : 0;
+                    confTxt.textContent = `Confidence: ${score}%`;
+
+                    // Draw the captured image + bounding box onto the canvas
+                    const img = new Image();
+                    img.onload = function () {
+                        rejCanvas.width = img.naturalWidth || img.width;
+                        rejCanvas.height = img.naturalHeight || img.height;
+                        const ctx = rejCanvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+
+                        if (data.verification && data.verification.bbox) {
+                            const box = data.verification.bbox;
+                            // box: [x1, y1, x2, y2]
+                            const lw = Math.max(4, Math.round((img.naturalWidth || img.width) / 150));
+                            ctx.lineWidth = lw;
+                            ctx.strokeStyle = '#ef4444';
+                            ctx.strokeRect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
+                            // Semi-transparent fill
+                            ctx.fillStyle = 'rgba(239, 68, 68, 0.18)';
+                            ctx.fillRect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
+                            // Label
+                            ctx.font = `bold ${Math.max(14, lw * 3)}px sans-serif`;
+                            ctx.fillStyle = '#ef4444';
+                            ctx.fillText('Pothole', box[0] + lw, Math.max(box[1] - lw, 16));
+                        }
+                    };
+                    // Convert blob to data URL to avoid any object-URL lifecycle issues
+                    const reader = new FileReader();
+                    reader.onloadend = function () {
+                        img.src = reader.result;
+                    };
+                    reader.readAsDataURL(capturedBlob);
+
+                    document.getElementById('captureBtn').style.display = 'none';
+                    document.getElementById('retakeBtn').style.display = 'block';
+
+                    // Scroll rejection card into view so user sees it immediately
+                    setTimeout(() => { rejCard.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+
+                    await window.showError(
+                        'Repair Verification Failed',
+                        'Remaining pothole detected. Repair the highlighted area and capture another after photo.'
+                    );
+                } else if (type === 'before') {
+                    closeCaptureModal();
+                    await window.showError('Pothole Not Detected', 'Pothole not detected. Please capture the image again.');
+                } else {
+                    closeCaptureModal();
+                    await window.showError('Repair Verification Failed', data.message || (data.verification ? data.verification.message : "Image could not be verified."));
+                }
+            }
+        } catch (e) {
+            document.getElementById('aiLoadingOverlay').style.display = 'none';
+            closeCaptureModal();
+            await window.showError('Error', 'Network or server error during upload.');
+        }
+    }
+
+    // --- GPS Tracking and Telemetry ---
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371e3; // metres
+        const φ1 = lat1 * Math.PI / 180;
+        const φ2 = lat2 * Math.PI / 180;
+        const Δφ = (lat2 - lat1) * Math.PI / 180;
+        const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c; // in metres
+    }
+
+    function getBearing(startLat, startLng, destLat, destLng) {
+        const startLatRad = (startLat * Math.PI) / 180;
+        const startLngRad = (startLng * Math.PI) / 180;
+        const destLatRad = (destLat * Math.PI) / 180;
+        const destLngRad = (destLng * Math.PI) / 180;
+
+        const y = Math.sin(destLngRad - startLngRad) * Math.cos(destLatRad);
+        const x = Math.cos(startLatRad) * Math.sin(destLatRad) - Math.sin(startLatRad) * Math.cos(destLatRad) * Math.cos(destLngRad - startLngRad);
+
+        let brng = Math.atan2(y, x);
+        brng = (brng * 180) / Math.PI;
+        return (brng + 360) % 360;
+    }
+
+    function centerOnWorker() {
+        if (workerMarker && map) {
+            map.setView(workerMarker.getLatLng(), 17, { animate: true, duration: 1 });
+        }
+    }
+
+    function fitRouteBounds() {
+        if (workerMarker && hazardMarker && map) {
+            const group = new L.featureGroup([workerMarker, hazardMarker]);
+            map.fitBounds(group.getBounds(), { padding: [50, 50], animate: true, duration: 1 });
+        }
+    }
+
+    let routingControl = null;
+    let lastRouteUpdate = 0;
+    let lastWaypointLat = null;
+    let lastWaypointLon = null;
+    let lastGpsTime = null;
+
+    function startGpsTracking() {
+        if (watchId) return; // already tracking
+
+        if (!("geolocation" in navigator)) {
+            window.showError('Error', 'Geolocation is not supported by your browser.');
+            return;
+        }
+
+        // Update telemetry every 5 seconds
+        setInterval(() => {
+            if (!workerMarker || !currentJobId) return;
+            const pos = workerMarker.getLatLng();
+            fetch(`/api/worker/jobs/${currentJobId}/location`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lat: pos.lat, lon: pos.lng })
+            }).catch(console.error);
+        }, 5000);
+
+        let hasArrived = false;
+
+        watchId = navigator.geolocation.watchPosition((position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const acc = position.coords.accuracy;
+            let speed = position.coords.speed;
+
+            workerMarker.setLatLng([lat, lon]);
+            accuracyCircle.setLatLng([lat, lon]);
+            accuracyCircle.setRadius(acc);
+
+            if (document.getElementById('navAcc')) document.getElementById('navAcc').textContent = acc.toFixed(0) + ' m';
+
+            const now = Date.now();
+
+            // Calculate manual speed if browser doesn't provide it
+            let kmh = 0;
+            if (speed != null && speed > 0) {
+                kmh = speed * 3.6;
+            } else if (lastWaypointLat != null && lastGpsTime != null) {
+                const distSinceLast = getDistance(lastWaypointLat, lastWaypointLon, lat, lon);
+                const timeDiffSeconds = (now - lastGpsTime) / 1000;
+                if (timeDiffSeconds > 0) {
+                    kmh = (distSinceLast / timeDiffSeconds) * 3.6;
+                }
+            }
+
+            if (document.getElementById('navSpeed')) document.getElementById('navSpeed').textContent = kmh > 0 ? kmh.toFixed(0) + ' km/h' : '--';
+
+            // Smooth rotation logic
+            let currentHeading = 0;
+            if (position.coords.heading !== null && !isNaN(position.coords.heading)) {
+                currentHeading = position.coords.heading;
+            } else if (lastWaypointLat != null && lastWaypointLon != null) {
+                currentHeading = getBearing(lastWaypointLat, lastWaypointLon, lat, lon);
+            }
+
+            const markerDirEl = document.getElementById('workerMarkerDir');
+            if (markerDirEl && kmh > 1) {
+                markerDirEl.style.transform = `rotate(${currentHeading}deg)`;
+            }
+
+            lastGpsTime = now;
+
+            // Debounce OSRM routing requests
+            let shouldRoute = false;
+
+            if (!routingControl) {
+                shouldRoute = true;
+            } else {
+                const distanceFromLast = getDistance(lat, lon, lastWaypointLat, lastWaypointLon);
+                // Route if moved more than 10m or 5 seconds elapsed
+                if (distanceFromLast > 10 || (now - lastRouteUpdate > 5000)) {
+                    shouldRoute = true;
+                }
+            }
+
+            if (shouldRoute) {
+                lastRouteUpdate = now;
+                lastWaypointLat = lat;
+                lastWaypointLon = lon;
+
+                if (!routingControl) {
+                    routingControl = L.Routing.control({
+                        waypoints: [
+                            L.latLng(lat, lon),
+                            L.latLng(currentHazardLat, currentHazardLon)
+                        ],
+                        router: L.Routing.osrmv1({
+                            serviceUrl: 'https://router.project-osrm.org/route/v1'
+                        }),
+                        addWaypoints: false,
+                        routeWhileDragging: false,
+                        show: false,
+                        fitSelectedRoutes: true,
+                        lineOptions: {
+                            styles: [{ color: '#3b82f6', opacity: 0.8, weight: 6 }]
+                        },
+                        createMarker: function () { return null; } // Don't duplicate markers
+                    }).addTo(map);
+
+                    routingControl.on('routesfound', function (e) {
+                        const routes = e.routes;
+                        const summary = routes[0].summary;
+
+                        const totalMeters = summary.totalDistance;
+                        const mins = Math.ceil(summary.totalTime / 60);
+                        const distText = totalMeters > 1000 ? (totalMeters / 1000).toFixed(1) + ' km' : totalMeters.toFixed(0) + ' m';
+
+                        let etaText = '45 sec';
+                        if (mins >= 60) {
+                            const hrs = Math.floor(mins / 60);
+                            const remMins = mins % 60;
+                            etaText = hrs + ' hr ' + (remMins > 0 ? remMins + ' min' : '');
+                        } else if (mins > 0) {
+                            etaText = mins + ' min';
+                        }
+
+                        document.getElementById('kpiEta').textContent = etaText;
+                        document.getElementById('kpiDist').textContent = distText;
+
+                        // Update old UI tags silently if they exist
+                        if (document.getElementById('navDist')) document.getElementById('navDist').textContent = distText;
+                        if (document.getElementById('navEta')) document.getElementById('navEta').textContent = etaText;
+                        if (document.getElementById('uiTotalDist')) document.getElementById('uiTotalDist').textContent = distText;
+                        if (document.getElementById('uiTravelTime')) document.getElementById('uiTravelTime').textContent = etaText;
+                        if (document.getElementById('stripTotalDist')) document.getElementById('stripTotalDist').textContent = distText;
+                        if (document.getElementById('stripEta')) document.getElementById('stripEta').textContent = etaText;
+                        if (document.getElementById('stripRemaining')) document.getElementById('stripRemaining').textContent = distText;
+
+                        currentDistanceMeters = totalMeters; // Store for Geofence
+
+                        // Navigation Status Logic
+                        let statusText = "Travelling";
+                        let statusColor = "#3b82f6";
+                        if (totalMeters <= 50) {
+                            statusText = "Reached Destination";
+                            statusColor = "#22c55e";
+                        } else if (totalMeters <= 200) {
+                            statusText = "Approaching Destination";
+                            statusColor = "#f59e0b";
+                        }
+
+                        document.getElementById('kpiStatus').textContent = statusText;
+                        document.getElementById('kpiStatus').style.color = statusColor;
+
+                        // Auto-Arrival Geofencing (100 meters)
+                        if (totalMeters <= 100 && !hasArrived) {
+                            hasArrived = true;
+                            document.getElementById('kpiStatus').textContent = "Navigation Complete";
+                            document.getElementById('kpiStatus').style.color = "#22c55e";
+
+                            // 1. Send API request in background
+                            fetch(`/api/worker/jobs/${currentJobId}/status`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ status: 'Reached Site' })
+                            }).then(() => {
+                                // Re-render timeline to unlock camera button seamlessly
+                                fetch('/api/worker/active-job').then(r => r.json()).then(d => {
+                                    if (d.data) renderTimeline(d.data);
+                                    else if (d.hazard_id) renderTimeline(d);
+                                });
+                            });
+
+                            // 2. Show inline success banner smoothly
+                            const banner = document.createElement('div');
+                            banner.innerHTML = `<div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.4); padding: 12px 16px; border-radius: 12px; color: #4ade80; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; animation: fadeInScale 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
                               <i class="fa-solid fa-circle-check" style="font-size: 1.8rem; filter: drop-shadow(0 0 8px rgba(34,197,94,0.5));"></i>
                               <div>
                                   <div style="font-weight: 700; font-size: 1.05rem; color: #fff;">✓ Within Geofence</div>
                                   <div style="font-size: 0.9rem; color: #a7f3d0; margin-top: 2px;">You have reached the work location. Camera unlocked.</div>
                               </div>
                           </div>`;
-                          
-                          // Insert above navigation metrics
-                          const navMetrics = document.getElementById('navMetrics');
-                          if (navMetrics && navMetrics.parentNode) {
-                              navMetrics.parentNode.insertBefore(banner, navMetrics);
-                          } else {
-                              const tl = document.getElementById('timelineContainer');
-                              if (tl && tl.parentNode) tl.parentNode.insertBefore(banner, tl);
-                          }
-                      }
-                  });
-              } else {
-                  routingControl.setWaypoints([
-                      L.latLng(lat, lon),
-                      L.latLng(currentHazardLat, currentHazardLon)
-                  ]);
-              }
-          }
-      }, (err) => {
-          console.warn('GPS Error:', err);
-      }, {
-          enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 5000
-      });
-  }
+
+                            // Insert above navigation metrics
+                            const navMetrics = document.getElementById('navMetrics');
+                            if (navMetrics && navMetrics.parentNode) {
+                                navMetrics.parentNode.insertBefore(banner, navMetrics);
+                            } else {
+                                const tl = document.getElementById('timelineContainer');
+                                if (tl && tl.parentNode) tl.parentNode.insertBefore(banner, tl);
+                            }
+                        }
+                    });
+                } else {
+                    routingControl.setWaypoints([
+                        L.latLng(lat, lon),
+                        L.latLng(currentHazardLat, currentHazardLon)
+                    ]);
+                }
+            }
+        }, (err) => {
+            console.warn('GPS Error:', err);
+        }, {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 5000
+        });
+    }
 </script>
 {% endblock %}

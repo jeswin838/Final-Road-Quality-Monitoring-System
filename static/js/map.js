@@ -18,6 +18,22 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
 }).addTo(map);
 
+
+// --- ID Normalization Layer ---
+function normalizeHazardId(id, source = null) {
+    if (!id) return id;
+    let strId = String(id);
+    if (strId.startsWith('AI-') || strId.startsWith('USER-')) return strId;
+    if (!isNaN(strId)) {
+        if (source && (source.toLowerCase() === 'user_reports' || source.toLowerCase() === 'user' || source.toLowerCase() === 'citizen')) {
+            return `USER-${strId}`;
+        }
+        return `AI-${strId}`;
+    }
+    return strId;
+}
+// ------------------------------
+
 // ── State ───────────────────────────────────────────────────────────────────
 let markerClusterGroup = L.markerClusterGroup({ maxClusterRadius: 50, disableClusteringAtZoom: 17 });
 let allData            = [];
@@ -104,8 +120,22 @@ function locateMe() {
 }
 
 // ── Marker icons ─────────────────────────────────────────────────────────────
-function makeIcon(severity, isUserReport = false) {
+function makeIcon(severity, isUserReport = false, status = '') {
   const sev = (severity || '').toLowerCase();
+  const sts = (status || '').toLowerCase();
+  if (sts === 'in progress' || sts === 'repair started') {
+    const maintenanceSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 32" width="24" height="32">
+      <path d="M12 0C5.4 0 0 5.4 0 12c0 8 12 20 12 20S24 20 24 12C24 5.4 18.6 0 12 0z" fill="#f59e0b" stroke="#fff" stroke-width="1.5"/>
+      <path d="M7 16h10l-1-7H8l-1 7zM9 8h6v1H9V8z" fill="#111" />
+    </svg>`;
+    return L.divIcon({
+      html: maintenanceSvg,
+      className: '',
+      iconSize:   [24, 32],
+      iconAnchor: [12, 32],
+      popupAnchor:[0, -32],
+    });
+  }
   const colors = { critical: '#DC2626', high: '#ef4444', medium: '#f97316', low: '#22c55e' };
   const color  = colors[sev] || '#6366f1';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 32" width="24" height="32">
@@ -348,13 +378,13 @@ function focusTargetReport() {
            targetGroup = group;
            break;
        }
-       if (targetHazardId && String(group.id) === String(targetHazardId)) {
+       if (targetHazardId && (String(group.id) === String(targetHazardId) || String(group.id) === normalizeHazardId(targetHazardId, group.source))) {
            targetGroup = group;
            break;
        }
        if ((targetReportId || targetHazardId) && group.reports) {
            const searchId = targetReportId || targetHazardId;
-           if (group.reports.some(r => String(r.id) === String(searchId) || String(r.hazard_id) === String(searchId))) {
+           if (group.reports.some(r => String(r.id) === String(searchId) || String(r.hazard_id) === String(searchId) || String(r.id) === normalizeHazardId(searchId, group.source))) {
                targetGroup = group;
                break;
            }
@@ -424,7 +454,7 @@ function renderMarkers() {
     
     if (showClusters) {
       const isUserReport = r.type === 'user_report';
-      const marker = L.marker([lat, lon], { icon: makeIcon(r.severity) });
+      const marker = L.marker([lat, lon], { icon: makeIcon(r.severity, isUserReport, r.status) });
       
       // Store a usable identifier inside the marker options even if marker_id does not exist.
       marker.options.marker_id = r.marker_id ?? r.id;
@@ -631,7 +661,7 @@ window.showReports = async function(report_id) {
                   break;
               }
               // Priority 2: hazard_id
-              if (r.hazard_id && String(r.hazard_id) === search_id) {
+              if (r.hazard_id && (String(r.hazard_id) === search_id || String(r.hazard_id) === normalizeHazardId(search_id, r.source))) {
                   fallbackData = r;
                   lookupStrategy = "hazard_id";
                   break;
@@ -646,7 +676,7 @@ window.showReports = async function(report_id) {
               if (r.reports && Array.isArray(r.reports)) {
                   let foundInReports = false;
                   for (let sub_r of r.reports) {
-                      if (String(sub_r.id) === search_id || String(sub_r.hazard_id) === search_id) {
+                      if (String(sub_r.id) === search_id || String(sub_r.hazard_id) === search_id || String(sub_r.id) === normalizeHazardId(search_id, r.source)) {
                           foundInReports = true;
                           break;
                       }

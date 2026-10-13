@@ -253,7 +253,7 @@ if (confirmAssignBtn) {
         res = await fetch('/api/assignments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pothole_id: +pid, worker_name: name, notes })
+          body: JSON.stringify({ hazard_id: pid, worker_name: name, notes })
         });
     } else {
         const status = document.getElementById('assignStatus').value;

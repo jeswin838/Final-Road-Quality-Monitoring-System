@@ -861,6 +861,7 @@ def upload_photo(job_id, sql_log):
         
         has_defect = False
         best_conf = 0.0
+        best_box = None
         
         for r in results:
             if r.boxes is not None:
@@ -869,6 +870,7 @@ def upload_photo(job_id, sql_log):
                     has_defect = True
                     if conf > best_conf:
                         best_conf = conf
+                        best_box = box.xyxy[0].tolist()
                         
         ai_score = int(best_conf * 100)
         is_verified = False
@@ -908,6 +910,7 @@ def upload_photo(job_id, sql_log):
                     "verification_status": "Before Photo Verified",
                     "verification_notes": "AI detected pothole successfully.",
                     "reached_at": now,
+                    "repair_started_at": now,   # mark repair start for duration calculation
                     "status": "Repair Started",
                     "before_photo_lat": p_lat,
                     "before_photo_lon": p_lon,
@@ -985,17 +988,51 @@ def upload_photo(job_id, sql_log):
             except Exception as e:
                 print(f"[!] Error updating hazard cache on photo upload: {e}")
         
+        status_code = 200 if is_verified else 422
         return {
-            "success": True,
+            "success": is_verified,
             "verification": {
                 "verified": is_verified,
                 "score": ai_score,
                 "message": ai_message,
-                "processing_time_ms": _t_ms
+                "processing_time_ms": _t_ms,
+                "bbox": best_box
             },
             "message": ai_message
-        }
+        }, status_code
             
     except Exception as e:
         print("Upload Photo Error:", e)
         return {"success": False, "message": str(e)}, 500
+
+@worker_dispatch_api.route("/live-yolo", methods=["POST"])
+@worker_api
+def live_yolo(sql_log):
+    file = request.files.get("photo")
+    if not file:
+        return {"success": False}, 400
+        
+    try:
+        from routes.ai import load_model, run_inference
+        import numpy as np
+        import cv2
+        
+        model = load_model()
+        file_bytes = file.read()
+        nparr = np.frombuffer(file_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        results, detections = run_inference(model, img)
+        
+        best_box = None
+        best_conf = 0.0
+        
+        for d in detections:
+            if d.get("confidence", 0) > best_conf:
+                best_conf = d["confidence"]
+                best_box = d.get("box")
+                
+        return {"success": True, "bbox": best_box, "confidence": best_conf}
+    except Exception as e:
+        print("Live YOLO Error:", e)
+        return {"success": False}, 500

@@ -200,6 +200,22 @@
 
 {% block scripts %}
 <script>
+
+// --- ID Normalization Layer ---
+function normalizeHazardId(id, source = null) {
+    if (!id) return id;
+    let strId = String(id);
+    if (strId.startsWith('AI-') || strId.startsWith('USER-')) return strId;
+    if (!isNaN(strId)) {
+        if (source && (source.toLowerCase() === 'user_reports' || source.toLowerCase() === 'user' || source.toLowerCase() === 'citizen')) {
+            return `USER-${strId}`;
+        }
+        return `AI-${strId}`;
+    }
+    return strId;
+}
+// ------------------------------
+
 let allHazards = [];
 let selectedHazardId = null;
 let searchTimer = null;
@@ -249,14 +265,14 @@ async function fetchAlerts(silent = false) {
         document.getElementById('alertCount').innerText = allHazards.length;
         
         // Retain selection if exists
-        if (selectedHazardId && !allHazards.find(h => (h.hazard_id || h.id) == selectedHazardId)) {
+        if (selectedHazardId && !allHazards.find(h => (h.hazard_id || h.id) == selectedHazardId || String(h.hazard_id || h.id) === normalizeHazardId(selectedHazardId, h.source))) {
             closeDrawer();
             selectedHazardId = null;
         }
         
         renderList();
         if (selectedHazardId) {
-            const hz = allHazards.find(h => (h.hazard_id || h.id) == selectedHazardId);
+            const hz = allHazards.find(h => (h.hazard_id || h.id) == selectedHazardId || String(h.hazard_id || h.id) === normalizeHazardId(selectedHazardId, h.source));
             if(hz) populateDetail(hz);
         }
     } catch(err) {
@@ -342,27 +358,33 @@ function renderList() {
         return true;
     });
     
-    // Sort logic
+    // Sort logic matching backend
     filtered.sort((a, b) => {
-        const pA = PRIORITY_ORDER[a.priority || 'Medium'] || 2;
-        const pB = PRIORITY_ORDER[b.priority || 'Medium'] || 2;
-        if (pA !== pB) return pB - pA;
-        
+        // 1. Priority Score
         const sa = a.priority_score || 0;
         const sb = b.priority_score || 0;
         if (sa !== sb) return sb - sa;
         
-        const rsa = a.risk_score || 0;
-        const rsb = b.risk_score || 0;
-        if (rsa !== rsb) return rsb - rsa;
+        // 2. Severity tie-breaker
+        const sevOrder = { "critical": 100, "high": 80, "medium": 55, "low": 30 };
+        const sevA = sevOrder[(a.severity || "low").toLowerCase()] || 30;
+        const sevB = sevOrder[(b.severity || "low").toLowerCase()] || 30;
+        if (sevA !== sevB) return sevB - sevA;
         
-        const wa = a.waiting_days || 0;
-        const wb = b.waiting_days || 0;
-        if (wa !== wb) return wb - wa;
-        
+        // 3. Report count tie-breaker
         const ra = a.report_count || 1;
         const rb = b.report_count || 1;
         if (ra !== rb) return rb - ra;
+        
+        // 4. Waiting days tie-breaker
+        const wa = a.priority_breakdown?.waiting_days || a.waiting_days || 0;
+        const wb = b.priority_breakdown?.waiting_days || b.waiting_days || 0;
+        if (wa !== wb) return wb - wa;
+        
+        // 5. Risk score tie-breaker
+        const rsa = a.risk_score || 0;
+        const rsb = b.risk_score || 0;
+        if (rsa !== rsb) return rsb - rsa;
         
         return new Date(b.created_at) - new Date(a.created_at);
     });
@@ -499,7 +521,7 @@ function selectHazard(id) {
     selectedHazardId = id;
     renderList(); // Update selected state
     
-    const h = allHazards.find(x => (x.hazard_id || x.id) == id);
+    const h = allHazards.find(x => (x.hazard_id || x.id) == id || String(x.hazard_id || x.id) === normalizeHazardId(id, x.source));
     if(h) populateDetail(h);
     
     // Open drawer on small screens
@@ -960,13 +982,13 @@ function hotSwapHazard(updated) {
         allHazards[idx] = updated;
         
         // Update detail view if selected
-        if (selectedHazardId && (selectedHazardId == updated.id || selectedHazardId == updated.hazard_id)) {
+        if (selectedHazardId && (selectedHazardId == updated.id || selectedHazardId == updated.hazard_id || normalizeHazardId(selectedHazardId, updated.source) === String(updated.id))) {
             populateDetail(updated);
         }
     } else {
         // If it's a new assignment dynamically added, push it
         allHazards.push(updated);
-        if (selectedHazardId && (selectedHazardId == updated.id || selectedHazardId == updated.hazard_id)) {
+        if (selectedHazardId && (selectedHazardId == updated.id || selectedHazardId == updated.hazard_id || normalizeHazardId(selectedHazardId, updated.source) === String(updated.id))) {
             populateDetail(updated);
         }
     }

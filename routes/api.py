@@ -930,79 +930,12 @@ def list_assignments():
 
 @api_bp.route("/assignments", methods=["POST"])
 def create_assignment():
-    from app import supabase
+    from routes.assignment_api import process_create_assignment
     from flask import session
-    data = request.get_json(silent=True) or {}
-    pothole_id = data.get("pothole_id")
-    worker_name = data.get("worker_name", "").strip()
-    notes = data.get("notes", "")
-    
-    if not pothole_id or not worker_name:
-        return jsonify({"error": "pothole_id and worker_name required"}), 400
+    payload = request.get_json(silent=True) or {}
+    resp, code = process_create_assignment(payload, session.get('user_id'), session.get('name', 'Admin'))
+    return jsonify(resp), code
 
-    assigned_by = session.get('user_id')
-    assigned_by_name = session.get('name', 'Admin')
-
-    worker_res = supabase.table('users').select('*').ilike('name', worker_name).eq('role', 'worker').execute()
-    worker = worker_res.data[0] if worker_res.data else None
-
-    # Determine hazard_source
-    hazard_source = 'AI'
-    h_res = supabase.table('potholes').select('*').eq('id', pothole_id).execute()
-    if not h_res.data:
-        h_res = supabase.table('user_reports').select('*').eq('id', pothole_id).execute()
-        if h_res.data:
-            hazard_source = 'USER'
-        else:
-            return jsonify({"error": "Hazard not found"}), 404
-
-    # Prevent duplicate active assignments
-    existing_res = supabase.table('assignments').select('id, status').eq('hazard_id', pothole_id).order('id', desc=True).limit(1).execute()
-    if existing_res.data:
-        latest_status = str(existing_res.data[0].get('status', '')).lower()
-        if latest_status not in ['completed', 'closed', 'rejected', 'resolved', 'fixed', 'verified']:
-            return jsonify({
-                "error": "An active assignment already exists for this hazard.",
-                "id": existing_res.data[0]['id']
-            }), 409
-
-    insert_data = {
-        'hazard_id': pothole_id,
-        'hazard_source': hazard_source,
-        'worker_id': worker['id'] if worker else None,
-        'worker_name': worker['name'] if worker else worker_name,
-        'worker_email': worker['email'] if worker else None,
-        'assigned_by': assigned_by,
-        'assigned_by_name': assigned_by_name,
-        'status': 'Assigned',
-        'verification_status': 'Pending',
-        'notes': notes
-    }
-
-    try:
-        res = supabase.table('assignments').insert(insert_data).execute()
-        new_id = res.data[0]['id'] if res.data else None
-
-        # Construct master hazard ID for cache update
-        prefix = 'AI' if hazard_source == 'AI' else 'USER'
-        master_id = f"{prefix}-{pothole_id}"
-
-        # Update cache instantly
-        from services.hazard_registry import registry_cache, global_alerts_cache
-        sync_hazard_cache(master_id, pothole_id)
-        # Invalidate alerts JSON cache so next fetch returns fresh data
-        global_alerts_cache["data"] = None
-        
-        print("\n========== ASSIGNMENT DEBUG ==========")
-        print(f"Hazard ID: {pothole_id}")
-        print(f"Worker ID: {insert_data['worker_id']}")
-        print(f"Insert Result: {res.data}")
-        print(f"Assignment ID: {new_id}")
-        print("=====================================\n")
-        
-        return jsonify({"id": new_id, "message": "Assigned"}), 201
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 @api_bp.route("/assignments/<int:aid>", methods=["PUT"])
 def update_assignment(aid):
@@ -1479,8 +1412,8 @@ def safe_route():
            haversine(h.latitude, h.longitude, float(end[0]), float(end[1])) < 15000:
             proximate_hazards.append(h)
 
-    # 2. ORS Call - Avoid ONLY critical/emergency
-    critical_hazards = [h for h in proximate_hazards if h.severity.lower() in ("critical", "emergency")]
+    # 2. ORS Call - Avoid ONLY in-progress critical/high hazards
+    critical_hazards = [h for h in proximate_hazards if h.status.lower() in ("in progress", "repair started") and h.severity.lower() in ("high", "critical", "emergency")]
     start_ll, end_ll = [float(start[1]), float(start[0])], [float(end[1]), float(end[0])]
     
     # Merge overlapping polygons roughly by clustering points within 60m of each other

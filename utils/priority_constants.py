@@ -1,11 +1,9 @@
 # Priority Weights (total 100%)
 PRIORITY_WEIGHTS = {
-    "risk": 0.40,
-    "road": 0.20,
-    "traffic": 0.15,
-    "waiting": 0.10,
-    "reports": 0.10,
-    "emergency": 0.05
+    "severity": 0.30,
+    "reports": 0.25,
+    "waiting": 0.20,
+    "risk": 0.25
 }
 
 # Priority Level Thresholds

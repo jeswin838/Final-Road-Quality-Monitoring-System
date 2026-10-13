@@ -305,7 +305,7 @@ function renderMaintCards() {
   if (search) {
     list = list.filter(a => 
         a.worker_name.toLowerCase().includes(search) || 
-        `#${a.pothole_id}`.includes(search) ||
+        `#${a.hazard_id || a.pothole_id}`.includes(search) ||
         (a.notes || '').toLowerCase().includes(search)
     );
   }
@@ -328,7 +328,7 @@ function renderMaintCards() {
     return `
     <div class="maint-card">
       <div class="maint-header">
-        <span class="pothole-id-tag">Pothole #${a.pothole_id}</span>
+        <span class="pothole-id-tag">Job #${a.hazard_id || a.pothole_id}</span>
         <span class="status-pill ${spClass}">${status}</span>
       </div>
 
@@ -367,7 +367,7 @@ async function assignWorker() {
   if (!pid || !name) { showToast('Fill pothole ID and worker name', 'error'); return; }
   const res = await fetch('/api/assignments', {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ pothole_id: +pid, worker_name: name, notes: document.getElementById('mNotes').value })
+    body: JSON.stringify({ hazard_id: pid, worker_name: name, notes: document.getElementById('mNotes').value })
   });
   const d = await res.json();
   if (res.ok) {

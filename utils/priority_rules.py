@@ -17,11 +17,29 @@ def calculate_traffic_priority(road_class: str) -> int:
 
 def calculate_waiting_priority(waiting_days: int) -> int:
     days = waiting_days or 0
-    return int(min(100, (days / WAITING_BONUS_MAX_DAYS) * 100)) if WAITING_BONUS_MAX_DAYS else 0
+    # Saturating function: 90 days = 100% priority.
+    # We can use min(100, (days / 90) * 100) or a curve.
+    return int(min(100, max(0, (days / 90.0) * 100)))
 
 def calculate_report_priority(report_count: int) -> int:
     count = report_count or 1
-    return int(min(100, (count / REPORT_BONUS_MAX_COUNT) * 100)) if REPORT_BONUS_MAX_COUNT else 0
+    if count <= 1:
+        return 0
+    import math
+    # Logarithmic scale: 1 -> 0, 10 -> 40, 100 -> 80, 316+ -> 100
+    return int(min(100, max(0, math.log10(count) * 40)))
+
+def calculate_severity_priority(severity: str) -> int:
+    sev = str(severity).lower()
+    if sev == "critical":
+        return 100
+    elif sev == "high":
+        return 80
+    elif sev == "medium":
+        return 55
+    elif sev == "low":
+        return 30
+    return 30
 
 def calculate_emergency_priority(hazard: Hazard) -> int:
     if getattr(hazard, 'requires_emergency_team', False):

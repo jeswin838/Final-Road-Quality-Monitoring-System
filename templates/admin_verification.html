@@ -270,56 +270,87 @@
         const tBefore = a.before_photo_timestamp ? new Date(a.before_photo_timestamp).toLocaleString() : 'No GPS Metadata';
         const tAfter = a.after_photo_timestamp ? new Date(a.after_photo_timestamp).toLocaleString() : 'No GPS Metadata';
         
-        let durationStr = "Unknown";
-        if (a.reached_at && a.completed_at) {
-            const ms = new Date(a.completed_at) - new Date(a.reached_at);
-            const mins = Math.floor(ms / 60000);
-            durationStr = mins > 0 ? `${mins} mins` : `< 1 min`;
+        // --- ISSUE 2 FIX: Use repair_started_at → repair_completed_at for actual repair duration ---
+        let durationStr = "Duration Not Available";
+        if (a.repair_started_at && a.repair_completed_at) {
+            const ms = new Date(a.repair_completed_at) - new Date(a.repair_started_at);
+            if (ms >= 0) {
+                const totalSeconds = Math.floor(ms / 1000);
+                const hours   = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+                if (hours > 0) {
+                    durationStr = minutes > 0 ? `${hours} hour${hours > 1 ? 's' : ''} ${minutes} minute${minutes !== 1 ? 's' : ''}` : `${hours} hour${hours > 1 ? 's' : ''}`;
+                } else if (minutes > 0) {
+                    durationStr = seconds > 0 ? `${minutes} minute${minutes !== 1 ? 's' : ''} ${seconds} second${seconds !== 1 ? 's' : ''}` : `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+                } else {
+                    durationStr = `${seconds} second${seconds !== 1 ? 's' : ''}`;
+                }
+            }
+        } else if (a.reached_at && a.repair_completed_at) {
+            // Fallback: use reached_at if repair_started_at is missing
+            const ms = new Date(a.repair_completed_at) - new Date(a.reached_at);
+            if (ms >= 0) {
+                const totalSeconds = Math.floor(ms / 1000);
+                const hours   = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+                if (hours > 0) {
+                    durationStr = minutes > 0 ? `${hours} hour${hours > 1 ? 's' : ''} ${minutes} minute${minutes !== 1 ? 's' : ''}` : `${hours} hour${hours > 1 ? 's' : ''}`;
+                } else if (minutes > 0) {
+                    durationStr = seconds > 0 ? `${minutes} minute${minutes !== 1 ? 's' : ''} ${seconds} second${seconds !== 1 ? 's' : ''}` : `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+                } else {
+                    durationStr = `${seconds} second${seconds !== 1 ? 's' : ''}`;
+                }
+            }
         }
 
         // Logic for AI Recommendation
         const aiBefore = a.before_photo ? true : false; 
         const aiAfter = a.after_photo ? true : false;
         
-        // Validation logic
-        function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-            if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return 9999;
-            const l1 = parseFloat(lat1);
-            const ln1 = parseFloat(lon1);
-            const l2 = parseFloat(lat2);
-            const ln2 = parseFloat(lon2);
-            const R = 6371; 
-            const dLat = (l2-l1) * (Math.PI/180);
-            const dLon = (ln2-ln1) * (Math.PI/180); 
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                    Math.cos(l1 * (Math.PI/180)) * Math.cos(l2 * (Math.PI/180)) * 
-                    Math.sin(dLon/2) * Math.sin(dLon/2); 
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-            return R * c; 
+        // --- ISSUE 1 FIX: Compare Before GPS vs After GPS using Haversine, with 10 m tolerance ---
+        // Only fail if BOTH coords exist but are far apart. Show unavailable when coords are missing.
+        function haversineMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // metres
+            const toRad = x => x * Math.PI / 180;
+            const dLat = toRad(parseFloat(lat2) - parseFloat(lat1));
+            const dLon = toRad(parseFloat(lon2) - parseFloat(lon1));
+            const sinLat = Math.sin(dLat / 2);
+            const sinLon = Math.sin(dLon / 2);
+            const a = sinLat * sinLat +
+                Math.cos(toRad(parseFloat(lat1))) * Math.cos(toRad(parseFloat(lat2))) * sinLon * sinLon;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
 
-        const bDist = getDistanceFromLatLonInKm(h.latitude, h.longitude, a.before_photo_lat, a.before_photo_lon);
-        const aDist = getDistanceFromLatLonInKm(h.latitude, h.longitude, a.after_photo_lat, a.after_photo_lon);
-        
-        const bDistMeters = bDist * 1000;
-        const aDistMeters = aDist * 1000;
-        const threshold = 100;
-        
-        const gpsMatches = (a.before_photo_lat != null && a.after_photo_lat != null && bDistMeters <= threshold && aDistMeters <= threshold); 
-        
-        console.log(`Hazard GPS: ${h.latitude},${h.longitude}`);
-        console.log(`Before GPS: ${a.before_photo_lat},${a.before_photo_lon}`);
-        console.log(`After GPS: ${a.after_photo_lat},${a.after_photo_lon}`);
-        console.log(`Distance Before: ${bDistMeters.toFixed(2)} m`);
-        console.log(`Distance After: ${aDistMeters.toFixed(2)} m`);
-        console.log(`Threshold: ${threshold} m`);
-        console.log(`GPS Result: ${gpsMatches ? 'PASS' : 'FAIL'}`);
+        const GPS_TOLERANCE_METERS = 10; // allow up to 10 m drift between photos
+        const beforeHasGps = (a.before_photo_lat != null && a.before_photo_lon != null);
+        const afterHasGps  = (a.after_photo_lat  != null && a.after_photo_lon  != null);
+        let gpsMatches = false;
+        let gpsUnavailable = false;
+
+        if (!beforeHasGps || !afterHasGps) {
+            // One or both photos have no GPS metadata
+            gpsUnavailable = true;
+            gpsMatches = false;
+        } else {
+            const distBetweenPhotos = haversineMeters(
+                a.before_photo_lat, a.before_photo_lon,
+                a.after_photo_lat,  a.after_photo_lon
+            );
+            gpsMatches = distBetweenPhotos <= GPS_TOLERANCE_METERS;
+            console.log(`Before GPS: ${a.before_photo_lat},${a.before_photo_lon}`);
+            console.log(`After GPS:  ${a.after_photo_lat},${a.after_photo_lon}`);
+            console.log(`Distance between photos: ${distBetweenPhotos.toFixed(2)} m | Tolerance: ${GPS_TOLERANCE_METERS} m`);
+            console.log(`GPS Result: ${gpsMatches ? 'PASS' : 'FAIL'}`);
+        }
 
         const timeValid = (a.before_photo_timestamp && a.after_photo_timestamp && new Date(a.before_photo_timestamp) <= new Date(a.after_photo_timestamp));
 
         const aiScore = a.ai_score || 95; // Default if missing
 
-        const isPass = aiBefore && aiAfter && gpsMatches && timeValid;
+        // GPS unavailability should not cause a hard fail of the overall AI recommendation
+        const isPass = aiBefore && aiAfter && (gpsMatches || gpsUnavailable) && timeValid;
 
         const aiResultBefore = aiBefore ? 
             `<span style="color:#22c55e;"><i class="fa-solid fa-check"></i> Pothole Detected</span>` : 
@@ -403,8 +434,8 @@
                                     No pothole detected after
                                 </div>
                                 <div class="ai-check-item">
-                                    <i class="fa-solid ${gpsMatches ? 'fa-check-circle ai-check-icon pass' : 'fa-times-circle ai-check-icon fail'}"></i>
-                                    GPS matches
+                                    <i class="fa-solid ${gpsUnavailable ? 'fa-circle-question ai-check-icon' : (gpsMatches ? 'fa-check-circle ai-check-icon pass' : 'fa-times-circle ai-check-icon fail')}" style="${gpsUnavailable ? 'color:#f59e0b;' : ''}"></i>
+                                    ${gpsUnavailable ? 'GPS Metadata Unavailable' : 'GPS matches'}
                                 </div>
                                 <div class="ai-check-item">
                                     <i class="fa-solid ${timeValid ? 'fa-check-circle ai-check-icon pass' : 'fa-times-circle ai-check-icon fail'}"></i>

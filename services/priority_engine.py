@@ -8,10 +8,8 @@ from utils.priority_constants import (
     ESTIMATED_REPAIR_DAYS
 )
 from utils.priority_rules import (
-    calculate_road_priority, calculate_traffic_priority,
-    calculate_waiting_priority, calculate_report_priority,
-    calculate_emergency_priority, determine_escalation_level,
-    generate_priority_reason
+    calculate_waiting_priority, calculate_report_priority, calculate_severity_priority,
+    determine_escalation_level, generate_priority_reason
 )
 
 logger = logging.getLogger(__name__)
@@ -23,29 +21,25 @@ class PriorityEngine:
     def calculate(hazard: Hazard) -> Hazard:
         """Calculates Priority Score, Flags, and Operational Metadata."""
         
-        # Component Scores (No getattr)
+        # Component Scores
         r_score = hazard.risk_score or 0
-        road_imp = hazard.road_importance or 10
-        road_cls = hazard.road_class or "Unknown"
+        severity_val = getattr(hazard, 'severity', 'Low') or "Low"
         waiting = hazard.waiting_days or 0
         reports = hazard.report_count or 1
+        road_imp = hazard.road_importance or 10 # Needed for operational flags
         
-        p_risk = r_score * PRIORITY_WEIGHTS["risk"]
-        p_road = calculate_road_priority(road_imp) * PRIORITY_WEIGHTS["road"]
-        p_traffic = calculate_traffic_priority(road_cls) * PRIORITY_WEIGHTS["traffic"]
-        p_wait = calculate_waiting_priority(waiting) * PRIORITY_WEIGHTS["waiting"]
-        p_rep = calculate_report_priority(reports) * PRIORITY_WEIGHTS["reports"]
-        p_emg = calculate_emergency_priority(hazard) * PRIORITY_WEIGHTS["emergency"]
+        p_risk = r_score * PRIORITY_WEIGHTS.get("risk", 0.25)
+        p_sev = calculate_severity_priority(severity_val) * PRIORITY_WEIGHTS.get("severity", 0.30)
+        p_wait = calculate_waiting_priority(waiting) * PRIORITY_WEIGHTS.get("waiting", 0.20)
+        p_rep = calculate_report_priority(reports) * PRIORITY_WEIGHTS.get("reports", 0.25)
         
-        raw_score = p_risk + p_road + p_traffic + p_wait + p_rep + p_emg
+        raw_score = p_risk + p_sev + p_wait + p_rep
         
         hazard.priority_breakdown = {
             "risk": round(p_risk, 2),
-            "road": round(p_road, 2),
-            "traffic": round(p_traffic, 2),
+            "severity": round(p_sev, 2),
             "waiting": round(p_wait, 2),
-            "reports": round(p_rep, 2),
-            "emergency": round(p_emg, 2)
+            "reports": round(p_rep, 2)
         }
         
         hazard.priority_score = int(min(100, max(0, raw_score)))
@@ -119,12 +113,13 @@ class PriorityEngine:
                 logger.exception(f"Error calculating priority for hazard {h.hazard_id}: {e}")
             
         # Sort highest priority score first
-        # Resolve ties with waiting_days, then report_count, risk_score, created_at
+        # Resolve ties with severity, then report_count, waiting_days, risk_score, created_at
         hazards.sort(
             key=lambda h: (
                 h.priority_score or 0,
-                h.waiting_days or 0,
+                calculate_severity_priority(getattr(h, 'severity', 'Low') or "Low"),
                 h.report_count or 1,
+                h.waiting_days or 0,
                 h.risk_score or 0,
                 h.created_at or ""
             ),

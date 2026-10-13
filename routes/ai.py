@@ -590,20 +590,6 @@ def analyze():
         debug_dir = os.path.join("debug_uploads", req_folder)
         os.makedirs(debug_dir, exist_ok=True)
         
-        print("==================================================")
-        print("NEW REQUEST")
-        print(f"Timestamp: {now_dt.isoformat()}")
-        print(f"Request Folder: {req_folder}")
-        print(f"Number of Images: {len(raw_files)}")
-        print(f"Client IP: {request.headers.get('X-Forwarded-For', request.remote_addr)}")
-        print(f"User Agent: {request.headers.get('User-Agent', '')}")
-        print("==================================================")
-
-        for i, f in enumerate(raw_files):
-            save_path = os.path.join(debug_dir, f"frame_{i}.jpg")
-            f.save(save_path)
-            f.stream.seek(0)
-
         # SAFE GPS PARSING
         try:
             lat = float(request.form.get("lat", "0"))
@@ -612,18 +598,21 @@ def analyze():
             lat = 0.0
             lon = 0.0
 
-        phone_vibration = float(
-            request.form.get("vibration", 0)
-        )
+        phone_vibration = float(request.form.get("vibration", 0))
 
-        print(
-            f"[PHONE VIBRATION] {phone_vibration}"
-        )
+        print("====================================================")
+        print("📸 NEW AI ANALYSIS REQUEST")
+        print("====================================================")
+        print(f"Timestamp: {now_dt.isoformat()}")
+        print(f"Latitude: {lat}")
+        print(f"Longitude: {lon}")
+        print(f"Vibration value: {phone_vibration}")
+        print(f"Number of uploaded images: {len(raw_files)}")
 
-        print("========== REQUEST DEBUG ==========")
-        print("FILES COUNT:", len(raw_files))
-        print("LAT:", lat)
-        print("LON:", lon)
+        for i, f in enumerate(raw_files):
+            save_path = os.path.join(debug_dir, f"frame_{i}.jpg")
+            f.save(save_path)
+            f.stream.seek(0)
 
         # STRICT VALIDATION
         valid_files = []
@@ -682,26 +671,16 @@ def analyze():
         for idx, item in enumerate(files):
             f, file_bytes, q_val = item
             
-            mem_bd = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
-            print(f"[MEM] Before decode: {mem_bd:.1f}MB")
-            
             np_arr = np.frombuffer(file_bytes, np.uint8)
             img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-            
-            mem_ad = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
-            print(f"[MEM] After decode: {mem_ad:.1f}MB")
             
             decode_success = img is not None
             img_h, img_w, img_c = img.shape if decode_success else (0, 0, 0)
             
-            print(f"Frame Index: {idx}")
+            print(f"\nImage {idx + 1}")
             print(f"Filename: {f.filename if hasattr(f, 'filename') else 'unknown'}")
-            print(f"Byte Size: {len(file_bytes)}")
-            print(f"Image Width: {img_w}")
-            print(f"Image Height: {img_h}")
-            print(f"Image Channels: {img_c}")
-            print(f"JPEG Decode Success: {decode_success}")
-            print("--------------------------------------------------")
+            print(f"Resolution: {img_w}x{img_h}")
+            print(f"Size: {len(file_bytes) // 1024} KB")
             
             del np_arr
 
@@ -713,19 +692,15 @@ def analyze():
                 cv2.imwrite(f"received_{idx}.jpg", img)
 
             if m:
-                mem_bi = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
-                print(f"[MEM] Before YOLO inference: {mem_bi:.1f}MB")
-                
+                print("\nRunning YOLO inference...")
                 results, detections = run_inference(m, img)
                 
-                mem_ai = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
-                print(f"[MEM] After YOLO inference: {mem_ai:.1f}MB")
-
-                print(f"Frame Index: {idx}")
-                print(f"Number of detections: {len(detections)}")
-                for d in detections:
-                    print(f"Confidence: {d.get('confidence')}")
-                    print(f"Bounding Box: {d.get('box')}")
+                if not detections:
+                    print("No object detected")
+                else:
+                    for d in detections:
+                        print(f"Detected: {d.get('type', 'pothole')}")
+                        print(f"Confidence: {d.get('confidence', 0.0):.2f}")
 
                 strong_detections = [
                     d for d in detections
@@ -736,8 +711,6 @@ def analyze():
                     any_valid_frames = True
                     # Calculate score manually instead of storing all frames
                     primary = max(strong_detections, key=lambda d: d.get("bbox_ratio", 0.0))
-                    
-                    print(f"Best Detection: {primary}")
                     
                     yolo_conf = primary.get("confidence", 0.0)
                     bbox_ratio = primary.get("bbox_ratio", 0.0)
@@ -764,7 +737,12 @@ def analyze():
         _yolo_ms = (time.time() - _t_yolo_start) * 1000
 
         # ----- 5. Best Frame Selection -----
+        print("\n===================================")
+        print("BEST DETECTION")
+        print("===================================")
+        
         if not any_valid_frames or best_img is None:
+            print("No pothole detected.\n")
             dlog.no_detection()
             return jsonify({
                 "success": False,
@@ -772,11 +750,18 @@ def analyze():
             })
 
         if len(best_detections) == 0:
+            print("No pothole detected.\n")
             dlog.no_detection()
             return jsonify({
                 "status": "ignored",
                 "reason": "no_ai_detection"
             })
+
+        best_f_name = files[best_idx][0].filename if best_idx >= 0 and best_idx < len(files) else "unknown"
+        primary_overall = max(best_detections, key=lambda d: d.get("bbox_ratio", 0.0)) if best_detections else {}
+        print(f"Best Image: {best_f_name}")
+        print(f"Class: {primary_overall.get('type', 'pothole')}")
+        print(f"Confidence: {primary_overall.get('confidence', 0.0):.2f}\n")
 
         # ----- Log each detection -----
         for i, det in enumerate(best_detections, start=1):
@@ -886,15 +871,9 @@ def analyze():
                 # Always refresh duplicate timestamp and increment count
                 refresh_duplicate_timestamp(supabase, inserted_id, now_iso)
                 
-            print("==================================================")
-            print("DATABASE INSERT LOG")
-            print(f"Best Frame Index: {best_idx}")
-            print(f"Best Confidence: {primary['confidence']}")
-            print(f"Latitude: {lat}")
-            print(f"Longitude: {lon}")
-            print(f"Duplicate Found: {duplicate is not None}")
-            print(f"Action: {action_taken}")
-            print("==================================================")
+            print("\nSaving report...")
+            print(f"Report ID: {inserted_id}")
+            print("Report saved successfully.")
 
         except Exception as e:
             import traceback
@@ -955,24 +934,10 @@ def analyze():
 
         # ----- 10. Immediate API Response -----
         _total_s = time.time() - _t_total_start
-        print("========== PERFORMANCE LOGGING ==========")
-        print(f"Received Frames: {len(raw_files)}")
-        print(f"Valid Frames: {len(files)}")
-        print(f"Frames Sent To YOLO: {len(files)}")
-        print(f"Best Frame Index: {best_idx}")
-        print(f"Best Frame Score: {best_score:.2f}")
-        print(f"YOLO Inference Time: {_yolo_ms:.2f}ms")
-        print(f"Database Insert Time: {_db_ms:.2f}ms")
-        print(f"Background Upload Time: Delegated to async thread")
-        print(f"Total Request Time: {_total_s * 1000:.2f}ms")
-        print("=========================================")
-
         dlog.timings(yolo_ms=_yolo_ms, upload_ms=0.0, db_ms=_db_ms, total_s=_total_s)
         dlog.request_end()
         
-        print("Request Finished")
-        print(f"Folder Location: {debug_dir}")
-        print("==================================================")
+        print("\nAnalysis completed successfully.\n")
         
         return jsonify({
             "status":     "success",
@@ -987,14 +952,17 @@ def analyze():
 
     except Exception as e:
         import traceback
+        print("\n===================================")
+        print("❌ ERROR DURING AI ANALYSIS")
+        print("===================================")
         traceback.print_exc()
+        print(f"Error Message: {str(e)}\n")
         dlog.error(e)
-        print(f"[FUSION] ❌ Unhandled error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         processing = False
-        mem_after_resp = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
-        print(f"[MEM] After response: {mem_after_resp:.1f}MB")
+        processing = False
+        gc.collect()
         gc.collect()
 
 

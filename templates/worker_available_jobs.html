@@ -439,7 +439,10 @@ const MapManager = {
     map: null, workerMarker: null, markers: {},
     init() {
         this.map = L.map('jobsMap', { zoomControl: false, attributionControl: false }).setView([40.7128, -74.0060], 13);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(this.map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(this.map);
     },
     initWorkerMarker() {
         const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="wk-map-marker-pulse"></div>`, iconSize: [30, 30], iconAnchor: [15, 15] });

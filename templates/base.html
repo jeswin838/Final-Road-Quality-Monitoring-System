@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}PotholePro{% endblock %}</title>
+  <title>{% block title %}VisionaryRoad{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
     rel="stylesheet" />
@@ -12,12 +12,12 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}"/>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/design_system.css') }}"/>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/glassmorphism.css') }}"/>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/design_system.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/glassmorphism.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}" />
   {% if session.get('role') == 'worker' %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/worker.css') }}"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/worker.css') }}" />
   {% endif %}
   {% block head %}{% endblock %}
 </head>
@@ -71,32 +71,28 @@
       {% if session.get('role') == 'worker' %}
       <div class="nav-section">
         <div class="nav-label">Work Management</div>
-        <a href="{{ url_for('pages.worker_available_jobs') }}" class="nav-item {% if page=='worker_available_jobs' %}active{% endif %}">
+        <a href="{{ url_for('pages.worker_available_jobs') }}"
+          class="nav-item {% if page=='worker_available_jobs' %}active{% endif %}">
           <i class="fa-solid fa-briefcase"></i><span>Available Jobs</span>
           <span class="wk-count-badge" style="position:static; margin-left:auto;">3</span>
         </a>
-        <a href="{{ url_for('pages.worker_active_job') }}" class="nav-item {% if page=='worker_active_job' %}active{% endif %}">
+        <a href="{{ url_for('pages.worker_active_job') }}"
+          class="nav-item {% if page=='worker_active_job' %}active{% endif %}">
           <i class="fa-solid fa-hammer"></i><span>My Active Job</span>
         </a>
-        <a href="{{ url_for('pages.worker_history') }}" class="nav-item {% if page=='worker_history' %}active{% endif %}">
+        <a href="{{ url_for('pages.worker_history') }}"
+          class="nav-item {% if page=='worker_history' %}active{% endif %}">
           <i class="fa-solid fa-clock-rotate-left"></i><span>Work History</span>
         </a>
-        <a href="{{ url_for('pages.worker_upload') }}" class="nav-item {% if page=='worker_upload' %}active{% endif %}">
-          <i class="fa-solid fa-upload"></i><span>Upload Evidence</span>
-        </a>
-        <a href="{{ url_for('pages.worker_notifications') }}" class="nav-item {% if page=='worker_notifications' %}active{% endif %}">
-          <i class="fa-solid fa-bell"></i><span>Notifications</span>
-          <span class="wk-count-badge" style="position:static; margin-left:auto; background:var(--worker-accent-primary);">1</span>
-        </a>
+        
       </div>
       <div class="nav-section">
         <div class="nav-label">Account</div>
-        <a href="{{ url_for('pages.worker_profile') }}" class="nav-item {% if page=='worker_profile' %}active{% endif %}">
+        <a href="{{ url_for('pages.worker_profile') }}"
+          class="nav-item {% if page=='worker_profile' %}active{% endif %}">
           <i class="fa-solid fa-user"></i><span>Profile</span>
         </a>
-        <a href="{{ url_for('pages.settings') }}" class="nav-item {% if page=='settings' %}active{% endif %}">
-          <i class="fa-solid fa-gear"></i><span>Settings</span>
-        </a>
+        
       </div>
       {% endif %}
 
@@ -109,10 +105,9 @@
         <a href="{{ url_for('pages.analytics') }}" class="nav-item {% if page=='analytics' %}active{% endif %}">
           <i class="fa-solid fa-chart-line"></i><span>Analytics</span>
         </a>
-        <a href="{{ url_for('pages.maintenance') }}" class="nav-item {% if page=='maintenance' %}active{% endif %}">
-          <i class="fa-solid fa-wrench"></i><span>Tracking</span>
-        </a>
-        <a href="{{ url_for('pages.admin_verification') }}" class="nav-item {% if page=='admin_verification' %}active{% endif %}">
+       
+        <a href="{{ url_for('pages.admin_verification') }}"
+          class="nav-item {% if page=='admin_verification' %}active{% endif %}">
           <i class="fa-solid fa-clipboard-check"></i><span>Worker Verification</span>
         </a>
       </div>
@@ -188,7 +183,7 @@
   </main>
 
   <!-- Modals converted to new custom API -->
-  
+
   <!-- Assign Modal (Kept due to complex multi-input form) -->
   <div class="modal-overlay" id="assignModal" style="display:none">
     <div class="modal-box">
