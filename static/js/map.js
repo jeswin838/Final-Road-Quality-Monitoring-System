@@ -42,10 +42,40 @@ let showClusters       = true;
 let refreshTimer       = null;
 let autoRefreshInterval= null;
 let isLoadingMarkers   = false;
-let activeFilters      = { severity: '', status: '', confidence: 0 };
+let activeFilters      = { severity: '', status: '' };
 let userMarker         = null;
 let firstLoad           = true;
 let currentOpenMarkerId = null;
+
+function normalizeStatusGroup(statusStr) {
+  if (!statusStr) return 'pending';
+  const s = String(statusStr).toLowerCase().trim();
+  if (s === 'fixed' || s === 'completed' || s === 'verified' || s === 'repair completed' || s === 'closed') {
+    return 'fixed';
+  }
+  if (s === 'in progress' || s === 'in_progress' || s === 'repair started' || s === 'travelling' || s === 'reached site' || s === 'assigned' || s === 'accepted') {
+    return 'in progress';
+  }
+  if (s === 'pending' || s === 'pending repair' || s === 'available' || s === 'detected' || s === 'unassigned') {
+    return 'pending';
+  }
+  return 'pending';
+}
+
+function normalizeSeverityGroup(sevStr) {
+  if (!sevStr) return 'medium';
+  const s = String(sevStr).toLowerCase().trim();
+  if (s === 'critical' || s === 'high') {
+    return 'high';
+  }
+  if (s === 'medium') {
+    return 'medium';
+  }
+  if (s === 'low') {
+    return 'low';
+  }
+  return s;
+}
 
 map.addLayer(markerClusterGroup);
 
@@ -122,8 +152,23 @@ function locateMe() {
 // ── Marker icons ─────────────────────────────────────────────────────────────
 function makeIcon(severity, isUserReport = false, status = '') {
   const sev = (severity || '').toLowerCase();
-  const sts = (status || '').toLowerCase();
-  if (sts === 'in progress' || sts === 'repair started') {
+  const stsNorm = normalizeStatusGroup(status);
+  
+  if (stsNorm === 'fixed') {
+    const fixedSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 32" width="24" height="32">
+      <path d="M12 0C5.4 0 0 5.4 0 12c0 8 12 20 12 20S24 20 24 12C24 5.4 18.6 0 12 0z" fill="#10b981" stroke="#fff" stroke-width="1.5"/>
+      <path d="M7.5 12.5l3 3 6-6" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+    return L.divIcon({
+      html: fixedSvg,
+      className: '',
+      iconSize:   [24, 32],
+      iconAnchor: [12, 32],
+      popupAnchor:[0, -32],
+    });
+  }
+  
+  if (stsNorm === 'in progress') {
     const maintenanceSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 32" width="24" height="32">
       <path d="M12 0C5.4 0 0 5.4 0 12c0 8 12 20 12 20S24 20 24 12C24 5.4 18.6 0 12 0z" fill="#f59e0b" stroke="#fff" stroke-width="1.5"/>
       <path d="M7 16h10l-1-7H8l-1 7zM9 8h6v1H9V8z" fill="#111" />
@@ -136,6 +181,7 @@ function makeIcon(severity, isUserReport = false, status = '') {
       popupAnchor:[0, -32],
     });
   }
+  
   const colors = { critical: '#DC2626', high: '#ef4444', medium: '#f97316', low: '#22c55e' };
   const color  = colors[sev] || '#6366f1';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 32" width="24" height="32">
@@ -335,7 +381,7 @@ async function loadMarkers() {
     if (spinner) spinner.style.display = 'block';
 
     try {
-      const res = await fetch('/api/alerts');
+      const res = await fetch('/api/alerts?all=true');
       allData = await res.json();
       userReports = []; // No longer needed separately
     } catch (e) {
@@ -345,13 +391,8 @@ async function loadMarkers() {
     }
     
     if (spinner) spinner.style.display = 'none';
-    renderMarkers();
+    applyFilters();
     updateStats();
-    
-    // Update alerts panel using the same data to save API calls
-    if (typeof pollAlerts === 'function') {
-      pollAlerts(allData);
-    }
 
     if (firstLoad) {
       focusTargetReport();
@@ -444,16 +485,60 @@ function focusTargetReport() {
     }
 }
 
-function renderMarkers() {
-  markerClusterGroup.clearLayers();
+function getFilteredData() {
+  if (!allData || !Array.isArray(allData)) return [];
+  
+  return allData.filter(r => {
+    // 1. Severity filter
+    if (activeFilters.severity) {
+      const targetSev = activeFilters.severity.toLowerCase();
+      const itemSev = normalizeSeverityGroup(r.severity);
+      if (targetSev === 'high') {
+        if (itemSev !== 'high') return false;
+      } else if (targetSev === 'medium') {
+        if (itemSev !== 'medium') return false;
+      } else if (targetSev === 'low') {
+        if (itemSev !== 'low') return false;
+      }
+    }
+    
+    // 2. Status filter
+    if (activeFilters.status) {
+      const targetStat = activeFilters.status.toLowerCase();
+      const rawStatus = r.status || (r.workflow && r.workflow.state) || (r.assignment && r.assignment.status);
+      const itemStat = normalizeStatusGroup(rawStatus);
+      if (targetStat === 'pending') {
+        if (itemStat !== 'pending') return false;
+      } else if (targetStat === 'in progress') {
+        if (itemStat !== 'in progress') return false;
+      } else if (targetStat === 'fixed') {
+        if (itemStat !== 'fixed') return false;
+      }
+    }
+    
+    return true;
+  });
+}
 
-    allData.forEach(r => {
+function applyFilters() {
+  const filtered = getFilteredData();
+  renderMarkers(filtered);
+  if (typeof pollAlerts === 'function') {
+    pollAlerts(filtered);
+  }
+}
+
+function renderMarkers(dataset) {
+  markerClusterGroup.clearLayers();
+  const data = dataset !== undefined ? dataset : getFilteredData();
+
+  data.forEach(r => {
     const lat = parseFloat(r.latitude);
     const lon = parseFloat(r.longitude);
     if (isNaN(lat) || isNaN(lon)) return;
     
     if (showClusters) {
-      const isUserReport = r.type === 'user_report';
+      const isUserReport = r.type === 'user_report' || (r.source && r.source.toLowerCase() === 'citizen');
       const marker = L.marker([lat, lon], { icon: makeIcon(r.severity, isUserReport, r.status) });
       
       // Store a usable identifier inside the marker options even if marker_id does not exist.
@@ -475,7 +560,6 @@ function renderMarkers() {
           }
       });
   }
-
 }
 
 // ── Stats cards ──────────────────────────────────────────────────────────────
@@ -485,11 +569,12 @@ async function updateStats() {
     const data = await res.json();
     const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
     
-    if (typeof allData !== 'undefined' && allData) {
+    if (typeof allData !== 'undefined' && allData && allData.length > 0) {
         let totalLocations = allData.length;
         let todayLocations = 0;
         let fixedLocations = 0;
         let pendingLocations = 0;
+        let inprogLocations = 0;
         
         const todayStr = new Date().toISOString().split('T')[0];
 
@@ -500,25 +585,28 @@ async function updateStats() {
             }
 
             // Check the status of the grouped location
-            const s = (r.status || 'Pending').toLowerCase().trim();
-            if (s === 'completed' || s === 'fixed' || s === 'closed') {
+            const rawStat = r.status || (r.workflow && r.workflow.state) || (r.assignment && r.assignment.status);
+            const s = normalizeStatusGroup(rawStat);
+            if (s === 'fixed') {
                 fixedLocations++;
             } else if (s === 'in progress') {
-                pendingLocations++; // Alternatively track separately if needed, but 'Pending Repairs' usually encompasses non-fixed
+                inprogLocations++;
             } else {
                 pendingLocations++;
             }
         });
 
-        setEl('stat-total',   totalLocations);
-        setEl('stat-today',   todayLocations);
-        setEl('stat-fixed',   fixedLocations);
-        setEl('stat-pending', pendingLocations);
+        setEl('stat-total',      totalLocations);
+        setEl('stat-today',      todayLocations);
+        setEl('stat-fixed',      fixedLocations);
+        setEl('stat-pending',    pendingLocations);
+        setEl('stat-inprogress', inprogLocations);
     } else {
-        setEl('stat-total',   data.total   ?? '—');
-        setEl('stat-today',   data.today   ?? '—');
-        setEl('stat-fixed',   data.fixed   ?? '—');
-        setEl('stat-pending', data.pending ?? '—');
+        setEl('stat-total',      data.total       ?? '—');
+        setEl('stat-today',      data.today       ?? '—');
+        setEl('stat-fixed',      data.fixed       ?? '—');
+        setEl('stat-pending',    data.pending     ?? '—');
+        setEl('stat-inprogress', data.in_progress ?? '—');
     }
   } catch (_) {}
 }
@@ -530,14 +618,13 @@ function toggleClusters() {
   renderMarkers();
 }
 
-
 // ── Filter chips ─────────────────────────────────────────────────────────────
 document.querySelectorAll('#severityFilters .filter-chip').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#severityFilters .filter-chip').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    activeFilters.severity = btn.dataset.val;
-    scheduleRefresh();
+    activeFilters.severity = btn.dataset.val || '';
+    applyFilters();
   });
 });
 
@@ -545,8 +632,8 @@ document.querySelectorAll('#statusFilters .filter-chip').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#statusFilters .filter-chip').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    activeFilters.status = btn.dataset.val;
-    scheduleRefresh();
+    activeFilters.status = btn.dataset.val || '';
+    applyFilters();
   });
 });
 
@@ -583,14 +670,6 @@ window.navigateHazardToSafeNav = function(id, lat, lng) {
       }
   });
 };
-
-const confSlider = document.getElementById('confSlider');
-if (confSlider) {
-  confSlider.addEventListener('change', () => {
-    activeFilters.confidence = confSlider.value;
-    scheduleRefresh();
-  });
-}
 
 // ── Auto refresh ─────────────────────────────────────────────────────────────
 function scheduleRefresh() {
