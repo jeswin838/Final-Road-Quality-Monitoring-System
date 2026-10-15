@@ -66,16 +66,12 @@ class HazardRegistryCache:
     def _precompute_dict(self, hazard: Hazard):
         """Precompute JSON serialization for O(1) response caching."""
         d = hazard.to_dict()
-        status_val = getattr(hazard, 'status', None) or "Pending"
-        m_state = getattr(hazard, 'maintenance_state', None)
         if hasattr(hazard, 'assignment') and hazard.assignment:
             d["assignment"] = hazard.assignment
             if d["assignment"].get("status"):
-                status_val = d["assignment"]["status"]
+                d["status"] = d["assignment"]["status"]
         else:
             d["assignment"] = None
-        d["status"] = status_val
-        d["maintenance_state"] = m_state or status_val
         hazard._cached_dict = d
 
     def update_hazard_in_cache(self, hazard: Hazard):

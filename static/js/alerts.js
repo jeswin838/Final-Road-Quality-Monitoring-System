@@ -39,12 +39,6 @@ function renderAlertPanel(alerts) {
   const countEl = document.getElementById('alertCount');
   if (!panel) return;
 
-  if (!alerts || alerts.length === 0) {
-    panel.innerHTML = '<div style="text-align:center; padding:30px 10px; color:var(--muted); font-size:0.85rem"><i class="fa-solid fa-filter-circle-xmark" style="font-size:1.8rem; display:block; margin-bottom:8px; opacity:0.5"></i>No reports match current filters.</div>';
-    if (countEl) countEl.textContent = '0';
-    return;
-  }
-
   // Sort by last_reported_at desc
   const sorted = [...alerts].sort((a,b) => new Date(b.last_reported_at) - new Date(a.last_reported_at));
   
@@ -56,19 +50,15 @@ function renderAlertPanel(alerts) {
 
   recent.forEach(r => {
     const stat = (r.status || '').toLowerCase();
-    const rawSev = (r.severity || '').toLowerCase();
     let sevDisplay = '';
     let sevColor = '';
-    
-    if (rawSev && rawSev !== 'unknown' && rawSev !== 'n/a') {
-      sevDisplay = rawSev.toUpperCase();
-      sevColor = rawSev === 'critical' ? '#DC2626' : rawSev === 'high' ? '#ef4444' : rawSev === 'medium' ? '#f97316' : '#22c55e';
-    } else if (stat === 'pending' || stat === 'rejected') {
-      sevDisplay = 'PENDING';
-      sevColor = '#9ca3af';
+    if (stat === 'pending' || stat === 'rejected') {
+        sevDisplay = 'N/A';
+        sevColor = '#9ca3af';
     } else {
-      sevDisplay = 'MEDIUM';
-      sevColor = '#f97316';
+        const sev = (r.severity || '').toLowerCase();
+        sevDisplay = sev.toUpperCase();
+        sevColor = sev === 'critical' ? '#DC2626' : sev === 'high' ? '#ef4444' : sev === 'medium' ? '#f97316' : '#22c55e';
     }
     
     const cardId = `live-alert-${r.id || r.marker_id}`;

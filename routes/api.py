@@ -1671,7 +1671,7 @@ def get_alerts_unified():
         cache_miss = True
     db_time = time.time() - db_start
     
-    f_all = request.args.get("all", "").lower() in ("true", "1") or request.args.get("include_all", "").lower() in ("true", "1")
+    # Extract Filters
     f_severity  = request.args.get("severity", "").lower()
     f_status    = request.args.get("status", "").lower()
     f_priority  = request.args.get("priority", "").lower()
@@ -1705,9 +1705,6 @@ def get_alerts_unified():
             f"Total API Time: {total_time * 1000:.2f}ms\n"
             f"====================================="
         )
-        if f_all:
-            return jsonify(registry_cache.get_all_json())
-
         # Filter out terminal statuses (Completed, Rejected, Closed) from the O(1) cache path
         # so the Alerts page never shows completed hazards even on cache-hit
         TERMINAL_STATUSES = {'Completed', 'Rejected', 'Closed', 'Verified', 'Fixed'}
@@ -1719,34 +1716,18 @@ def get_alerts_unified():
         print(f"[WORKFLOW] [ALERT CACHE REFRESHED] /api/alerts serving {len(active_hazards)} active hazards.")
         return jsonify(active_hazards)
         
-    def _norm_status_group(status_str):
-        if not status_str:
-            return "pending"
-        s = str(status_str).lower().strip()
-        if s in ("fixed", "completed", "verified", "repair completed", "closed"):
-            return "fixed"
-        if s in ("in progress", "in_progress", "repair started", "travelling", "reached site", "assigned", "accepted"):
-            return "in progress"
-        if s in ("pending", "pending repair", "available", "detected", "unassigned"):
-            return "pending"
-        return "pending"
-
     filtered_alerts = []
     # If filters are applied, loop over the O(1) cached dicts for sub-ms filtering
     hazards_json = registry_cache.get_all_json()
     for alert_dict in hazards_json:
-        if f_severity and f_severity != "all":
-            sev_raw = str(alert_dict.get("severity", "")).lower()
-            if f_severity in ("high", "critical"):
-                if sev_raw not in ("high", "critical"):
-                    continue
-            elif sev_raw != f_severity:
-                continue
+        if f_severity and f_severity != "all" and str(alert_dict.get("severity", "")).lower() != f_severity:
+            continue
             
+        h_state = (alert_dict.get("maintenance_state") or alert_dict.get("status") or "").lower()
         if f_status and f_status != "all":
-            curr_stat = _norm_status_group(alert_dict.get("status") or alert_dict.get("maintenance_state") or (alert_dict.get("assignment") or {}).get("status"))
-            target_stat = _norm_status_group(f_status)
-            if curr_stat != target_stat:
+            if f_status == "pending" and h_state != "pending repair":
+                continue
+            elif f_status != "pending" and h_state != f_status:
                 continue
                 
         if f_priority and f_priority != "all" and str(alert_dict.get("priority", "")).lower() != f_priority:

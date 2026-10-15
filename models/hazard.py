@@ -172,8 +172,6 @@ class Hazard:
             "first_reported_at": first_rep,
             "last_seen": self.latest_report_time or self.created_at,
             
-            "status": a_dict.get("status") or getattr(self, "status", "Pending") or "Pending",
-            "maintenance_state": a_dict.get("status") or getattr(self, "maintenance_state", None) or getattr(self, "status", "Pending") or "Pending",
             "road_name": getattr(self, "road_name", "Unknown Road"),
             "street_name": getattr(self, "street", ""),
             "landmark": getattr(self, "landmark", "Unavailable"),
