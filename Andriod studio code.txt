@@ -1,0 +1,876 @@
+package com.example.roadmonitorapp;
+
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.graphics.ImageFormat;
+import android.graphics.Rect;
+import android.graphics.YuvImage;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CaptureRequest;
+import android.location.Location;
+import android.os.Bundle;
+import android.util.Log;
+import android.util.Range;
+import android.util.Size;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.camera.camera2.interop.Camera2Interop;
+import androidx.camera.core.CameraSelector;
+import androidx.camera.core.ImageAnalysis;
+import androidx.camera.core.ImageProxy;
+import androidx.camera.core.Preview;
+import androidx.camera.lifecycle.ProcessCameraProvider;
+import androidx.camera.view.PreviewView;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.Priority;
+import com.google.common.util.concurrent.ListenableFuture;
+
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
+
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+public class MainActivity extends AppCompatActivity implements SensorEventListener {
+
+    private static final String TAG = "RoadMonitor_PROD";
+    private final String BASE_URL = "http://10.137.240.180:5000";
+
+    private PreviewView previewView;
+    private FusedLocationProviderClient fusedLocationClient;
+
+    // ================= FRAME BUFFER & CONCURRENCY =================
+
+    // Increased to 30 frames (~0.5 seconds of history at 60FPS)
+    private final ArrayDeque<FrameData> frameBuffer = new ArrayDeque<>(30);
+
+    private final ExecutorService analysisExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService uploadExecutor = Executors.newSingleThreadExecutor();
+
+    // ================= SMART TRIGGER MANAGER =================
+    // STRICT ATOMIC THREAD SAFETY FOR UPLOADS & PENDING QUEUE
+    private final AtomicBoolean isProcessing = new AtomicBoolean(false);
+    private final AtomicBoolean pendingDetection = new AtomicBoolean(false);
+
+    private final AtomicLong frameCounter = new AtomicLong(0);
+    private long lastProcessedFrameId = 0;
+
+    // Tracks the last time a primary trigger (ESP32 or Periodic) fired
+    private final AtomicLong lastPrimaryTriggerTime = new AtomicLong(0);
+    // Cooldown for AI Vision: ignore AI triggers if a primary fired within this window (e.g., 3 seconds)
+    private static final long AI_VISION_COOLDOWN_MS = 3000;
+
+    // ================= SENSORS & AI VISION =================
+    private SensorManager sensorManager;
+    private Sensor accelerometer;
+    private static final float VIBRATION_THRESHOLD = 5.0f;
+    private float lastVibrationValue = 0f;
+
+    // Stores the previous frame's Y-Plane to calculate optical flow/motion difference
+    private byte[] previousYData = null;
+
+    // ================= IMAGE CONVERSION BUFFERS =================
+    // Reusable buffers to prevent memory allocation / Garbage Collection spikes at 60 FPS
+    private byte[] nv21Buffer;
+    private byte[] yRowBuffer;
+    private byte[] uRowBuffer;
+    private byte[] vRowBuffer;
+    private final ByteArrayOutputStream jpegOutputStream = new ByteArrayOutputStream();
+
+    private static class FrameData {
+
+        byte[] jpegData;
+        int width;
+        int height;
+        float qualityScore;
+
+        // Unique frame identifier
+        long frameId;
+
+        FrameData(byte[] jpegData,
+                  int width,
+                  int height,
+                  float qualityScore,
+                  long frameId) {
+
+            this.jpegData = jpegData;
+            this.width = width;
+            this.height = height;
+            this.qualityScore = qualityScore;
+            this.frameId = frameId;
+        }
+    }
+
+    private static class QualityResult {
+        float score;
+        boolean aiTriggerAnomaly;
+
+        QualityResult(float score, boolean aiTriggerAnomaly) {
+            this.score = score;
+            this.aiTriggerAnomaly = aiTriggerAnomaly;
+        }
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        previewView = findViewById(R.id.previewView);
+
+        if (checkPermissions()) {
+            initApp();
+        } else {
+            ActivityCompat.requestPermissions(this, new String[]{
+                    Manifest.permission.CAMERA,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.INTERNET
+            }, 1);
+        }
+    }
+
+    private boolean checkPermissions() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 1 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            initApp();
+        } else {
+            Log.e(TAG, "Permissions denied. App cannot function.");
+        }
+    }
+
+    private void initApp() {
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        if (sensorManager != null) {
+            accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        }
+
+        startCamera();
+        startCheckingTrigger();
+       startPeriodicAIScan();
+    }
+
+    // =========================================================
+    // CAMERA SETUP
+    // =========================================================
+
+    @SuppressLint("UnsafeOptInUsageError")
+    private void startCamera() {
+        ListenableFuture<ProcessCameraProvider> cameraProviderFuture =
+                ProcessCameraProvider.getInstance(this);
+
+        cameraProviderFuture.addListener(() -> {
+            try {
+                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+                CameraSelector cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA;
+
+                Preview preview = new Preview.Builder().build();
+                preview.setSurfaceProvider(previewView.getSurfaceProvider());
+
+                // ImageAnalysis (CameraX default AF/AE/AWB)
+                ImageAnalysis.Builder analysisBuilder = new ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .setTargetResolution(new Size(1600, 900));
+
+                ImageAnalysis imageAnalysis = analysisBuilder.build();
+
+                imageAnalysis.setAnalyzer(analysisExecutor, image -> {
+                    try {
+                        processRawFrame(image);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Frame processing failed", e);
+                    } finally {
+                        image.close();
+                    }
+                });
+
+                cameraProvider.unbindAll();
+                cameraProvider.bindToLifecycle(
+                        this,
+                        cameraSelector,
+                        preview,
+                        imageAnalysis
+                );
+
+                Log.i(TAG, "Camera started successfully");
+
+            } catch (Exception e) {
+                Log.e(TAG, "Camera initialization failed", e);
+            }
+        }, ContextCompat.getMainExecutor(this));
+    }
+
+    private Range<Integer> getBestFpsRange() {
+        try {
+            CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+            if (manager == null) return new Range<>(30, 30);
+
+            String cameraId = manager.getCameraIdList()[0];
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
+            Range<Integer>[] ranges = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+
+            if (ranges == null || ranges.length == 0) return new Range<>(30, 30);
+
+            for (Range<Integer> r : ranges) {
+                if (r.getLower() == 60 && r.getUpper() == 60) return r;
+            }
+            for (Range<Integer> r : ranges) {
+                if (r.getLower() == 30 && r.getUpper() == 30) return r;
+            }
+
+            Range<Integer> best = ranges[0];
+            for (Range<Integer> r : ranges) {
+                if (r.getUpper() > best.getUpper()) best = r;
+            }
+            return best;
+        } catch (Exception e) {
+            Log.e(TAG, "Unable to determine FPS range", e);
+            return new Range<>(30, 30);
+        }
+    }
+
+    // =========================================================
+    // REAL-TIME FRAME ANALYSIS & AI TRIGGER
+    // =========================================================
+
+    private void processRawFrame(ImageProxy image) {
+        ByteBuffer yBuffer = image.getPlanes()[0].getBuffer();
+        yBuffer.rewind(); // Crucial: ensure buffer starts at zero before reading
+        byte[] yData = new byte[yBuffer.remaining()];
+        yBuffer.get(yData);
+
+        int width = image.getWidth();
+        int height = image.getHeight();
+
+        QualityResult result = calculateQualityAndMotion(yData, width, height, image.getPlanes()[0].getRowStride());
+
+        // Reject garbage frames immediately
+        if (result.score < 0) {
+            return;
+        }
+
+        // 1. AI VISION TRIGGER (Lightweight Optical Flow Check - Secondary)
+        if (result.aiTriggerAnomaly) {
+            long now = System.currentTimeMillis();
+            // Check if a primary trigger has fired recently
+            if (now - lastPrimaryTriggerTime.get() > AI_VISION_COOLDOWN_MS) {
+                Log.d(TAG, "AI_VISION_TRIGGER: Sudden visual motion/anomaly detected! Requesting detection.");
+                requestDetection();
+            } else {
+                Log.d(TAG, "AI_VISION_TRIGGER: Anomaly detected but ignored due to recent Primary Trigger.");
+            }
+        }
+
+        // 2. Buffer the good frame (Proven Production ImageProxy to JPEG Conversion)
+        // 2. Buffer the good frame (Proven Production ImageProxy to JPEG Conversion)
+        byte[] jpegData = imageProxyToJpeg(image);
+
+        long captureTime = System.currentTimeMillis();
+        int frameHash = java.util.Arrays.hashCode(jpegData);
+
+        Log.d("FRAME_CAPTURE",
+                "NEW FRAME | " +
+                        "time=" + captureTime +
+                        " bytes=" + jpegData.length +
+                        " hash=" + frameHash +
+                        " quality=" + result.score);
+
+        synchronized (frameBuffer) {
+
+            Log.d("FRAME_BUFFER",
+                    "Before Add | size=" + frameBuffer.size());
+
+            if (frameBuffer.size() >= 30) {
+
+                FrameData removed = frameBuffer.pollFirst();
+
+                Log.d("FRAME_BUFFER",
+                        "Removed oldest hash=" +
+                                java.util.Arrays.hashCode(removed.jpegData));
+            }
+
+            FrameData newFrame = new FrameData(
+                    jpegData,
+                    width,
+                    height,
+                    result.score,
+                    frameCounter.incrementAndGet()
+            );
+
+            frameBuffer.addLast(newFrame);
+
+            Log.d("FRAME_BUFFER",
+                    "Added frameId=" + newFrame.frameId +
+                            " hash=" + java.util.Arrays.hashCode(newFrame.jpegData) +
+                            " quality=" + newFrame.qualityScore +
+                            " size=" + frameBuffer.size());
+
+            Log.d("FRAME_BUFFER",
+                    "After Add | size=" + frameBuffer.size());
+        }
+    }
+
+    private QualityResult calculateQualityAndMotion(byte[] yData, int width, int height, int rowStride) {
+        long sumBrightness = 0;
+        long laplacianSum = 0;
+        long motionDiffSum = 0;
+        int pixelCount = 0;
+        int step = 4;
+
+        // RESTRICT QUALITY SCORING TO ROAD REGION (Lower 65%)
+        int startY = (int) (height * 0.35);
+
+        for (int y = startY; y < height - 1; y += step) {
+            for (int x = 1; x < width - 1; x += step) {
+                int idx = y * rowStride + x;
+                int p = yData[idx] & 0xFF;
+                sumBrightness += p;
+                pixelCount++;
+
+                int top = yData[idx - rowStride] & 0xFF;
+                int bottom = yData[idx + rowStride] & 0xFF;
+                int left = yData[idx - 1] & 0xFF;
+                int right = yData[idx + 1] & 0xFF;
+
+                // Sharpness/Blur checking
+                laplacianSum += Math.abs((p * 4) - top - bottom - left - right);
+
+                // Motion/Optical flow checking against previous frame
+                if (previousYData != null && previousYData.length == yData.length) {
+                    int prevP = previousYData[idx] & 0xFF;
+                    motionDiffSum += Math.abs(p - prevP);
+                }
+            }
+        }
+
+        // Save current frame for the next motion check
+        if (previousYData == null || previousYData.length != yData.length) {
+            previousYData = new byte[yData.length];
+        }
+        System.arraycopy(yData, 0, previousYData, 0, yData.length);
+
+        float avgBrightness = (float) sumBrightness / pixelCount;
+        float blurVariance = (float) laplacianSum / pixelCount;
+        float motionScore = (previousYData != null) ? ((float) motionDiffSum / pixelCount) : 0;
+
+        // Hard rejections (Too dark, washed out, or too blurry)
+        if (avgBrightness < 40 || avgBrightness > 230) return new QualityResult(-1.0f, false);
+        if (blurVariance < 10.0f) return new QualityResult(-1.0f, false);
+
+        // AI Vision Trigger: Spikes in motion score indicate sudden jolts/bumps in the frame
+        boolean isAnomaly = (motionScore > 45.0f);
+
+        // Weighted Frame Stability Ranking
+        float brightnessPenalty = Math.abs(avgBrightness - 128) / 128f;
+        float motionPenalty = Math.min(motionScore / 100f, 1.0f); // Penalize frames captured exactly during a blur streak
+
+        // FINAL SCORE: 60% Sharpness, 20% Perfect Exposure, 20% Motion Stability
+        float finalScore = (blurVariance * 0.60f) + ((1.0f - brightnessPenalty) * 20.0f) + ((1.0f - motionPenalty) * 20.0f);
+
+        return new QualityResult(finalScore, isAnomaly);
+    }
+
+    /**
+     * Proven Production Implementation: ImageProxy (YUV_420_888) directly to JPEG.
+     * Extracts planes sequentially using correct row/pixel strides, avoiding
+     * device-specific array padding corruption (fixes Xiaomi, Samsung, Motorola striping).
+     * Reuses buffers strictly to maintain fast real-time CPU performance.
+     */
+    private byte[] imageProxyToJpeg(ImageProxy image) {
+        ImageProxy.PlaneProxy[] planes = image.getPlanes();
+        ByteBuffer yBuffer = planes[0].getBuffer();
+        ByteBuffer uBuffer = planes[1].getBuffer();
+        ByteBuffer vBuffer = planes[2].getBuffer();
+
+        // Rewind to ensure data extraction starts cleanly at position 0
+        yBuffer.rewind();
+        uBuffer.rewind();
+        vBuffer.rewind();
+
+        int width = image.getWidth();
+        int height = image.getHeight();
+
+        int yRowStride = planes[0].getRowStride();
+        int yPixelStride = planes[0].getPixelStride();
+        int uRowStride = planes[1].getRowStride();
+        int uPixelStride = planes[1].getPixelStride();
+        int vRowStride = planes[2].getRowStride();
+        int vPixelStride = planes[2].getPixelStride();
+
+        int ySize = width * height;
+        int uvSize = ySize / 2;
+        int nv21Size = ySize + uvSize;
+
+        // Initialize or resize reusable buffers only if strictly necessary
+        if (nv21Buffer == null || nv21Buffer.length != nv21Size) {
+            nv21Buffer = new byte[nv21Size];
+        }
+        if (yRowBuffer == null || yRowBuffer.length < yRowStride) yRowBuffer = new byte[yRowStride];
+        if (uRowBuffer == null || uRowBuffer.length < uRowStride) uRowBuffer = new byte[uRowStride];
+        if (vRowBuffer == null || vRowBuffer.length < vRowStride) vRowBuffer = new byte[vRowStride];
+
+        int pos = 0;
+
+        // 1. Properly extract Y plane (Luma) row-by-row
+        if (yRowStride == width && yPixelStride == 1) {
+            // Fast-path: Buffer is contiguous and not padded
+            yBuffer.get(nv21Buffer, 0, ySize);
+            pos += ySize;
+        } else {
+            // Slow-path: Safely strip padding away from the end of each row
+            for (int y = 0; y < height; y++) {
+                int bytesToRead = Math.min(yBuffer.remaining(), yRowStride);
+                yBuffer.get(yRowBuffer, 0, bytesToRead);
+                for (int x = 0; x < width; x++) {
+                    nv21Buffer[pos++] = yRowBuffer[x * yPixelStride];
+                }
+            }
+        }
+
+        // 2. Properly extract U and V planes (Chroma). NV21 expects V, then U.
+        int uvHeight = height / 2;
+        int uvWidth = width / 2;
+
+        for (int y = 0; y < uvHeight; y++) {
+            int vBytesToRead = Math.min(vBuffer.remaining(), vRowStride);
+            vBuffer.get(vRowBuffer, 0, vBytesToRead);
+
+            int uBytesToRead = Math.min(uBuffer.remaining(), uRowStride);
+            uBuffer.get(uRowBuffer, 0, uBytesToRead);
+
+            for (int x = 0; x < uvWidth; x++) {
+                nv21Buffer[pos++] = vRowBuffer[x * vPixelStride];
+                nv21Buffer[pos++] = uRowBuffer[x * uPixelStride];
+            }
+        }
+
+        // 3. Perform correct JPEG compression
+        // 3. Convert NV21 -> JPEG
+        YuvImage yuvImage = new YuvImage(nv21Buffer, ImageFormat.NV21, width, height, null);
+
+        jpegOutputStream.reset();
+        yuvImage.compressToJpeg(new Rect(0, 0, width, height), 90, jpegOutputStream);
+
+// 4. Decode JPEG into Bitmap
+        byte[] jpegBytes = jpegOutputStream.toByteArray();
+        Bitmap bitmap = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.length);
+
+// 5. Rotate according to CameraX metadata
+        int rotation = image.getImageInfo().getRotationDegrees();
+
+        if (rotation != 0) {
+            Matrix matrix = new Matrix();
+            matrix.postRotate(rotation);
+
+            bitmap = Bitmap.createBitmap(
+                    bitmap,
+                    0,
+                    0,
+                    bitmap.getWidth(),
+                    bitmap.getHeight(),
+                    matrix,
+                    true
+            );
+        }
+
+// 6. Compress rotated Bitmap back to JPEG
+        jpegOutputStream.reset();
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, jpegOutputStream);
+
+        bitmap.recycle();
+
+        return jpegOutputStream.toByteArray();
+    }
+
+    // =========================================================
+    // SENSOR, ESP32, & PERIODIC TRIGGERS (PRIMARY)
+    // =========================================================
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+            float x = event.values[0];
+            float y = event.values[1];
+            float z = event.values[2];
+
+            double totalAcceleration = Math.sqrt(x * x + y * y + z * z);
+            double linearAcceleration = Math.abs(totalAcceleration - SensorManager.GRAVITY_EARTH);
+            lastVibrationValue = (float) linearAcceleration;
+
+            if (linearAcceleration > VIBRATION_THRESHOLD) {
+                Log.d("VIBRATION_SENSOR", "Value: " + lastVibrationValue);
+                lastPrimaryTriggerTime.set(System.currentTimeMillis());
+                requestDetection();
+            }
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+
+    void startCheckingTrigger() {
+        new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    // Do NOT skip based on isProcessing. Just request.
+                    URL url = new URL(BASE_URL + "/check");
+                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("GET");
+                    conn.setConnectTimeout(2000);
+                    conn.setReadTimeout(2000);
+
+                    if (conn.getResponseCode() == 200) {
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                        StringBuilder builder = new StringBuilder();
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            builder.append(line);
+                        }
+
+                        JSONObject json = new JSONObject(builder.toString());
+                        if (json.getBoolean("capture")) {
+                            Log.d(TAG, "ESP32 POTHOLE TRIGGER");
+                            lastPrimaryTriggerTime.set(System.currentTimeMillis());
+                            requestDetection();
+                        }
+                    }
+                    conn.disconnect();
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception e) {
+                    try { Thread.sleep(2000); } catch (Exception ignored) {}
+                }
+            }
+        }).start();
+    }
+
+    void startPeriodicAIScan() {
+        new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    Thread.sleep(3000); // Periodic live detection
+                    Log.d(TAG, "Running periodic scan");
+                    lastPrimaryTriggerTime.set(System.currentTimeMillis());
+                    requestDetection();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception e) {
+                    Log.e(TAG, "Periodic scan failed", e);
+                }
+            }
+        }).start();
+    }
+
+    // =========================================================
+    // SMART TRIGGER MANAGER
+    // =========================================================
+
+    /**
+     * Replaces the old processLatestClip logic. Acts as the Central Trigger Manager.
+     * Starts detection immediately if free, otherwise schedules EXACTLY ONE pending detection.
+     */
+    void requestDetection() {
+
+        Log.d("REQUEST_DEBUG",
+                "requestDetection()" +
+                        " | processing=" + isProcessing.get() +
+                        " | pending=" + pendingDetection.get() +
+                        " | bufferSize=" + frameBuffer.size());
+
+        if (isProcessing.compareAndSet(false, true)) {
+
+            Log.d(TAG, "Starting new detection sequence.");
+
+            executeDetectionSequence();
+
+        } else {
+
+            // Already processing - safely queue ONE smart pending detection
+            pendingDetection.set(true);
+
+            Log.d(TAG, "Detection currently running. Request logged as PENDING.");
+        }
+    }
+
+    private void executeDetectionSequence() {
+        analysisExecutor.execute(() -> {
+            try {
+                List<FrameData> selectedFrames;
+
+                synchronized (frameBuffer) {
+
+                    if (frameBuffer.isEmpty()) {
+                        Log.d(TAG, "Frame buffer is empty. Aborting.");
+                        finishDetection();
+                        return;
+                    }
+
+                    Log.d("FRAME_BUFFER", "================================");
+                    Log.d("FRAME_BUFFER", "Buffer Size = " + frameBuffer.size());
+
+                    int idx = 0;
+                    for (FrameData frame : frameBuffer) {
+                        Log.d("FRAME_BUFFER",
+                                "Buffer[" + idx + "]" +
+                                        " bytes=" + frame.jpegData.length +
+                                        " hash=" + java.util.Arrays.hashCode(frame.jpegData) +
+                                        " quality=" + frame.qualityScore);
+                        idx++;
+                    }
+
+                    // Select the BEST 10 frames based on weighted stability ranking
+                    // Select only NEW frames that haven't been processed yet
+                    selectedFrames = frameBuffer.stream()
+                            .filter(f -> f.frameId > lastProcessedFrameId)
+                            .sorted((a, b) -> Float.compare(b.qualityScore, a.qualityScore))
+                            .limit(10)
+                            .collect(Collectors.toList());
+                }
+
+                Log.d("FRAME_SELECTION", "========== SELECTED ==========");
+
+                for (int i = 0; i < selectedFrames.size(); i++) {
+
+                    FrameData frame = selectedFrames.get(i);
+
+                    Log.d("FRAME_SELECTION",
+                            "Selected[" + i + "]" +
+                                    " frameId=" + frame.frameId +
+                                    " bytes=" + frame.jpegData.length +
+                                    " hash=" + java.util.Arrays.hashCode(frame.jpegData) +
+                                    " quality=" + frame.qualityScore);
+                }
+
+                Log.d("FRAME_SELECTION", "==============================");
+                Log.d(TAG, "Selected " + selectedFrames.size() + " best frames from RAM.");
+
+// Do not upload if there are no new frames
+                if (selectedFrames.isEmpty()) {
+                    Log.d(TAG, "No new frames available. Skipping upload.");
+                    finishDetection();
+                    return;
+                }
+
+                getLocationAndUpload(selectedFrames);
+
+            } catch (Exception e) {
+                Log.e(TAG, "Frame selection failed", e);
+                finishDetection();
+            }
+        });
+    }
+
+    private void finishDetection() {
+        // Release the primary lock
+        isProcessing.set(false);
+
+        // Check if a new trigger fired while we were processing
+        if (pendingDetection.compareAndSet(true, false)) {
+            Log.d(TAG, "Pending detection found. Starting follow-up detection immediately.");
+            requestDetection();
+        }
+    }
+
+    // =========================================================
+    // UPLOAD LOGIC
+    // =========================================================
+
+    void getLocationAndUpload(List<FrameData> frames) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Log.e(TAG, "Location permission missing.");
+            finishDetection();
+            return;
+        }
+
+        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                .addOnSuccessListener(location -> {
+                    if (location != null) {
+                        uploadImages(frames, location);
+                    } else {
+                        Log.w(TAG, "Location is null, dropping upload.");
+                        finishDetection();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Location request failed", e);
+                    finishDetection();
+                });
+    }
+
+    void uploadImages(List<FrameData> frames, Location location) {
+
+        // Safety check
+        if (frames == null || frames.isEmpty()) {
+            Log.d("UPLOAD", "No frames to upload. Skipping request.");
+            finishDetection();
+            return;
+        }
+
+        uploadExecutor.execute(() -> {
+            HttpURLConnection conn = null;
+            try {
+                Log.d("UPLOAD", "Starting background multipart upload...");
+                String boundary = "----Boundary" + System.currentTimeMillis();
+                URL url = new URL(BASE_URL + "/analyze");
+
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setDoOutput(true);
+                conn.setDoInput(true);
+                conn.setUseCaches(false);
+                conn.setConnectTimeout(30000);
+                conn.setReadTimeout(30000);
+                conn.setRequestProperty("Connection", "Keep-Alive");
+                conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+                DataOutputStream dos = new DataOutputStream(conn.getOutputStream());
+
+                // Directly upload the pre-compressed JPEG data stream
+                // Directly upload the pre-compressed JPEG data stream
+                for (int i = 0; i < frames.size(); i++) {
+
+                    FrameData frame = frames.get(i);
+
+                    Log.d("UPLOAD_DEBUG",
+                            "Uploading Frame[" + i + "]" +
+                                    " | bytes=" + frame.jpegData.length +
+                                    " | hash=" + java.util.Arrays.hashCode(frame.jpegData) +
+                                    " | quality=" + frame.qualityScore);
+
+                    Log.d("UPLOAD", "Sending in-memory frame: frame_" + i + ".jpg");
+
+                    dos.writeBytes("--" + boundary + "\r\n");
+                    dos.writeBytes("Content-Disposition: form-data; name=\"image\"; filename=\"frame_" + i + ".jpg\"\r\n");
+                    dos.writeBytes("Content-Type: image/jpeg\r\n\r\n");
+
+                    dos.write(frame.jpegData);
+
+                    dos.writeBytes("\r\n");
+                }
+
+                // Metadata
+                dos.writeBytes("--" + boundary + "\r\n");
+                dos.writeBytes("Content-Disposition: form-data; name=\"lat\"\r\n\r\n");
+                dos.writeBytes(location.getLatitude() + "\r\n");
+
+                dos.writeBytes("--" + boundary + "\r\n");
+                dos.writeBytes("Content-Disposition: form-data; name=\"lon\"\r\n\r\n");
+                dos.writeBytes(location.getLongitude() + "\r\n");
+
+                dos.writeBytes("--" + boundary + "\r\n");
+                dos.writeBytes("Content-Disposition: form-data; name=\"vibration\"\r\n\r\n");
+                dos.writeBytes(lastVibrationValue + "\r\n");
+
+                dos.writeBytes("--" + boundary + "--\r\n");
+                dos.flush();
+                dos.close();
+
+                Log.d("UPLOAD", "Waiting for server response...");
+                int response = conn.getResponseCode();
+                Log.d("UPLOAD", "Response code: " + response);
+
+                if (response >= 200 && response < 300) {
+
+                    // Mark uploaded frames as processed
+                    lastProcessedFrameId = frames.stream()
+                            .mapToLong(f -> f.frameId)
+                            .max()
+                            .orElse(lastProcessedFrameId);
+
+                    Log.d("FRAME_FILTER",
+                            "Updated lastProcessedFrameId = " + lastProcessedFrameId);
+                }
+
+                BufferedReader reader;
+                if (response >= 200 && response < 300) {
+                    reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                } else {
+                    reader = new BufferedReader(new InputStreamReader(conn.getErrorStream()));
+                }
+
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    Log.d("UPLOAD_RESPONSE", line);
+                }
+                reader.close();
+                Log.d("UPLOAD", "Upload completed successfully");
+
+            } catch (Exception e) {
+                Log.e("UPLOAD", "Upload failed", e);
+            } finally {
+                if (conn != null) conn.disconnect();
+                // Ensure finishDetection() is unconditionally called
+                finishDetection();
+            }
+        });
+    }
+
+    // =========================================================
+    // LIFECYCLE
+    // =========================================================
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (sensorManager != null && accelerometer != null) {
+            sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (sensorManager != null) {
+            sensorManager.unregisterListener(this);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (analysisExecutor != null && !analysisExecutor.isShutdown()) {
+            analysisExecutor.shutdownNow();
+        }
+        if (uploadExecutor != null && !uploadExecutor.isShutdown()) {
+            uploadExecutor.shutdownNow();
+        }
+        synchronized (frameBuffer) {
+            frameBuffer.clear();
+        }
+        super.onDestroy();
+    }
+}

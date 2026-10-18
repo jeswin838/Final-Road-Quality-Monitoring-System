@@ -1,0 +1,308 @@
+#include <Arduino.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+// ================= WIFI =================
+const char* ssid = "Badwolf";
+const char* password = "badwolfjes";
+
+// ================= SERVER =================
+String server = "http://10.137.240.180:5000/trigger";
+
+// ================= PINS =================
+#define TRIG_PIN 5
+#define ECHO_PIN 18
+#define VIBRATION_PIN 34
+
+// ================= SETTINGS =================
+
+// ================= DETECTION SETTINGS =================
+
+// Increase threshold to reduce false detections
+#define POTHOLE_THRESHOLD 4.0f
+
+// Road considered normal again
+#define RESET_THRESHOLD 1.0f
+
+// Number of consecutive normal readings before re-arming
+#define NORMAL_READINGS 10
+
+// ================= VARIABLES =================
+long duration;
+
+float dist = 0;
+
+float filteredDist = 0;
+
+float baseDistance = 0;
+
+float difference = 0;
+
+// ================= STATE MACHINE =================
+bool potholeActive = false;
+int normalRoadCounter = 0;
+
+// ================= NEW VARIABLES =================
+int potholeCounter = 0;
+unsigned long potholeTime = 0;
+
+// ================= DISTANCE =================
+float getDistance() {
+
+  digitalWrite(TRIG_PIN, LOW);
+
+  delayMicroseconds(2);
+
+  digitalWrite(TRIG_PIN, HIGH);
+
+  delayMicroseconds(10);
+
+  digitalWrite(TRIG_PIN, LOW);
+
+  duration = pulseIn(
+      ECHO_PIN,
+      HIGH,
+      30000
+  );
+
+  if (duration == 0)
+    return -1;
+
+  return duration * 0.034 / 2;
+}
+
+// ================= SEND =================
+void sendToServer(
+    float diff,
+    int vibration
+) {
+
+  if (WiFi.status() != WL_CONNECTED) {
+
+    Serial.println("❌ WiFi disconnected");
+
+    return;
+  }
+
+  HTTPClient http;
+
+  http.begin(server);
+
+  http.addHeader(
+      "Content-Type",
+      "application/x-www-form-urlencoded"
+  );
+
+  String data =
+      "depth=" + String(diff) +
+      "&vibration=" + String(vibration);
+
+  Serial.println("📡 Sending pothole");
+
+  int responseCode =
+      http.POST(data);
+
+  Serial.print("🌐 Response: ");
+
+  Serial.println(responseCode);
+
+  http.end();
+}
+
+
+// ================= POTHOLE DETECTION =================
+void detectPothole(float difference, int vibration) {
+
+    // ---------- Already inside pothole ----------
+   if (potholeActive) {
+
+    if (difference <= RESET_THRESHOLD) {
+
+        normalRoadCounter++;
+
+        Serial.print("Normal Count: ");
+        Serial.println(normalRoadCounter);
+
+        if (normalRoadCounter >= NORMAL_READINGS) {
+
+            potholeActive = false;
+            normalRoadCounter = 0;
+            potholeCounter = 0;
+
+            Serial.println("✅ Ready for next pothole");
+        }
+
+    } else {
+
+        normalRoadCounter = 0;
+    }
+
+    if (millis() - potholeTime > 3000) {
+
+        potholeActive = false;
+        normalRoadCounter = 0;
+        potholeCounter = 0;
+
+        Serial.println("⏰ Timeout Reset");
+        Serial.println("✅ Ready for next pothole");
+    }
+
+    // IMPORTANT
+    return;
+}
+    // ---------- Detect new pothole ----------
+
+    if (difference >= POTHOLE_THRESHOLD) {
+    potholeCounter++;
+} else {
+    potholeCounter = 0;
+}
+
+Serial.print("Pothole Counter: ");
+Serial.println(potholeCounter);
+    
+    // Require 3 consecutive detections
+   if (potholeCounter >= 3 && vibration == 1) {
+
+    Serial.println("======================");
+    Serial.println("🚨 POTHOLE DETECTED");
+
+    Serial.print("Depth: ");
+    Serial.println(difference);
+
+    Serial.print("Vibration: ");
+    Serial.println(vibration);
+
+    Serial.print("Time: ");
+    Serial.println(millis());
+
+    sendToServer(difference, vibration);
+
+    potholeActive = true;
+    Serial.println("Entering pothole mode...");
+    potholeTime = millis();
+
+    potholeCounter = 0;
+    normalRoadCounter = 0;
+}
+}
+// ================= SETUP =================
+void setup() {
+
+  Serial.begin(115200);
+
+  pinMode(TRIG_PIN, OUTPUT);
+
+  pinMode(ECHO_PIN, INPUT);
+
+  pinMode(VIBRATION_PIN, INPUT);
+
+  // WIFI
+  WiFi.begin(ssid, password);
+
+  Serial.print("📶 Connecting");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    Serial.print(" Status=");
+    Serial.println(WiFi.status());
+    delay(1000);
+}
+
+  Serial.println("\n✅ WiFi Connected");
+
+  // ================= BASE DISTANCE =================
+
+  Serial.println(
+      "\nKeep sensor on NORMAL ROAD..."
+  );
+
+  Serial.println("\nKeep sensor on NORMAL ROAD...");
+
+float sum = 0;
+int validReadings = 0;
+
+while (validReadings < 20) {
+
+    float temp = getDistance();
+
+    if (temp > 0) {
+
+        sum += temp;
+        validReadings++;
+
+        Serial.print("Calibration ");
+        Serial.print(validReadings);
+        Serial.println("/20");
+    }
+
+    delay(100);
+}
+
+baseDistance = sum / 20.0;
+
+  filteredDist = baseDistance;
+
+  Serial.println("======================");
+
+  Serial.print("✅ BASE DISTANCE: ");
+
+  Serial.println(baseDistance);
+
+  Serial.println("======================");
+}
+
+// ================= LOOP =================
+void loop() {
+
+  dist = getDistance();
+
+  int vibration =
+      digitalRead(VIBRATION_PIN);
+
+  // INVALID
+if (dist <= 0) {
+    return;
+}
+
+  // FAST RESPONSE FILTER
+// Smoother filter to reduce hand movement noise
+filteredDist =
+      (filteredDist * 0.6f) +
+      (dist * 0.4f);
+
+  // DIFFERENCE
+  difference =
+      filteredDist - baseDistance;
+
+  // Ignore upward bumps
+  if (difference < 0)
+    difference = 0;
+
+  // Slowly update the base distance only when the road is normal
+if (!potholeActive && difference < RESET_THRESHOLD) {
+    baseDistance = (baseDistance * 0.98f) + (filteredDist * 0.02f);
+}
+
+  // ================= DEBUG =================
+
+  Serial.print("Normal: ");
+
+  Serial.print(baseDistance);
+
+  Serial.print(" Current: ");
+
+  Serial.print(filteredDist);
+
+  Serial.print(" Difference: ");
+
+  Serial.print(difference);
+
+  Serial.print(" Vib: ");
+
+  Serial.println(vibration);
+
+detectPothole(difference, vibration);
+
+delay(70);
+}
